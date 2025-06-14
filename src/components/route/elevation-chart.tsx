@@ -18,8 +18,10 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
   onPointHover,
   hoveredSegment 
 }) => {
-  // Mock data if no real data provided
-  const mockData: ElevationPoint[] = [
+  console.log('ElevationChart received data:', elevationData.length, 'points');
+
+  // Usar datos reales si están disponibles, sino datos mock
+  const data = elevationData.length > 0 ? elevationData : [
     { distance: 0, elevation: 1200, segmentIndex: 0 },
     { distance: 3.2, elevation: 1350, segmentIndex: 0 },
     { distance: 6.0, elevation: 1630, segmentIndex: 1 },
@@ -28,10 +30,10 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
     { distance: 16.0, elevation: 1460, segmentIndex: 4 },
   ];
 
-  const data = elevationData.length > 0 ? elevationData : mockData;
-
   // Calculate stats and chart dimensions
   const { stats, chartData } = useMemo(() => {
+    console.log('Calculating chart stats for', data.length, 'points');
+    
     const totalGain = data.reduce((acc, point, index) => {
       if (index === 0) return 0;
       const diff = point.elevation - data[index - 1].elevation;
@@ -128,16 +130,25 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
     return { xLines, yLines };
   }, [xScale, yScale, minDistance, maxDistance, minElevation, maxElevation, width, height, padding]);
 
+  const isUsingRealData = elevationData.length > 0;
+
   return (
     <div className="h-80 bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 p-6">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-          Elevation Profile
-        </h3>
+        <div>
+          <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
+            Perfil de Elevación
+          </h3>
+          {!isUsingRealData && (
+            <p className="text-xs text-orange-600 dark:text-orange-400">
+              Mostrando datos de ejemplo - procesando datos reales...
+            </p>
+          )}
+        </div>
         <div className="flex gap-4 text-sm text-mountain-600 dark:text-mountain-400">
-          <span>↗ Gain: +{Math.round(stats.totalGain)}m</span>
-          <span>↘ Loss: -{Math.round(stats.totalLoss)}m</span>
-          <span>📏 Distance: {stats.totalDistance.toFixed(1)}km</span>
+          <span>↗ Ganancia: +{Math.round(stats.totalGain)}m</span>
+          <span>↘ Pérdida: -{Math.round(stats.totalLoss)}m</span>
+          <span>📏 Distancia: {stats.totalDistance.toFixed(1)}km</span>
         </div>
       </div>
       
@@ -150,8 +161,8 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
           {/* Gradient definition */}
           <defs>
             <linearGradient id="elevationGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="rgb(34, 197, 94)" stopOpacity={0.6} />
-              <stop offset="100%" stopColor="rgb(34, 197, 94)" stopOpacity={0.1} />
+              <stop offset="0%" stopColor={isUsingRealData ? "rgb(34, 197, 94)" : "rgb(249, 115, 22)"} stopOpacity={0.6} />
+              <stop offset="100%" stopColor={isUsingRealData ? "rgb(34, 197, 94)" : "rgb(249, 115, 22)"} stopOpacity={0.1} />
             </linearGradient>
           </defs>
 
@@ -191,7 +202,7 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
           <path
             d={pathData}
             fill="none"
-            stroke="rgb(34, 197, 94)"
+            stroke={isUsingRealData ? "rgb(34, 197, 94)" : "rgb(249, 115, 22)"}
             strokeWidth={2}
           />
 
@@ -202,7 +213,7 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
               cx={xScale(point.distance)}
               cy={yScale(point.elevation)}
               r={point.segmentIndex === hoveredSegment ? 6 : 4}
-              fill={point.segmentIndex === hoveredSegment ? "rgb(239, 68, 68)" : "rgb(34, 197, 94)"}
+              fill={point.segmentIndex === hoveredSegment ? "rgb(239, 68, 68)" : (isUsingRealData ? "rgb(34, 197, 94)" : "rgb(249, 115, 22)")}
               stroke="white"
               strokeWidth={2}
               className="cursor-pointer hover:r-6 transition-all"
@@ -250,7 +261,7 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
             fill="currentColor"
             className="text-mountain-700 dark:text-mountain-300"
           >
-            Distance (km)
+            Distancia (km)
           </text>
           <text
             x={15}
@@ -261,7 +272,7 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
             className="text-mountain-700 dark:text-mountain-300"
             transform={`rotate(-90, 15, ${height / 2})`}
           >
-            Elevation (m)
+            Elevación (m)
           </text>
         </svg>
       </div>
