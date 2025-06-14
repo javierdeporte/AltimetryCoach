@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState } from 'react';
 import { Button } from '../ui/button';
 import { Upload, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
@@ -148,15 +147,15 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
   const getStatusIcon = () => {
     switch (uploadStatus) {
       case 'uploading':
-        return <Upload className="h-8 w-8 text-primary-500 animate-pulse" />;
+        return <Upload className="h-5 w-5 text-primary-500 animate-pulse" />;
       case 'success':
-        return <CheckCircle className="h-8 w-8 text-green-500" />;
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
       case 'error':
-        return <AlertCircle className="h-8 w-8 text-red-500" />;
+        return <AlertCircle className="h-5 w-5 text-red-500" />;
       case 'duplicate':
-        return <AlertTriangle className="h-8 w-8 text-yellow-500" />;
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
       default:
-        return <Upload className={`h-8 w-8 ${isDragOver ? 'text-primary-600' : 'text-primary-500'}`} />;
+        return <Upload className={`h-5 w-5 ${isDragOver ? 'text-primary-600' : 'text-primary-500'}`} />;
     }
   };
 
@@ -180,7 +179,7 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
   const getStatusTitle = () => {
     switch (uploadStatus) {
       case 'uploading':
-        return 'Procesando tu ruta...';
+        return 'Procesando...';
       case 'success':
         return '¡Éxito!';
       case 'error':
@@ -188,106 +187,94 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
       case 'duplicate':
         return 'Posible Duplicado';
       default:
-        return 'Sube tu archivo GPX';
+        return 'Subir archivo GPX';
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div
-        className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 ${getStatusColor()}`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <div className="space-y-6">
-          <div className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center ${
-            uploadStatus === 'uploading' ? 'bg-primary-100 dark:bg-primary-900' : 
-            uploadStatus === 'success' ? 'bg-green-100 dark:bg-green-900' :
-            uploadStatus === 'error' ? 'bg-red-100 dark:bg-red-900' :
-            uploadStatus === 'duplicate' ? 'bg-yellow-100 dark:bg-yellow-900' :
-            isDragOver ? 'bg-primary-100 dark:bg-primary-900' : 'bg-primary-50 dark:bg-mountain-700'
-          }`}>
-            {getStatusIcon()}
-          </div>
-          
-          <div>
-            <h3 className="text-xl font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-              {getStatusTitle()}
-            </h3>
-            <p className="text-mountain-600 dark:text-mountain-400 mb-4">
-              {uploadMessage || (uploadStatus === 'idle' ? 'Arrastra y suelta tu archivo GPX aquí, o haz clic para explorar' : '')}
-            </p>
-          </div>
-
-          {uploadStatus === 'idle' && (
-            <div className="space-y-4">
-              <input
-                type="file"
-                accept=".gpx"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="gpx-upload"
-              />
-              <label htmlFor="gpx-upload">
-                <Button
-                  asChild
-                  className="bg-primary-600 hover:bg-primary-700 text-white cursor-pointer"
-                >
-                  <span>Seleccionar archivo GPX</span>
-                </Button>
-              </label>
-              
-              <p className="text-sm text-mountain-500 dark:text-mountain-400">
-                Soporta archivos .gpx hasta 10MB
-              </p>
-            </div>
-          )}
-
-          {uploadStatus === 'uploading' && (
-            <div className="w-full bg-primary-200 dark:bg-mountain-700 rounded-full h-2">
-              <div className="bg-primary-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
-            </div>
-          )}
-
-          {uploadStatus === 'duplicate' && (
-            <div className="space-y-3">
-              <div className="flex gap-3 justify-center">
-                <Button
-                  onClick={handleViewExisting}
-                  variant="outline"
-                  className="border-yellow-500 text-yellow-700 hover:bg-yellow-50"
-                >
-                  Ver Existente
-                </Button>
-                <Button
-                  onClick={handleContinueUpload}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                >
-                  Subir Igualmente
-                </Button>
-              </div>
-              <Button
-                onClick={resetUpload}
-                variant="ghost"
-                size="sm"
-              >
-                Cancelar
-              </Button>
-            </div>
-          )}
-
-          {uploadStatus === 'error' && (
-            <Button
-              onClick={resetUpload}
-              variant="outline"
-              className="mt-4"
-            >
-              Intentar de nuevo
-            </Button>
-          )}
+    <div
+      className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300 ${getStatusColor()}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <div className="flex items-center justify-center gap-4">
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+          uploadStatus === 'uploading' ? 'bg-primary-100 dark:bg-primary-900' : 
+          uploadStatus === 'success' ? 'bg-green-100 dark:bg-green-900' :
+          uploadStatus === 'error' ? 'bg-red-100 dark:bg-red-900' :
+          uploadStatus === 'duplicate' ? 'bg-yellow-100 dark:bg-yellow-900' :
+          isDragOver ? 'bg-primary-100 dark:bg-primary-900' : 'bg-primary-50 dark:bg-mountain-700'
+        }`}>
+          {getStatusIcon()}
         </div>
+        
+        <div className="flex-1 text-left">
+          <h4 className="font-medium text-mountain-800 dark:text-mountain-200 mb-1">
+            {getStatusTitle()}
+          </h4>
+          <p className="text-sm text-mountain-600 dark:text-mountain-400">
+            {uploadMessage || (uploadStatus === 'idle' ? 'Arrastra un archivo GPX aquí o haz clic para explorar' : '')}
+          </p>
+        </div>
+
+        {uploadStatus === 'idle' && (
+          <div>
+            <input
+              type="file"
+              accept=".gpx"
+              onChange={handleFileSelect}
+              className="hidden"
+              id="gpx-upload"
+            />
+            <label htmlFor="gpx-upload">
+              <Button
+                asChild
+                size="sm"
+                className="bg-primary-600 hover:bg-primary-700 text-white cursor-pointer"
+              >
+                <span>Seleccionar</span>
+              </Button>
+            </label>
+          </div>
+        )}
+
+        {uploadStatus === 'duplicate' && (
+          <div className="flex gap-2">
+            <Button
+              onClick={handleViewExisting}
+              variant="outline"
+              size="sm"
+              className="border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+            >
+              Ver Existente
+            </Button>
+            <Button
+              onClick={handleContinueUpload}
+              size="sm"
+              className="bg-yellow-600 hover:bg-yellow-700 text-white"
+            >
+              Subir Igualmente
+            </Button>
+          </div>
+        )}
+
+        {uploadStatus === 'error' && (
+          <Button
+            onClick={resetUpload}
+            variant="outline"
+            size="sm"
+          >
+            Reintentar
+          </Button>
+        )}
       </div>
+
+      {uploadStatus === 'uploading' && (
+        <div className="w-full bg-primary-200 dark:bg-mountain-700 rounded-full h-1 mt-3">
+          <div className="bg-primary-600 h-1 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+        </div>
+      )}
     </div>
   );
 };
