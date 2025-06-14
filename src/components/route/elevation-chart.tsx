@@ -18,45 +18,64 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
   onPointHover,
   hoveredSegment 
 }) => {
-  console.log('ElevationChart received data:', elevationData.length, 'points');
+  console.log('ElevationChart render with', elevationData.length, 'points');
 
-  // Usar datos reales si están disponibles, sino datos mock
-  const data = elevationData.length > 0 ? elevationData : [
-    { distance: 0, elevation: 1200, segmentIndex: 0 },
-    { distance: 3.2, elevation: 1350, segmentIndex: 0 },
-    { distance: 6.0, elevation: 1630, segmentIndex: 1 },
-    { distance: 10.1, elevation: 1510, segmentIndex: 2 },
-    { distance: 13.6, elevation: 1270, segmentIndex: 3 },
-    { distance: 16.0, elevation: 1460, segmentIndex: 4 },
-  ];
+  // Validar datos de entrada
+  const validData = useMemo(() => {
+    if (!Array.isArray(elevationData) || elevationData.length === 0) {
+      console.log('No valid elevation data, using mock data');
+      return [
+        { distance: 0, elevation: 1200, segmentIndex: 0 },
+        { distance: 3.2, elevation: 1350, segmentIndex: 0 },
+        { distance: 6.0, elevation: 1630, segmentIndex: 1 },
+        { distance: 10.1, elevation: 1510, segmentIndex: 2 },
+        { distance: 13.6, elevation: 1270, segmentIndex: 3 },
+        { distance: 16.0, elevation: 1460, segmentIndex: 4 },
+      ];
+    }
+    return elevationData.slice(0, 100); // Limitar a 100 puntos para rendimiento
+  }, [elevationData]);
 
-  // Calculate stats and chart dimensions
-  const { stats, chartData } = useMemo(() => {
-    console.log('Calculating chart stats for', data.length, 'points');
+  const isUsingRealData = elevationData.length > 0;
+
+  // Calcular estadísticas básicas de forma segura
+  const stats = useMemo(() => {
+    if (validData.length === 0) {
+      return { totalGain: 0, totalLoss: 0, totalDistance: 0 };
+    }
+
+    let totalGain = 0;
+    let totalLoss = 0;
     
-    const totalGain = data.reduce((acc, point, index) => {
-      if (index === 0) return 0;
-      const diff = point.elevation - data[index - 1].elevation;
-      return acc + (diff > 0 ? diff : 0);
-    }, 0);
+    for (let i = 1; i < validData.length; i++) {
+      const diff = validData[i].elevation - validData[i - 1].elevation;
+      if (diff > 0) {
+        totalGain += diff;
+      } else {
+        totalLoss += Math.abs(diff);
+      }
+    }
 
-    const totalLoss = data.reduce((acc, point, index) => {
-      if (index === 0) return 0;
-      const diff = point.elevation - data[index - 1].elevation;
-      return acc + (diff < 0 ? Math.abs(diff) : 0);
-    }, 0);
+    const totalDistance = validData[validData.length - 1]?.distance || 0;
 
-    const totalDistance = data[data.length - 1]?.distance || 0;
+    return { totalGain, totalLoss, totalDistance };
+  }, [validData]);
 
-    // Chart dimensions and scales
+  // Generar datos del gráfico de forma simple
+  const chartData = useMemo(() => {
+    if (validData.length === 0) return null;
+
     const width = 600;
     const height = 200;
     const padding = { top: 20, right: 20, bottom: 40, left: 60 };
     
-    const minDistance = Math.min(...data.map(d => d.distance));
-    const maxDistance = Math.max(...data.map(d => d.distance));
-    const minElevation = Math.min(...data.map(d => d.elevation));
-    const maxElevation = Math.max(...data.map(d => d.elevation));
+    const distances = validData.map(d => d.distance);
+    const elevations = validData.map(d => d.elevation);
+    
+    const minDistance = Math.min(...distances);
+    const maxDistance = Math.max(...distances);
+    const minElevation = Math.min(...elevations);
+    const maxElevation = Math.max(...elevations);
     
     const xScale = (distance: number) => 
       padding.left + ((distance - minDistance) / (maxDistance - minDistance)) * (width - padding.left - padding.right);
@@ -64,73 +83,41 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
     const yScale = (elevation: number) => 
       padding.top + ((maxElevation - elevation) / (maxElevation - minElevation)) * (height - padding.top - padding.bottom);
 
-    // Generate path data
-    const pathData = data.map((point, index) => {
-      const x = xScale(point.distance);
-      const y = yScale(point.elevation);
-      return index === 0 ? `M ${x} ${y}` : `L ${x} ${y}`;
-    }).join(' ');
+    const points = validData.map(point => ({
+      x: xScale(point.distance),
+      y: yScale(point.elevation),
+      ...point
+    }));
 
-    // Generate area path data
-    const areaData = pathData + ` L ${xScale(data[data.length - 1].distance)} ${height - padding.bottom} L ${xScale(data[0].distance)} ${height - padding.bottom} Z`;
+    const pathData = points.map((point, index) => 
+      index === 0 ? `M ${point.x} ${point.y}` : `L ${point.x} ${point.y}`
+    ).join(' ');
+
+    const areaData = pathData + ` L ${points[points.length - 1].x} ${height - padding.bottom} L ${points[0].x} ${height - padding.bottom} Z`;
 
     return {
-      stats: { totalGain, totalLoss, totalDistance },
-      chartData: {
-        width,
-        height,
-        padding,
-        xScale,
-        yScale,
-        pathData,
-        areaData,
-        minDistance,
-        maxDistance,
-        minElevation,
-        maxElevation
-      }
+      width,
+      height,
+      padding,
+      points,
+      pathData,
+      areaData,
+      minDistance,
+      maxDistance,
+      minElevation,
+      maxElevation
     };
-  }, [data]);
+  }, [validData]);
 
-  const { width, height, padding, xScale, yScale, pathData, areaData, minDistance, maxDistance, minElevation, maxElevation } = chartData;
-
-  // Generate grid lines
-  const gridLines = useMemo(() => {
-    const xTicks = 5;
-    const yTicks = 4;
-    const xLines = [];
-    const yLines = [];
-
-    // X grid lines
-    for (let i = 0; i <= xTicks; i++) {
-      const distance = minDistance + (maxDistance - minDistance) * (i / xTicks);
-      const x = xScale(distance);
-      xLines.push({
-        x1: x,
-        y1: padding.top,
-        x2: x,
-        y2: height - padding.bottom,
-        label: distance.toFixed(1)
-      });
-    }
-
-    // Y grid lines
-    for (let i = 0; i <= yTicks; i++) {
-      const elevation = minElevation + (maxElevation - minElevation) * (i / yTicks);
-      const y = yScale(elevation);
-      yLines.push({
-        x1: padding.left,
-        y1: y,
-        x2: width - padding.right,
-        y2: y,
-        label: Math.round(elevation).toString()
-      });
-    }
-
-    return { xLines, yLines };
-  }, [xScale, yScale, minDistance, maxDistance, minElevation, maxElevation, width, height, padding]);
-
-  const isUsingRealData = elevationData.length > 0;
+  if (!chartData) {
+    return (
+      <div className="h-80 bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 p-6">
+        <div className="flex items-center justify-center h-full">
+          <p className="text-mountain-600 dark:text-mountain-400">No hay datos de elevación disponibles</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-80 bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 p-6">
@@ -154,11 +141,10 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
       
       <div className="w-full h-64 overflow-hidden">
         <svg
-          viewBox={`0 0 ${width} ${height}`}
+          viewBox={`0 0 ${chartData.width} ${chartData.height}`}
           className="w-full h-full"
           preserveAspectRatio="xMidYMid meet"
         >
-          {/* Gradient definition */}
           <defs>
             <linearGradient id="elevationGradient" x1="0%" y1="0%" x2="0%" y2="100%">
               <stop offset="0%" stopColor={isUsingRealData ? "rgb(34, 197, 94)" : "rgb(249, 115, 22)"} stopOpacity={0.6} />
@@ -166,96 +152,40 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
             </linearGradient>
           </defs>
 
-          {/* Grid lines */}
-          {gridLines.yLines.map((line, index) => (
-            <line
-              key={`y-grid-${index}`}
-              x1={line.x1}
-              y1={line.y1}
-              x2={line.x2}
-              y2={line.y2}
-              stroke="rgb(203, 213, 225)"
-              strokeWidth={0.5}
-              opacity={0.5}
-            />
-          ))}
-          {gridLines.xLines.map((line, index) => (
-            <line
-              key={`x-grid-${index}`}
-              x1={line.x1}
-              y1={line.y1}
-              x2={line.x2}
-              y2={line.y2}
-              stroke="rgb(203, 213, 225)"
-              strokeWidth={0.5}
-              opacity={0.3}
-            />
-          ))}
-
           {/* Area fill */}
           <path
-            d={areaData}
+            d={chartData.areaData}
             fill="url(#elevationGradient)"
           />
 
           {/* Elevation line */}
           <path
-            d={pathData}
+            d={chartData.pathData}
             fill="none"
             stroke={isUsingRealData ? "rgb(34, 197, 94)" : "rgb(249, 115, 22)"}
             strokeWidth={2}
           />
 
           {/* Data points */}
-          {data.map((point, index) => (
+          {chartData.points.map((point, index) => (
             <circle
               key={index}
-              cx={xScale(point.distance)}
-              cy={yScale(point.elevation)}
+              cx={point.x}
+              cy={point.y}
               r={point.segmentIndex === hoveredSegment ? 6 : 4}
               fill={point.segmentIndex === hoveredSegment ? "rgb(239, 68, 68)" : (isUsingRealData ? "rgb(34, 197, 94)" : "rgb(249, 115, 22)")}
               stroke="white"
               strokeWidth={2}
-              className="cursor-pointer hover:r-6 transition-all"
+              className="cursor-pointer transition-all"
               onMouseEnter={() => onPointHover?.(point.segmentIndex ?? null)}
               onMouseLeave={() => onPointHover?.(null)}
             />
           ))}
 
-          {/* X Axis labels */}
-          {gridLines.xLines.map((line, index) => (
-            <text
-              key={`x-label-${index}`}
-              x={line.x1}
-              y={height - padding.bottom + 20}
-              textAnchor="middle"
-              fontSize="12"
-              fill="currentColor"
-              className="text-mountain-600 dark:text-mountain-400"
-            >
-              {line.label}km
-            </text>
-          ))}
-
-          {/* Y Axis labels */}
-          {gridLines.yLines.map((line, index) => (
-            <text
-              key={`y-label-${index}`}
-              x={padding.left - 10}
-              y={line.y1 + 4}
-              textAnchor="end"
-              fontSize="12"
-              fill="currentColor"
-              className="text-mountain-600 dark:text-mountain-400"
-            >
-              {line.label}m
-            </text>
-          ))}
-
-          {/* Axis labels */}
+          {/* Simple axis labels */}
           <text
-            x={width / 2}
-            y={height - 5}
+            x={chartData.width / 2}
+            y={chartData.height - 5}
             textAnchor="middle"
             fontSize="14"
             fill="currentColor"
@@ -265,12 +195,12 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
           </text>
           <text
             x={15}
-            y={height / 2}
+            y={chartData.height / 2}
             textAnchor="middle"
             fontSize="14"
             fill="currentColor"
             className="text-mountain-700 dark:text-mountain-300"
-            transform={`rotate(-90, 15, ${height / 2})`}
+            transform={`rotate(-90, 15, ${chartData.height / 2})`}
           >
             Elevación (m)
           </text>
