@@ -6,12 +6,14 @@ interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
   showText?: boolean;
   className?: string;
+  onClick?: () => void;
 }
 
 export const Logo: React.FC<LogoProps> = ({ 
   size = 'md', 
   showText = true, 
-  className = '' 
+  className = '',
+  onClick
 }) => {
   const sizeClasses = {
     sm: 'h-6 w-6',
@@ -26,7 +28,10 @@ export const Logo: React.FC<LogoProps> = ({
   };
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div 
+      className={`flex items-center gap-2 ${onClick ? 'cursor-pointer' : ''} ${className}`}
+      onClick={onClick}
+    >
       <div className={`${sizeClasses[size]} bg-gradient-to-br from-primary-500 to-earth-500 rounded-lg flex items-center justify-center`}>
         <Map className="h-1/2 w-1/2 text-white" />
       </div>

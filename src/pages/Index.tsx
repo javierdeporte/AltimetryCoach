@@ -8,7 +8,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const Index = () => {
   return (
-    <ThemeProvider defaultTheme="light" storageKey="altimetry-ui-theme">
+    <ThemeProvider>
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-earth-50 to-primary-100 dark:from-mountain-900 dark:via-mountain-800 dark:to-primary-900">
         {/* Navigation */}
         <nav className="container mx-auto px-4 py-6 flex justify-between items-center">
