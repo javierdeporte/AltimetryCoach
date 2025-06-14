@@ -13,10 +13,10 @@ interface SidebarItem {
 }
 
 const sidebarItems: SidebarItem[] = [
-  { icon: Map, label: 'Routes', href: '/dashboard' },
-  { icon: Upload, label: 'Upload', href: '/dashboard/upload' },
-  { icon: ArrowUp, label: 'Plans', href: '/dashboard/plans', disabled: true },
-  { icon: Settings, label: 'Settings', href: '/dashboard/settings', disabled: true },
+  { icon: Map, label: 'Rutas', href: '/dashboard' },
+  { icon: Upload, label: 'Subir', href: '/dashboard/upload' },
+  { icon: ArrowUp, label: 'Planes', href: '/dashboard/plans', disabled: true },
+  { icon: Settings, label: 'Configuración', href: '/dashboard/settings', disabled: true },
 ];
 
 interface SidebarProps {
@@ -33,6 +33,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
       return location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard/routes/');
     }
     return location.pathname === href;
+  };
+
+  const handleNavigation = (href: string, disabled?: boolean) => {
+    console.log('Navigating to:', href, 'disabled:', disabled);
+    if (!disabled) {
+      navigate(href);
+    }
   };
 
   return (
@@ -65,8 +72,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
                   isActive(item.href) 
                     ? 'bg-primary-600 text-white' 
                     : 'text-mountain-600 dark:text-mountain-300'
-                } ${isCollapsed ? 'px-2' : 'px-4'}`}
-                onClick={() => !item.disabled && navigate(item.href)}
+                } ${isCollapsed ? 'px-2' : 'px-4'} ${
+                  item.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                }`}
+                onClick={() => handleNavigation(item.href, item.disabled)}
                 disabled={item.disabled}
               >
                 <item.icon className="h-5 w-5 flex-shrink-0" />
@@ -89,6 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
         <Button
           variant="outline"
           className={`w-full justify-start gap-3 border-earth-300 text-earth-600 hover:bg-earth-50 ${isCollapsed ? 'px-2' : 'px-4'}`}
+          onClick={() => navigate('/dashboard/billing')}
         >
           <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
