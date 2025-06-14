@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '../ui/button';
 import { Logo } from '../ui/logo';
-import { Map, Upload, Settings, ArrowUp } from 'lucide-react';
+import { Home, Upload, Settings, ArrowUp, List } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface SidebarItem {
@@ -13,7 +13,8 @@ interface SidebarItem {
 }
 
 const sidebarItems: SidebarItem[] = [
-  { icon: Map, label: 'Rutas', href: '/dashboard' },
+  { icon: Home, label: 'Dashboard', href: '/dashboard' },
+  { icon: List, label: 'Mis Rutas', href: '/dashboard/routes' },
   { icon: Upload, label: 'Subir', href: '/dashboard/upload' },
   { icon: ArrowUp, label: 'Planes', href: '/dashboard/plans', disabled: true },
   { icon: Settings, label: 'Configuración', href: '/dashboard/settings', disabled: true },
@@ -30,7 +31,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
 
   const isActive = (href: string) => {
     if (href === '/dashboard') {
-      return location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard/routes/');
+      return location.pathname === '/dashboard';
+    }
+    if (href === '/dashboard/routes') {
+      return location.pathname === '/dashboard/routes' || location.pathname.startsWith('/dashboard/routes/');
     }
     return location.pathname === href;
   };

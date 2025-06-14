@@ -10,6 +10,7 @@ import SignUp from './pages/auth/SignUp';
 import Dashboard from './pages/dashboard/Dashboard';
 import DashboardHome from './pages/dashboard/DashboardHome';
 import Upload from './pages/dashboard/Upload';
+import RoutesList from './pages/dashboard/RoutesList';
 import RouteDetail from './pages/dashboard/RouteDetail';
 import Billing from './pages/dashboard/Billing';
 import NotFound from './pages/NotFound';
@@ -32,8 +33,9 @@ function App() {
               {/* Protected dashboard routes */}
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
                 <Route index element={<DashboardHome />} />
-                <Route path="upload" element={<Upload />} />
+                <Route path="routes" element={<RoutesList />} />
                 <Route path="routes/:routeId" element={<RouteDetail />} />
+                <Route path="upload" element={<Upload />} />
                 <Route path="billing" element={<Billing />} />
               </Route>
               
