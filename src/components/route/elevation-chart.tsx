@@ -20,7 +20,7 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
 }) => {
   console.log('ElevationChart render with', elevationData.length, 'points');
 
-  // Validar datos de entrada
+  // Validar y optimizar datos de entrada para grandes datasets
   const validData = useMemo(() => {
     if (!Array.isArray(elevationData) || elevationData.length === 0) {
       console.log('No valid elevation data, using mock data');
@@ -33,12 +33,21 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
         { distance: 16.0, elevation: 1460, segmentIndex: 4 },
       ];
     }
-    return elevationData.slice(0, 100); // Limitar a 100 puntos para rendimiento
+
+    // Para datasets muy grandes, optimizamos tomando una muestra representativa
+    let optimizedData = elevationData;
+    if (elevationData.length > 500) {
+      const step = Math.ceil(elevationData.length / 500);
+      optimizedData = elevationData.filter((_, index) => index % step === 0);
+      console.log(`Optimized data from ${elevationData.length} to ${optimizedData.length} points`);
+    }
+
+    return optimizedData;
   }, [elevationData]);
 
   const isUsingRealData = elevationData.length > 0;
 
-  // Calcular estadísticas básicas de forma segura
+  // Calcular estadísticas básicas de forma eficiente
   const stats = useMemo(() => {
     if (validData.length === 0) {
       return { totalGain: 0, totalLoss: 0, totalDistance: 0 };
@@ -61,7 +70,7 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
     return { totalGain, totalLoss, totalDistance };
   }, [validData]);
 
-  // Generar datos del gráfico de forma simple
+  // Generar datos del gráfico optimizados
   const chartData = useMemo(() => {
     if (validData.length === 0) return null;
 
@@ -131,6 +140,11 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
               Mostrando datos de ejemplo - procesando datos reales...
             </p>
           )}
+          {isUsingRealData && elevationData.length > 500 && (
+            <p className="text-xs text-blue-600 dark:text-blue-400">
+              Mostrando {validData.length} puntos optimizados de {elevationData.length} totales
+            </p>
+          )}
         </div>
         <div className="flex gap-4 text-sm text-mountain-600 dark:text-mountain-400">
           <span>↗ Ganancia: +{Math.round(stats.totalGain)}m</span>
@@ -166,8 +180,8 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
             strokeWidth={2}
           />
 
-          {/* Data points */}
-          {chartData.points.map((point, index) => (
+          {/* Data points - solo mostramos algunos para evitar sobrecarga visual */}
+          {chartData.points.filter((_, index) => index % Math.max(1, Math.floor(chartData.points.length / 50)) === 0).map((point, index) => (
             <circle
               key={index}
               cx={point.x}

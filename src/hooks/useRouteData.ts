@@ -40,7 +40,9 @@ export const useRouteData = (routeId: string) => {
 
   const loadRouteData = useCallback(async () => {
     if (!routeId) {
+      console.log('No routeId provided');
       setIsLoading(false);
+      setError('ID de ruta no válido');
       return;
     }
 
@@ -50,26 +52,27 @@ export const useRouteData = (routeId: string) => {
       
       console.log('Loading route data for ID:', routeId);
       
-      // Cargar datos de la ruta
+      // Cargar datos de la ruta con mejor manejo de errores
       const { data: routeData, error: routeError } = await supabase
         .from('routes')
         .select('*')
         .eq('id', routeId)
-        .single();
+        .maybeSingle();
 
       if (routeError) {
         console.error('Route error:', routeError);
-        throw new Error(`Error loading route: ${routeError.message}`);
+        throw new Error(`Error al cargar la ruta: ${routeError.message}`);
       }
 
       if (!routeData) {
-        throw new Error('Route not found');
+        console.error('Route not found for ID:', routeId);
+        throw new Error('Ruta no encontrada en la base de datos');
       }
 
-      console.log('Route data loaded:', routeData);
+      console.log('Route data loaded successfully:', routeData.name);
       setRoute(routeData);
 
-      // Cargar segmentos
+      // Cargar segmentos con mejor manejo de errores
       const { data: segmentsData, error: segmentsError } = await supabase
         .from('segments')
         .select('*')
@@ -78,34 +81,32 @@ export const useRouteData = (routeId: string) => {
 
       if (segmentsError) {
         console.error('Segments error:', segmentsError);
-        // No lanzar error aquí, solo loggear y continuar con array vacío
         setSegments([]);
       } else {
-        console.log('Segments data loaded:', segmentsData?.length || 0, 'segments');
+        console.log('Segments loaded:', segmentsData?.length || 0, 'segments');
         setSegments(segmentsData || []);
       }
 
-      // Procesar datos GPX para obtener puntos de elevación
+      // Procesar datos GPX sin limitación de puntos
       if (routeData.gpx_data) {
-        console.log('Processing GPX data, length:', routeData.gpx_data.length);
+        console.log('Processing GPX data...');
         try {
           const elevationPoints = parseGPXForElevation(routeData.gpx_data, segmentsData || []);
-          console.log('Elevation points parsed successfully:', elevationPoints.length);
+          console.log('Elevation points processed:', elevationPoints.length);
           setElevationData(elevationPoints);
         } catch (gpxError) {
           console.error('GPX parsing error:', gpxError);
-          // En caso de error de GPX, usar datos vacíos pero no fallar toda la carga
           setElevationData([]);
         }
       } else {
-        console.log('No GPX data found');
+        console.log('No GPX data found for this route');
         setElevationData([]);
       }
 
     } catch (err) {
       console.error('Error loading route data:', err);
-      setError(err instanceof Error ? err.message : 'Error loading route data');
-      // Resetear todos los estados en caso de error
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido al cargar la ruta';
+      setError(errorMessage);
       setRoute(null);
       setSegments([]);
       setElevationData([]);
@@ -121,7 +122,7 @@ export const useRouteData = (routeId: string) => {
   return { route, segments, elevationData, isLoading, error };
 };
 
-// Función auxiliar para parsear GPX y extraer puntos de elevación
+// Función auxiliar para parsear GPX y extraer puntos de elevación SIN LIMITACIÓN
 function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPoint[] {
   if (!gpxData || typeof gpxData !== 'string') {
     console.warn('Invalid GPX data provided');
@@ -138,11 +139,11 @@ function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPo
     const parseError = xmlDoc.querySelector('parsererror');
     if (parseError) {
       console.error('XML parsing error:', parseError.textContent);
-      throw new Error('Invalid GPX XML format');
+      throw new Error('Formato GPX XML inválido');
     }
     
     const trackPoints = xmlDoc.querySelectorAll('trkpt');
-    console.log('Track points found:', trackPoints.length);
+    console.log('Total track points found:', trackPoints.length);
     
     if (trackPoints.length === 0) {
       console.warn('No track points found in GPX');
@@ -154,68 +155,75 @@ function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPo
     let previousLat: number | null = null;
     let previousLon: number | null = null;
 
-    // Limitar el procesamiento para evitar bucles infinitos
-    const maxPoints = Math.min(trackPoints.length, 1000);
-    console.log('Processing', maxPoints, 'points...');
+    // PROCESAMOS TODOS LOS PUNTOS SIN LIMITACIÓN
+    console.log('Processing ALL', trackPoints.length, 'points...');
 
-    for (let index = 0; index < maxPoints; index++) {
-      const point = trackPoints[index];
-      const latStr = point.getAttribute('lat');
-      const lonStr = point.getAttribute('lon');
-      
-      if (!latStr || !lonStr) {
-        console.warn(`Missing coordinates at point ${index}`);
-        continue;
-      }
-
-      const lat = parseFloat(latStr);
-      const lon = parseFloat(lonStr);
-      
-      if (isNaN(lat) || isNaN(lon)) {
-        console.warn(`Invalid coordinates at point ${index}: lat=${latStr}, lon=${lonStr}`);
-        continue;
-      }
-
-      const elevationEl = point.querySelector('ele');
-      const elevation = elevationEl ? parseFloat(elevationEl.textContent || '0') : 0;
-
-      // Calcular distancia acumulada
-      if (index > 0 && previousLat !== null && previousLon !== null) {
-        const distance = calculateDistance(previousLat, previousLon, lat, lon);
-        if (!isNaN(distance) && distance > 0) {
-          totalDistance += distance;
+    for (let index = 0; index < trackPoints.length; index++) {
+      try {
+        const point = trackPoints[index];
+        const latStr = point.getAttribute('lat');
+        const lonStr = point.getAttribute('lon');
+        
+        if (!latStr || !lonStr) {
+          continue;
         }
-      }
 
-      // Determinar el índice del segmento basado en la distancia
-      let segmentIndex = 0;
-      if (segments.length > 0) {
-        let accumulatedDistance = 0;
-        for (let i = 0; i < segments.length; i++) {
-          const segmentEndDistance = accumulatedDistance + (segments[i].distance_km || 0);
-          if (totalDistance <= segmentEndDistance) {
-            segmentIndex = i;
-            break;
+        const lat = parseFloat(latStr);
+        const lon = parseFloat(lonStr);
+        
+        if (isNaN(lat) || isNaN(lon)) {
+          continue;
+        }
+
+        const elevationEl = point.querySelector('ele');
+        const elevation = elevationEl ? parseFloat(elevationEl.textContent || '0') : 0;
+
+        // Calcular distancia acumulada
+        if (index > 0 && previousLat !== null && previousLon !== null) {
+          const distance = calculateDistance(previousLat, previousLon, lat, lon);
+          if (!isNaN(distance) && distance > 0) {
+            totalDistance += distance;
           }
-          accumulatedDistance = segmentEndDistance;
         }
+
+        // Determinar el índice del segmento basado en la distancia
+        let segmentIndex = 0;
+        if (segments.length > 0) {
+          let accumulatedDistance = 0;
+          for (let i = 0; i < segments.length; i++) {
+            const segmentEndDistance = accumulatedDistance + (segments[i].distance_km || 0);
+            if (totalDistance <= segmentEndDistance) {
+              segmentIndex = i;
+              break;
+            }
+            accumulatedDistance = segmentEndDistance;
+          }
+        }
+
+        points.push({
+          distance: totalDistance,
+          elevation: isNaN(elevation) ? 0 : elevation,
+          segmentIndex
+        });
+
+        previousLat = lat;
+        previousLon = lon;
+
+        // Log de progreso cada 1000 puntos
+        if (index % 1000 === 0 && index > 0) {
+          console.log(`Processed ${index} points...`);
+        }
+      } catch (pointError) {
+        console.warn(`Error processing point ${index}:`, pointError);
+        continue;
       }
-
-      points.push({
-        distance: totalDistance,
-        elevation: isNaN(elevation) ? 0 : elevation,
-        segmentIndex
-      });
-
-      previousLat = lat;
-      previousLon = lon;
     }
 
-    console.log('Successfully processed', points.length, 'elevation points');
+    console.log('Successfully processed ALL', points.length, 'elevation points');
     return points;
   } catch (error) {
     console.error('Error parsing GPX for elevation:', error);
-    return [];
+    throw error;
   }
 }
 
