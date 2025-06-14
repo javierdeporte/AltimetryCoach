@@ -27,7 +27,7 @@ const RouteDetail = () => {
           <p className="text-red-600 dark:text-red-400 mb-4">
             No se pudo encontrar el ID de la ruta en la URL
           </p>
-          <Button onClick={() => navigate('/dashboard/upload')} variant="outline">
+          <Button onClick={() => navigate('/dashboard/routes')} variant="outline">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver a Rutas
           </Button>
@@ -39,7 +39,7 @@ const RouteDetail = () => {
   const { route, segments, elevationData, isLoading, error } = useRouteData(routeId);
 
   const handleBackToRoutes = () => {
-    navigate('/dashboard/upload');
+    navigate('/dashboard/routes');
   };
 
   const formatDate = (dateString: string) => {
