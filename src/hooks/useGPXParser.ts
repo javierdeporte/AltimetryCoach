@@ -46,66 +46,82 @@ function calculateDifficulty(elevationGain: number): string {
   return 'hard';
 }
 
-// Función mejorada para extraer fecha de captura del GPX con detección de fuente
+// Función mejorada para extraer fecha de captura del GPX con detección más precisa
 function extractGPXCaptureDate(xmlDoc: Document, originalFile: File): { date: Date | undefined, source: 'gps_metadata' | 'file' } {
-  console.log('Analyzing GPX date sources...');
+  console.log('🔍 Analyzing GPX date sources...');
   
-  // 1. Buscar en metadatos de tiempo del primer punto
-  const firstTimeEl = xmlDoc.querySelector('trkpt time');
-  if (firstTimeEl?.textContent) {
-    const timeStr = firstTimeEl.textContent.trim();
-    if (timeStr) {
-      const date = new Date(timeStr);
-      if (!isNaN(date.getTime())) {
-        console.log('Found GPS time in first track point:', timeStr);
-        return { date, source: 'gps_metadata' };
+  // 1. Buscar timestamps en todos los puntos del track
+  const timeElements = xmlDoc.querySelectorAll('trkpt time');
+  console.log(`📍 Found ${timeElements.length} track points with time data`);
+  
+  if (timeElements.length > 0) {
+    const times = Array.from(timeElements)
+      .map(el => el.textContent?.trim())
+      .filter(Boolean)
+      .map(timeStr => {
+        try {
+          return new Date(timeStr!);
+        } catch {
+          return null;
+        }
+      })
+      .filter(date => date && !isNaN(date.getTime()));
+    
+    console.log(`⏰ Valid timestamps found: ${times.length}`);
+    
+    if (times.length >= 2) {
+      // Verificar que las fechas son secuenciales y realistas para GPS
+      const timeDiffs = times.slice(1).map((time, i) => time!.getTime() - times[i]!.getTime());
+      const avgDiff = timeDiffs.reduce((acc, diff) => acc + diff, 0) / timeDiffs.length;
+      const minDiff = Math.min(...timeDiffs);
+      const maxDiff = Math.max(...timeDiffs);
+      
+      console.log(`📊 Time analysis: avg=${Math.round(avgDiff/1000)}s, min=${Math.round(minDiff/1000)}s, max=${Math.round(maxDiff/1000)}s`);
+      
+      // Criterios más flexibles para GPS real:
+      // - Diferencia promedio entre 1 segundo y 10 minutos
+      // - No todos los puntos con exactamente el mismo tiempo
+      // - Secuencia temporal coherente
+      const hasReasonableInterval = avgDiff >= 1000 && avgDiff <= 600000; // 1s a 10min
+      const hasVariation = maxDiff > minDiff; // No todos los puntos tienen el mismo tiempo
+      const isSequential = timeDiffs.every(diff => diff >= 0); // Orden cronológico
+      
+      if (hasReasonableInterval && hasVariation && isSequential) {
+        console.log('✅ GPS data detected: Sequential timestamps with realistic intervals');
+        return { date: times[0]!, source: 'gps_metadata' };
+      } else {
+        console.log('⚠️ Timestamps found but pattern doesn\'t match GPS recording');
       }
+    } else if (times.length === 1) {
+      // Un solo timestamp podría ser válido
+      console.log('📝 Single timestamp found, treating as GPS metadata');
+      return { date: times[0]!, source: 'gps_metadata' };
     }
   }
-
-  // 2. Buscar en metadatos del track completo
+  
+  // 2. Buscar en metadatos del track o archivo
   const trackTimeEl = xmlDoc.querySelector('trk time, metadata time');
   if (trackTimeEl?.textContent) {
     const timeStr = trackTimeEl.textContent.trim();
     if (timeStr) {
-      const date = new Date(timeStr);
-      if (!isNaN(date.getTime())) {
-        console.log('Found GPS time in track metadata:', timeStr);
-        return { date, source: 'gps_metadata' };
+      try {
+        const date = new Date(timeStr);
+        if (!isNaN(date.getTime())) {
+          console.log('📄 Found GPS time in track metadata:', timeStr);
+          return { date, source: 'gps_metadata' };
+        }
+      } catch {
+        console.log('❌ Invalid date format in metadata');
       }
     }
   }
-
-  // 3. Verificar si hay múltiples puntos con tiempo (indicativo de GPS real)
-  const timeElements = xmlDoc.querySelectorAll('trkpt time');
-  if (timeElements.length > 1) {
-    // Si hay al menos 2 puntos con tiempo, probablemente es GPS real
-    const times = Array.from(timeElements)
-      .map(el => el.textContent?.trim())
-      .filter(Boolean)
-      .map(timeStr => new Date(timeStr!))
-      .filter(date => !isNaN(date.getTime()));
-    
-    if (times.length >= 2) {
-      // Verificar que las fechas son secuenciales y realistas
-      const timeDiffs = times.slice(1).map((time, i) => time.getTime() - times[i].getTime());
-      const avgDiff = timeDiffs.reduce((acc, diff) => acc + diff, 0) / timeDiffs.length;
-      
-      // Si el promedio de diferencia está entre 1 segundo y 1 hora, es probablemente GPS real
-      if (avgDiff > 1000 && avgDiff < 3600000) {
-        console.log('Found sequential GPS timestamps indicating real GPS data');
-        return { date: times[0], source: 'gps_metadata' };
-      }
-    }
-  }
-
-  // 4. Buscar patrones de fecha en la descripción
+  
+  // 3. Buscar patrones de fecha en la descripción
   const descElement = xmlDoc.querySelector('trk desc, metadata desc');
   if (descElement?.textContent) {
     const desc = descElement.textContent;
-    console.log('Checking description for date patterns:', desc);
+    console.log('📝 Checking description for date patterns:', desc);
     
-    // Buscar patrones comunes de fecha
     const datePatterns = [
       /(\d{4}-\d{2}-\d{2})/,  // YYYY-MM-DD
       /(\d{2}\/\d{2}\/\d{4})/, // DD/MM/YYYY o MM/DD/YYYY
@@ -115,53 +131,96 @@ function extractGPXCaptureDate(xmlDoc: Document, originalFile: File): { date: Da
     for (const pattern of datePatterns) {
       const match = desc.match(pattern);
       if (match) {
-        const date = new Date(match[1]);
-        if (!isNaN(date.getTime())) {
-          console.log('Found date pattern in description:', match[1]);
-          return { date, source: 'gps_metadata' };
+        try {
+          const date = new Date(match[1]);
+          if (!isNaN(date.getTime())) {
+            console.log('📅 Found date pattern in description:', match[1]);
+            return { date, source: 'gps_metadata' };
+          }
+        } catch {
+          continue;
         }
       }
     }
   }
-
-  // 5. Como último recurso, usar fecha de modificación del archivo
-  console.log('No GPS metadata found, using file date as fallback');
+  
+  // 4. Como último recurso, usar fecha de modificación del archivo
+  console.log('📁 No GPS metadata found, using file date as fallback');
   return { date: new Date(originalFile.lastModified), source: 'file' };
 }
 
-// Función para detectar automáticamente el tipo de ruta
+// Función mejorada para detectar automáticamente el tipo de ruta
 function detectRouteType(xmlDoc: Document, dateSource: 'gps_metadata' | 'file', hasRealGPSData: boolean): string {
   const name = xmlDoc.querySelector('trk name')?.textContent?.toLowerCase() || '';
   const desc = xmlDoc.querySelector('trk desc, metadata desc')?.textContent?.toLowerCase() || '';
   
-  // Palabras clave para diferentes tipos
-  const raceKeywords = ['carrera', 'race', 'altimetría', 'altimetria', 'perfil', 'profile', 'competición', 'competition'];
-  const planningKeywords = ['planificación', 'planificacion', 'planning', 'ruta', 'route', 'plan'];
-  const trainingKeywords = ['entrenamiento', 'training', 'workout', 'run', 'corrida'];
+  console.log('🏷️ Analyzing route type with:', { name, desc: desc.substring(0, 100), dateSource, hasRealGPSData });
+  
+  // Palabras clave más específicas
+  const raceKeywords = [
+    'carrera', 'race', 'altimetría', 'altimetria', 'perfil', 'profile', 
+    'competición', 'competition', 'maratón', 'marathon', 'trail', 'ultra'
+  ];
+  
+  const planningKeywords = [
+    'planificación', 'planificacion', 'planning', 'ruta', 'route', 'plan',
+    'propuesta', 'diseño', 'trazado', 'recorrido', 'proyecto'
+  ];
+  
+  const trainingKeywords = [
+    'entrenamiento', 'training', 'workout', 'run', 'corrida', 'running',
+    'sesión', 'session', 'práctica', 'practice'
+  ];
   
   const text = `${name} ${desc}`;
+  console.log('🔤 Combined text for analysis:', text.substring(0, 200));
   
-  // Si no tiene datos GPS reales (dateSource = 'file'), probablemente es altimetría
-  if (dateSource === 'file' && !hasRealGPSData) {
-    // Verificar si parece altimetría de carrera
-    if (raceKeywords.some(keyword => text.includes(keyword))) {
+  // Lógica de clasificación mejorada
+  const hasRaceKeywords = raceKeywords.some(keyword => text.includes(keyword));
+  const hasPlanningKeywords = planningKeywords.some(keyword => text.includes(keyword));
+  const hasTrainingKeywords = trainingKeywords.some(keyword => text.includes(keyword));
+  
+  console.log('🎯 Keyword matches:', { 
+    race: hasRaceKeywords, 
+    planning: hasPlanningKeywords, 
+    training: hasTrainingKeywords 
+  });
+  
+  // Si tiene datos GPS reales (timestamps válidos), es más probable que sea entrenamiento
+  if (hasRealGPSData && dateSource === 'gps_metadata') {
+    console.log('📍 Real GPS data detected');
+    
+    if (hasRaceKeywords) {
+      console.log('🏁 Classified as: race_profile (GPS + race keywords)');
       return 'race_profile';
     }
-    // Si no tiene palabras de carrera pero tampoco GPS real, podría ser planificación
-    return 'route_planning';
+    
+    if (hasTrainingKeywords || (!hasPlanningKeywords && !hasRaceKeywords)) {
+      console.log('🏃 Classified as: training (GPS data + training context)');
+      return 'training';
+    }
   }
   
-  // Si tiene datos GPS reales, analizar contenido
-  if (raceKeywords.some(keyword => text.includes(keyword))) {
+  // Si no tiene GPS real o viene de archivo, analizar contenido
+  if (hasRaceKeywords) {
+    console.log('🏁 Classified as: race_profile (race keywords)');
     return 'race_profile';
   }
   
-  if (planningKeywords.some(keyword => text.includes(keyword)) && !trainingKeywords.some(keyword => text.includes(keyword))) {
+  if (hasPlanningKeywords) {
+    console.log('📋 Classified as: route_planning (planning keywords)');
     return 'route_planning';
   }
   
-  // Por defecto, si tiene GPS real, es entrenamiento
-  return hasRealGPSData ? 'training' : 'route_planning';
+  if (hasTrainingKeywords) {
+    console.log('🏃 Classified as: training (training keywords)');
+    return 'training';
+  }
+  
+  // Default: si no hay GPS real, probablemente es planificación
+  const defaultType = hasRealGPSData ? 'training' : 'route_planning';
+  console.log(`⚙️ Default classification: ${defaultType}`);
+  return defaultType;
 }
 
 export const useGPXParser = () => {
@@ -173,6 +232,7 @@ export const useGPXParser = () => {
     setError(null);
 
     try {
+      console.log('🚀 Starting GPX parsing for:', file.name);
       const text = await file.text();
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(text, 'text/xml');
@@ -187,22 +247,37 @@ export const useGPXParser = () => {
       const trackName = xmlDoc.querySelector('trk name')?.textContent || file.name.replace('.gpx', '');
       const trackDesc = xmlDoc.querySelector('trk desc')?.textContent || '';
 
+      console.log('📋 Track info:', { name: trackName, description: trackDesc?.substring(0, 100) });
+
       // Extraer fecha de captura y determinar fuente
       const { date: captureDate, source: dateSource } = extractGPXCaptureDate(xmlDoc, file);
 
-      // Verificar si hay datos GPS reales (múltiples puntos con tiempo)
+      // Verificar si hay datos GPS reales (múltiples puntos con tiempo válido)
       const timeElements = xmlDoc.querySelectorAll('trkpt time');
-      const hasRealGPSData = timeElements.length > 1;
+      const validTimes = Array.from(timeElements)
+        .map(el => el.textContent?.trim())
+        .filter(Boolean)
+        .map(timeStr => {
+          try {
+            return new Date(timeStr!);
+          } catch {
+            return null;
+          }
+        })
+        .filter(date => date && !isNaN(date.getTime()));
+
+      const hasRealGPSData = validTimes.length >= 2;
+      console.log(`📊 GPS analysis: ${validTimes.length} valid timestamps, hasRealGPSData: ${hasRealGPSData}`);
 
       // Detectar automáticamente el tipo de ruta
       const detectedRouteType = detectRouteType(xmlDoc, dateSource, hasRealGPSData);
 
-      console.log('Route analysis:', {
+      console.log('📈 Final route analysis:', {
         name: trackName,
         dateSource,
         hasRealGPSData,
         detectedRouteType,
-        timeElementsCount: timeElements.length
+        captureDate: captureDate?.toISOString()
       });
 
       // Extraer puntos del track
@@ -280,7 +355,7 @@ export const useGPXParser = () => {
       setIsLoading(false);
       return gpxData;
     } catch (err) {
-      console.error('GPX parsing error:', err);
+      console.error('❌ GPX parsing error:', err);
       setError(err instanceof Error ? err.message : 'Failed to parse GPX file');
       setIsLoading(false);
       return null;
@@ -297,13 +372,31 @@ export const useGPXParser = () => {
       // Calcular dificultad con nuevos criterios
       const difficulty = calculateDifficulty(gpxData.totalElevationGain);
 
-      // Detectar automáticamente el tipo de ruta basado en análisis GPX
-      const timeElements = originalFile.text ? (new DOMParser().parseFromString(await originalFile.text(), 'text/xml')).querySelectorAll('trkpt time') : [];
-      const hasRealGPSData = timeElements.length > 1;
+      // Determinar tipo de ruta basado en análisis GPX mejorado
+      const xmlDoc = new DOMParser().parseFromString(await originalFile.text(), 'text/xml');
+      const timeElements = xmlDoc.querySelectorAll('trkpt time');
       
-      const autoRouteType = gpxData.dateSource === 'gps_metadata' && hasRealGPSData ? 'training' : 'route_planning';
+      const validTimes = Array.from(timeElements)
+        .map(el => el.textContent?.trim())
+        .filter(Boolean)
+        .map(timeStr => {
+          try {
+            return new Date(timeStr!);
+          } catch {
+            return null;
+          }
+        })
+        .filter(date => date && !isNaN(date.getTime()));
 
-      console.log('Saving route with detected type:', autoRouteType);
+      const hasRealGPSData = validTimes.length >= 2;
+      const autoRouteType = detectRouteType(xmlDoc, gpxData.dateSource, hasRealGPSData);
+
+      console.log('💾 Saving route with analysis:', {
+        routeType: autoRouteType,
+        dateSource: gpxData.dateSource,
+        hasRealGPSData,
+        difficulty
+      });
 
       // Guardar la ruta en la base de datos con los nuevos campos
       const { data: route, error: routeError } = await supabase
@@ -372,7 +465,7 @@ export const useGPXParser = () => {
 
       return route;
     } catch (err) {
-      console.error('Database save error:', err);
+      console.error('❌ Database save error:', err);
       throw err;
     }
   }, []);
