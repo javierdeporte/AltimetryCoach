@@ -3,7 +3,7 @@ import React from 'react';
 import { useRoutes } from '@/hooks/useRoutes';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { ArrowUp, Calendar, MapPin, Eye } from 'lucide-react';
+import { ArrowUp, ArrowDown, Calendar, MapPin, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const RoutesList: React.FC = () => {
@@ -25,6 +25,17 @@ export const RoutesList: React.FC = () => {
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('es-ES');
+  };
+
+  const formatGPXCaptureDate = (route: any) => {
+    if (route.gpx_capture_date) {
+      return `GPX: ${formatDate(route.gpx_capture_date)}`;
+    }
+    return `Subida: ${formatDate(route.created_at)}`;
   };
 
   if (isLoading) {
@@ -101,18 +112,24 @@ export const RoutesList: React.FC = () => {
                 </Badge>
               </div>
               
-              <div className="flex items-center gap-4 text-sm text-mountain-600 dark:text-mountain-400">
+              <div className="flex items-center gap-4 text-sm text-mountain-600 dark:text-mountain-400 flex-wrap">
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
                   {route.distance_km?.toFixed(1)} km
                 </span>
                 <span className="flex items-center gap-1">
-                  <ArrowUp className="w-3 h-3" />
+                  <ArrowUp className="w-3 h-3 text-primary-600" />
                   +{route.elevation_gain_m}m
                 </span>
+                {route.elevation_loss_m && (
+                  <span className="flex items-center gap-1">
+                    <ArrowDown className="w-3 h-3 text-blue-600" />
+                    -{route.elevation_loss_m}m
+                  </span>
+                )}
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  {new Date(route.created_at).toLocaleDateString('es-ES')}
+                  {formatGPXCaptureDate(route)}
                 </span>
               </div>
               

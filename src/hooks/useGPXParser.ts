@@ -23,6 +23,7 @@ interface GPXData {
   };
   name: string;
   description?: string;
+  captureDate?: Date;
 }
 
 // Función para calcular la distancia entre dos puntos
@@ -36,6 +37,65 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
     Math.sin(dLon/2) * Math.sin(dLon/2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c;
+}
+
+// Función para determinar dificultad con nuevos criterios
+function calculateDifficulty(elevationGain: number): string {
+  if (elevationGain < 500) return 'easy';
+  if (elevationGain >= 500 && elevationGain <= 900) return 'medium';
+  return 'hard';
+}
+
+// Función para extraer fecha de captura del GPX
+function extractGPXCaptureDate(xmlDoc: Document, originalFile: File): Date | undefined {
+  // 1. Buscar en metadatos de tiempo del primer punto
+  const firstTimeEl = xmlDoc.querySelector('trkpt time');
+  if (firstTimeEl?.textContent) {
+    const timeStr = firstTimeEl.textContent.trim();
+    if (timeStr) {
+      const date = new Date(timeStr);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+  }
+
+  // 2. Buscar en metadatos del track completo
+  const trackTimeEl = xmlDoc.querySelector('trk time, metadata time');
+  if (trackTimeEl?.textContent) {
+    const timeStr = trackTimeEl.textContent.trim();
+    if (timeStr) {
+      const date = new Date(timeStr);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+  }
+
+  // 3. Buscar patrones de fecha en la descripción
+  const descElement = xmlDoc.querySelector('trk desc, metadata desc');
+  if (descElement?.textContent) {
+    const desc = descElement.textContent;
+    // Buscar patrones comunes de fecha
+    const datePatterns = [
+      /(\d{4}-\d{2}-\d{2})/,  // YYYY-MM-DD
+      /(\d{2}\/\d{2}\/\d{4})/, // DD/MM/YYYY o MM/DD/YYYY
+      /(\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/i // DD Mon YYYY
+    ];
+    
+    for (const pattern of datePatterns) {
+      const match = desc.match(pattern);
+      if (match) {
+        const date = new Date(match[1]);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+      }
+    }
+  }
+
+  // 4. Usar fecha de modificación del archivo como fallback
+  return new Date(originalFile.lastModified);
 }
 
 export const useGPXParser = () => {
@@ -60,6 +120,9 @@ export const useGPXParser = () => {
       // Extraer nombre y descripción del track
       const trackName = xmlDoc.querySelector('trk name')?.textContent || file.name.replace('.gpx', '');
       const trackDesc = xmlDoc.querySelector('trk desc')?.textContent || '';
+
+      // Extraer fecha de captura
+      const captureDate = extractGPXCaptureDate(xmlDoc, file);
 
       // Extraer puntos del track
       const trackPoints = xmlDoc.querySelectorAll('trkpt');
@@ -128,7 +191,8 @@ export const useGPXParser = () => {
           west: minLon
         },
         name: trackName,
-        description: trackDesc
+        description: trackDesc,
+        captureDate
       };
 
       setIsLoading(false);
@@ -148,7 +212,10 @@ export const useGPXParser = () => {
         throw new Error('User not authenticated');
       }
 
-      // Guardar la ruta en la base de datos
+      // Calcular dificultad con nuevos criterios
+      const difficulty = calculateDifficulty(gpxData.totalElevationGain);
+
+      // Guardar la ruta en la base de datos con los nuevos campos
       const { data: route, error: routeError } = await supabase
         .from('routes')
         .insert({
@@ -157,8 +224,10 @@ export const useGPXParser = () => {
           description: gpxData.description,
           distance_km: gpxData.totalDistance,
           elevation_gain_m: Math.round(gpxData.totalElevationGain),
+          elevation_loss_m: Math.round(gpxData.totalElevationLoss),
+          gpx_capture_date: gpxData.captureDate?.toISOString(),
           gpx_data: await originalFile.text(),
-          difficulty_level: gpxData.totalElevationGain > 500 ? 'hard' : gpxData.totalElevationGain > 200 ? 'medium' : 'easy'
+          difficulty_level: difficulty
         })
         .select()
         .single();

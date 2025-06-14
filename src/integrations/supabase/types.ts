@@ -93,6 +93,8 @@ export type Database = {
           difficulty_level: string | null
           distance_km: number | null
           elevation_gain_m: number | null
+          elevation_loss_m: number | null
+          gpx_capture_date: string | null
           gpx_data: string | null
           id: string
           name: string
@@ -105,6 +107,8 @@ export type Database = {
           difficulty_level?: string | null
           distance_km?: number | null
           elevation_gain_m?: number | null
+          elevation_loss_m?: number | null
+          gpx_capture_date?: string | null
           gpx_data?: string | null
           id?: string
           name: string
@@ -117,6 +121,8 @@ export type Database = {
           difficulty_level?: string | null
           distance_km?: number | null
           elevation_gain_m?: number | null
+          elevation_loss_m?: number | null
+          gpx_capture_date?: string | null
           gpx_data?: string | null
           id?: string
           name?: string

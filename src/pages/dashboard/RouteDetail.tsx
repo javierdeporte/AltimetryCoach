@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
 import { ElevationChart } from '../../components/route/elevation-chart';
 import { SegmentsTable } from '../../components/route/segments-table';
 import { Button } from '../../components/ui/button';
-import { ArrowUp, Map, Settings, ArrowLeft } from 'lucide-react';
+import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 
@@ -40,6 +41,17 @@ const RouteDetail = () => {
     navigate('/dashboard/upload');
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('es-ES');
+  };
+
+  const formatGPXCaptureDate = (route: any) => {
+    if (route.gpx_capture_date) {
+      return `GPX: ${formatDate(route.gpx_capture_date)}`;
+    }
+    return `Subida: ${formatDate(route.created_at)}`;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -73,7 +85,7 @@ const RouteDetail = () => {
   }
 
   // Calcular estadísticas adicionales
-  const totalElevationLoss = elevationData.reduce((acc, point, index) => {
+  const totalElevationLoss = route.elevation_loss_m || elevationData.reduce((acc, point, index) => {
     if (index === 0) return 0;
     const diff = point.elevation - elevationData[index - 1].elevation;
     return acc + (diff < 0 ? Math.abs(diff) : 0);
@@ -125,9 +137,15 @@ const RouteDetail = () => {
               {route.distance_km.toFixed(1)} km
             </span>
             <span className="flex items-center gap-1">
-              <ArrowUp className="w-4 h-4" />
+              <ArrowUp className="w-4 h-4 text-primary-600" />
               +{route.elevation_gain_m}m
             </span>
+            {totalElevationLoss > 0 && (
+              <span className="flex items-center gap-1">
+                <ArrowDown className="w-4 h-4 text-blue-600" />
+                -{Math.round(totalElevationLoss)}m
+              </span>
+            )}
             <span className="flex items-center gap-1">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -135,6 +153,7 @@ const RouteDetail = () => {
               {totalTime}
             </span>
             <span>Dificultad: {route.difficulty_level}</span>
+            <span>{formatGPXCaptureDate(route)}</span>
           </div>
           {route.description && (
             <p className="text-mountain-600 dark:text-mountain-400 mt-2">
@@ -156,7 +175,7 @@ const RouteDetail = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
           <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
             {Math.round(maxElevation)}m
@@ -180,6 +199,12 @@ const RouteDetail = () => {
             {maxGrade.toFixed(1)}%
           </div>
           <div className="text-sm text-mountain-600 dark:text-mountain-400">Max Grade</div>
+        </div>
+        <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {Math.round(totalElevationLoss)}m
+          </div>
+          <div className="text-sm text-mountain-600 dark:text-mountain-400">Total Descent</div>
         </div>
       </div>
 

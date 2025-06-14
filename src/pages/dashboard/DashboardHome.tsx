@@ -5,7 +5,7 @@ import { useRoutes } from '@/hooks/useRoutes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Map, ArrowUp, Plus, Calendar, MapPin, Eye } from 'lucide-react';
+import { Upload, Map, ArrowUp, ArrowDown, Plus, Calendar, MapPin, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const DashboardHome = () => {
@@ -19,14 +19,16 @@ const DashboardHome = () => {
       return {
         totalRoutes: 0,
         totalDistance: 0,
-        totalElevation: 0
+        totalElevation: 0,
+        totalElevationLoss: 0
       };
     }
 
     return {
       totalRoutes: routes.length,
       totalDistance: routes.reduce((acc, route) => acc + (route.distance_km || 0), 0),
-      totalElevation: routes.reduce((acc, route) => acc + (route.elevation_gain_m || 0), 0)
+      totalElevation: routes.reduce((acc, route) => acc + (route.elevation_gain_m || 0), 0),
+      totalElevationLoss: routes.reduce((acc, route) => acc + (route.elevation_loss_m || 0), 0)
     };
   }, [routes]);
 
@@ -45,6 +47,17 @@ const DashboardHome = () => {
 
   const handleViewRoute = (routeId: string) => {
     navigate(`/dashboard/routes/${routeId}`);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('es-ES');
+  };
+
+  const formatGPXCaptureDate = (route: any) => {
+    if (route.gpx_capture_date) {
+      return `GPX: ${formatDate(route.gpx_capture_date)}`;
+    }
+    return `Subida: ${formatDate(route.created_at)}`;
   };
 
   if (isLoading) {
@@ -80,7 +93,7 @@ const DashboardHome = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="border-primary-200 dark:border-mountain-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-mountain-600 dark:text-mountain-400">
@@ -120,7 +133,7 @@ const DashboardHome = () => {
         <Card className="border-primary-200 dark:border-mountain-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-mountain-600 dark:text-mountain-400">
-              Desnivel Total
+              Desnivel Positivo
             </CardTitle>
             <ArrowUp className="h-4 w-4 text-primary-600" />
           </CardHeader>
@@ -130,6 +143,23 @@ const DashboardHome = () => {
             </div>
             <p className="text-xs text-mountain-500 dark:text-mountain-500">
               Desnivel acumulado
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary-200 dark:border-mountain-700">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-mountain-600 dark:text-mountain-400">
+              Desnivel Negativo
+            </CardTitle>
+            <ArrowDown className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-mountain-800 dark:text-mountain-200">
+              {stats.totalElevationLoss}m
+            </div>
+            <p className="text-xs text-mountain-500 dark:text-mountain-500">
+              Descenso acumulado
             </p>
           </CardContent>
         </Card>
@@ -160,18 +190,24 @@ const DashboardHome = () => {
                       </Badge>
                     </div>
                     
-                    <div className="flex items-center gap-4 text-sm text-mountain-600 dark:text-mountain-400">
+                    <div className="flex items-center gap-4 text-sm text-mountain-600 dark:text-mountain-400 flex-wrap">
                       <span className="flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
                         {route.distance_km?.toFixed(1)} km
                       </span>
                       <span className="flex items-center gap-1">
-                        <ArrowUp className="w-3 h-3" />
+                        <ArrowUp className="w-3 h-3 text-primary-600" />
                         +{route.elevation_gain_m}m
                       </span>
+                      {route.elevation_loss_m && (
+                        <span className="flex items-center gap-1">
+                          <ArrowDown className="w-3 h-3 text-blue-600" />
+                          -{route.elevation_loss_m}m
+                        </span>
+                      )}
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {new Date(route.created_at).toLocaleDateString('es-ES')}
+                        {formatGPXCaptureDate(route)}
                       </span>
                     </div>
                     
