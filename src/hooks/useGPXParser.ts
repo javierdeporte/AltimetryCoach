@@ -150,7 +150,7 @@ function extractGPXCaptureDate(xmlDoc: Document, originalFile: File): { date: Da
 }
 
 // Función mejorada para detectar automáticamente el tipo de ruta
-function detectRouteType(xmlDoc: Document, dateSource: 'gps_metadata' | 'file', hasRealGPSData: boolean): string {
+function detectRouteType(xmlDoc: Document, dateSource: 'gps_metadata' | 'file' | 'manual', hasRealGPSData: boolean): string {
   const name = xmlDoc.querySelector('trk name')?.textContent?.toLowerCase() || '';
   const desc = xmlDoc.querySelector('trk desc, metadata desc')?.textContent?.toLowerCase() || '';
   
