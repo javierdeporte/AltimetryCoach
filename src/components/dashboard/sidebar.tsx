@@ -3,19 +3,20 @@ import React from 'react';
 import { Button } from '../ui/button';
 import { Logo } from '../ui/logo';
 import { Map, Upload, Settings, ArrowUp } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface SidebarItem {
   icon: React.ComponentType<any>;
   label: string;
   href: string;
-  active?: boolean;
+  disabled?: boolean;
 }
 
 const sidebarItems: SidebarItem[] = [
-  { icon: Map, label: 'Routes', href: '/dashboard/routes', active: true },
+  { icon: Map, label: 'Routes', href: '/dashboard' },
   { icon: Upload, label: 'Upload', href: '/dashboard/upload' },
-  { icon: ArrowUp, label: 'Plans', href: '/dashboard/plans' },
-  { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
+  { icon: ArrowUp, label: 'Plans', href: '/dashboard/plans', disabled: true },
+  { icon: Settings, label: 'Settings', href: '/dashboard/settings', disabled: true },
 ];
 
 interface SidebarProps {
@@ -24,6 +25,16 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const isActive = (href: string) => {
+    if (href === '/dashboard') {
+      return location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard/routes/');
+    }
+    return location.pathname === href;
+  };
+
   return (
     <div className={`bg-white dark:bg-mountain-800 border-r border-primary-200 dark:border-mountain-700 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'} flex flex-col`}>
       {/* Header */}
@@ -49,11 +60,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
           {sidebarItems.map((item) => (
             <li key={item.label}>
               <Button
-                variant={item.active ? "default" : "ghost"}
-                className={`w-full justify-start gap-3 ${item.active ? 'bg-primary-600 text-white' : 'text-mountain-600 dark:text-mountain-300'} ${isCollapsed ? 'px-2' : 'px-4'}`}
+                variant={isActive(item.href) ? "default" : "ghost"}
+                className={`w-full justify-start gap-3 ${
+                  isActive(item.href) 
+                    ? 'bg-primary-600 text-white' 
+                    : 'text-mountain-600 dark:text-mountain-300'
+                } ${isCollapsed ? 'px-2' : 'px-4'}`}
+                onClick={() => !item.disabled && navigate(item.href)}
+                disabled={item.disabled}
               >
                 <item.icon className="h-5 w-5 flex-shrink-0" />
-                {!isCollapsed && <span>{item.label}</span>}
+                {!isCollapsed && (
+                  <span className="flex items-center justify-between w-full">
+                    {item.label}
+                    {item.disabled && (
+                      <span className="text-xs text-muted-foreground">Próximamente</span>
+                    )}
+                  </span>
+                )}
               </Button>
             </li>
           ))}
