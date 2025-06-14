@@ -15,8 +15,29 @@ const RouteDetail = () => {
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   
   console.log('RouteDetail mounted with routeId:', routeId);
+  console.log('RouteId type:', typeof routeId, 'value:', routeId);
   
-  const { route, segments, elevationData, isLoading, error } = useRouteData(routeId || '');
+  // Verificar que tenemos un routeId válido antes de proceder
+  if (!routeId) {
+    console.error('No routeId found in URL parameters');
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-600 dark:text-red-400 mb-4">
+              No se pudo encontrar el ID de la ruta en la URL
+            </p>
+            <Button onClick={() => navigate('/dashboard/upload')} variant="outline">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Volver a Rutas
+            </Button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+  
+  const { route, segments, elevationData, isLoading, error } = useRouteData(routeId);
 
   const handleBackToRoutes = () => {
     navigate('/dashboard/upload');

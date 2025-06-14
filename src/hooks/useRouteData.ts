@@ -38,9 +38,12 @@ export const useRouteData = (routeId: string) => {
   const [error, setError] = useState<string | null>(null);
 
   const loadRouteData = useCallback(async () => {
+    console.log('useRouteData called with routeId:', routeId);
+    console.log('RouteId type:', typeof routeId, 'length:', routeId?.length);
+    
     // Validar que tenemos un routeId válido
     if (!routeId || routeId.trim() === '' || routeId === 'undefined' || routeId === 'null') {
-      console.log('No valid routeId provided:', routeId);
+      console.error('No valid routeId provided:', routeId);
       setIsLoading(false);
       setError('ID de ruta no válido');
       return;
@@ -58,6 +61,8 @@ export const useRouteData = (routeId: string) => {
         .select('*')
         .eq('id', routeId)
         .maybeSingle();
+
+      console.log('Supabase query result:', { routeData, routeError });
 
       if (routeError) {
         console.error('Route error:', routeError);
