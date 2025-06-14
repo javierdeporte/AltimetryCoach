@@ -4,7 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRoutes } from '@/hooks/useRoutes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, Map, ArrowUp, Plus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Upload, Map, ArrowUp, Plus, Calendar, MapPin, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const DashboardHome = () => {
@@ -28,6 +29,23 @@ const DashboardHome = () => {
       totalElevation: routes.reduce((acc, route) => acc + (route.elevation_gain_m || 0), 0)
     };
   }, [routes]);
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty?.toLowerCase()) {
+      case 'easy':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'hard':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+    }
+  };
+
+  const handleViewRoute = (routeId: string) => {
+    navigate(`/dashboard/routes/${routeId}`);
+  };
 
   if (isLoading) {
     return (
@@ -126,24 +144,52 @@ const DashboardHome = () => {
         </CardHeader>
         <CardContent>
           {routes && routes.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {routes.slice(0, 3).map((route) => (
-                <div key={route.id} className="flex items-center justify-between p-4 bg-primary-50 dark:bg-mountain-700 rounded-lg">
-                  <div>
-                    <h4 className="font-medium text-mountain-800 dark:text-mountain-200">{route.name}</h4>
-                    <div className="flex gap-4 text-sm text-mountain-600 dark:text-mountain-400">
-                      <span>{route.distance_km?.toFixed(1) || '0'} km</span>
-                      <span>+{route.elevation_gain_m || 0}m</span>
-                      <span>{route.difficulty_level || 'No definido'}</span>
+                <div 
+                  key={route.id} 
+                  className="flex items-center justify-between p-4 border border-mountain-200 dark:border-mountain-700 rounded-lg hover:bg-mountain-50 dark:hover:bg-mountain-800/50 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h4 className="font-medium text-mountain-800 dark:text-mountain-200 truncate">
+                        {route.name}
+                      </h4>
+                      <Badge className={`${getDifficultyColor(route.difficulty_level)} text-xs`}>
+                        {route.difficulty_level}
+                      </Badge>
                     </div>
+                    
+                    <div className="flex items-center gap-4 text-sm text-mountain-600 dark:text-mountain-400">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {route.distance_km?.toFixed(1)} km
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <ArrowUp className="w-3 h-3" />
+                        +{route.elevation_gain_m}m
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(route.created_at).toLocaleDateString('es-ES')}
+                      </span>
+                    </div>
+                    
+                    {route.description && (
+                      <p className="text-xs text-mountain-500 dark:text-mountain-400 mt-1 truncate">
+                        {route.description}
+                      </p>
+                    )}
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="border-primary-300 text-primary-600 hover:bg-primary-50"
-                    onClick={() => navigate(`/dashboard/routes/${route.id}`)}
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewRoute(route.id)}
+                    className="ml-4 flex-shrink-0"
                   >
-                    Ver Detalles
+                    <Eye className="w-4 h-4 mr-1" />
+                    Ver
                   </Button>
                 </div>
               ))}
