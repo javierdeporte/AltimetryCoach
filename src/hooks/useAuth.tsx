@@ -41,7 +41,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, fullName?: string) => {
-    const redirectUrl = `${window.location.origin}/dashboard`;
+    // Use the actual deployed URL for redirect
+    const redirectUrl = 'https://altimetry-trail-vision.lovable.app/dashboard';
     
     const { error } = await supabase.auth.signUp({
       email,
