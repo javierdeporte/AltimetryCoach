@@ -1,5 +1,6 @@
 
 import { useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface GPXPoint {
   lat: number;
@@ -20,6 +21,21 @@ interface GPXData {
     east: number;
     west: number;
   };
+  name: string;
+  description?: string;
+}
+
+// Función para calcular la distancia entre dos puntos
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Radio de la Tierra en km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
 }
 
 export const useGPXParser = () => {
@@ -31,39 +47,174 @@ export const useGPXParser = () => {
     setError(null);
 
     try {
-      // TODO: Implement actual GPX parsing logic
-      console.log('Parsing GPX file:', file.name);
+      const text = await file.text();
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(text, 'text/xml');
       
-      // Simulate parsing delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock GPX data for now
-      const mockData: GPXData = {
-        points: [
-          { lat: 46.1234, lon: 7.5678, elevation: 1200, distance: 0 },
-          { lat: 46.1244, lon: 7.5688, elevation: 1250, distance: 1.2 },
-          { lat: 46.1254, lon: 7.5698, elevation: 1180, distance: 2.4 },
-          // ... more points
-        ],
-        totalDistance: 16.2,
-        totalElevationGain: 520,
-        totalElevationLoss: 520,
-        bounds: {
-          north: 46.1300,
-          south: 46.1200,
-          east: 7.5750,
-          west: 7.5600,
+      // Verificar si hay errores en el parsing
+      const parseError = xmlDoc.querySelector('parsererror');
+      if (parseError) {
+        throw new Error('Invalid GPX file format');
+      }
+
+      // Extraer nombre y descripción del track
+      const trackName = xmlDoc.querySelector('trk name')?.textContent || file.name.replace('.gpx', '');
+      const trackDesc = xmlDoc.querySelector('trk desc')?.textContent || '';
+
+      // Extraer puntos del track
+      const trackPoints = xmlDoc.querySelectorAll('trkpt');
+      if (trackPoints.length === 0) {
+        throw new Error('No track points found in GPX file');
+      }
+
+      const points: GPXPoint[] = [];
+      let totalDistance = 0;
+      let elevationGain = 0;
+      let elevationLoss = 0;
+      let minLat = Infinity, maxLat = -Infinity;
+      let minLon = Infinity, maxLon = -Infinity;
+      let lastElevation: number | null = null;
+
+      trackPoints.forEach((point, index) => {
+        const lat = parseFloat(point.getAttribute('lat') || '0');
+        const lon = parseFloat(point.getAttribute('lon') || '0');
+        const elevationEl = point.querySelector('ele');
+        const elevation = elevationEl ? parseFloat(elevationEl.textContent || '0') : 0;
+        const timeEl = point.querySelector('time');
+        const time = timeEl ? new Date(timeEl.textContent || '') : undefined;
+
+        // Calcular distancia acumulada
+        if (index > 0) {
+          const prevPoint = points[index - 1];
+          const distance = calculateDistance(prevPoint.lat, prevPoint.lon, lat, lon);
+          totalDistance += distance;
         }
+
+        // Calcular ganancia/pérdida de elevación
+        if (lastElevation !== null) {
+          const elevDiff = elevation - lastElevation;
+          if (elevDiff > 0) {
+            elevationGain += elevDiff;
+          } else {
+            elevationLoss += Math.abs(elevDiff);
+          }
+        }
+        lastElevation = elevation;
+
+        // Actualizar bounds
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+        minLon = Math.min(minLon, lon);
+        maxLon = Math.max(maxLon, lon);
+
+        points.push({
+          lat,
+          lon,
+          elevation,
+          time,
+          distance: totalDistance
+        });
+      });
+
+      const gpxData: GPXData = {
+        points,
+        totalDistance,
+        totalElevationGain: elevationGain,
+        totalElevationLoss: elevationLoss,
+        bounds: {
+          north: maxLat,
+          south: minLat,
+          east: maxLon,
+          west: minLon
+        },
+        name: trackName,
+        description: trackDesc
       };
 
       setIsLoading(false);
-      return mockData;
+      return gpxData;
     } catch (err) {
-      setError('Failed to parse GPX file');
+      console.error('GPX parsing error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to parse GPX file');
       setIsLoading(false);
       return null;
     }
   }, []);
 
-  return { parseGPX, isLoading, error };
+  const saveRouteToDatabase = useCallback(async (gpxData: GPXData, originalFile: File) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Guardar la ruta en la base de datos
+      const { data: route, error: routeError } = await supabase
+        .from('routes')
+        .insert({
+          user_id: user.id,
+          name: gpxData.name,
+          description: gpxData.description,
+          distance_km: gpxData.totalDistance,
+          elevation_gain_m: Math.round(gpxData.totalElevationGain),
+          gpx_data: await originalFile.text(),
+          difficulty_level: gpxData.totalElevationGain > 500 ? 'hard' : gpxData.totalElevationGain > 200 ? 'medium' : 'easy'
+        })
+        .select()
+        .single();
+
+      if (routeError) {
+        throw routeError;
+      }
+
+      // Crear segmentos cada 1km aproximadamente
+      const segments = [];
+      const segmentDistance = 1; // 1km por segmento
+      let currentDistance = 0;
+      let segmentStart = 0;
+
+      for (let i = 1; i < gpxData.points.length; i++) {
+        if (gpxData.points[i].distance! - currentDistance >= segmentDistance || i === gpxData.points.length - 1) {
+          const startPoint = gpxData.points[segmentStart];
+          const endPoint = gpxData.points[i];
+          const segmentElevGain = Math.max(0, endPoint.elevation - startPoint.elevation);
+          const segmentDistance = endPoint.distance! - (gpxData.points[segmentStart].distance || 0);
+          const avgGrade = segmentDistance > 0 ? ((endPoint.elevation - startPoint.elevation) / (segmentDistance * 1000)) * 100 : 0;
+
+          segments.push({
+            route_id: route.id,
+            segment_index: segments.length,
+            start_lat: startPoint.lat,
+            start_lng: startPoint.lon,
+            end_lat: endPoint.lat,
+            end_lng: endPoint.lon,
+            distance_km: segmentDistance,
+            elevation_gain_m: Math.round(segmentElevGain),
+            avg_grade_percent: Math.round(avgGrade * 100) / 100
+          });
+
+          currentDistance = endPoint.distance!;
+          segmentStart = i;
+        }
+      }
+
+      // Guardar segmentos
+      if (segments.length > 0) {
+        const { error: segmentsError } = await supabase
+          .from('segments')
+          .insert(segments);
+
+        if (segmentsError) {
+          console.error('Error saving segments:', segmentsError);
+        }
+      }
+
+      return route;
+    } catch (err) {
+      console.error('Database save error:', err);
+      throw err;
+    }
+  }, []);
+
+  return { parseGPX, saveRouteToDatabase, isLoading, error };
 };

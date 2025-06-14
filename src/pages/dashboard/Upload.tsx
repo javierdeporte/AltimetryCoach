@@ -8,8 +8,7 @@ const Upload = () => {
 
   const handleFileUpload = (file: File) => {
     setUploadedFile(file);
-    console.log('File uploaded:', file.name);
-    // TODO: Process GPX file and redirect to route detail page
+    console.log('File uploaded successfully:', file.name);
   };
 
   return (
@@ -17,25 +16,14 @@ const Upload = () => {
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200 mb-2">
-            Upload Route
+            Subir Ruta
           </h1>
           <p className="text-mountain-600 dark:text-mountain-400">
-            Upload your GPX file to analyze elevation profiles and route segments
+            Sube tu archivo GPX para analizar perfiles de elevación y segmentos de ruta
           </p>
         </div>
 
         <GPXDropzone onFileUpload={handleFileUpload} />
-
-        {uploadedFile && (
-          <div className="mt-8 p-6 bg-primary-50 dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl">
-            <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-              Upload Successful! 🎉
-            </h3>
-            <p className="text-mountain-600 dark:text-mountain-400">
-              {uploadedFile.name} has been processed. You can now view detailed analysis.
-            </p>
-          </div>
-        )}
       </div>
     </DashboardLayout>
   );
