@@ -5,10 +5,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./components/theme-provider";
+import { AuthProvider } from "./hooks/useAuth";
+import { Layout } from "./components/Layout";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import Index from "./pages/Index";
-import Login from "./pages/auth/Login";
-import Signup from "./pages/auth/Signup";
-import Dashboard from "./pages/dashboard/Dashboard";
+import LoginPage from "./pages/auth/LoginPage";
+import SignUp from "./pages/auth/SignUp";
+import DashboardHome from "./pages/dashboard/DashboardHome";
 import Upload from "./pages/dashboard/Upload";
 import RouteDetail from "./pages/dashboard/RouteDetail";
 import Billing from "./pages/dashboard/Billing";
@@ -23,17 +26,49 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth/login" element={<Login />} />
-            <Route path="/auth/signup" element={<Signup />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/upload" element={<Upload />} />
-            <Route path="/dashboard/routes/:id" element={<RouteDetail />} />
-            <Route path="/dashboard/billing" element={<Billing />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth/login" element={<LoginPage />} />
+              <Route path="/auth/sign-up" element={<SignUp />} />
+              
+              {/* Protected Routes */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <DashboardHome />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/dashboard/upload" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Upload />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/dashboard/routes/:id" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <RouteDetail />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/dashboard/billing" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Billing />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>
