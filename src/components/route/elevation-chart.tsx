@@ -1,6 +1,5 @@
 
-import React, { useEffect, useRef, useState } from 'react';
-import * as d3 from 'd3';
+import React, { useMemo } from 'react';
 
 interface ElevationPoint {
   distance: number;
@@ -19,10 +18,6 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
   onPointHover,
   hoveredSegment 
 }) => {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 300 });
-
   // Mock data if no real data provided
   const mockData: ElevationPoint[] = [
     { distance: 0, elevation: 1200, segmentIndex: 0 },
@@ -35,183 +30,106 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
 
   const data = elevationData.length > 0 ? elevationData : mockData;
 
-  // Calculate stats
-  const stats = {
-    totalGain: data.reduce((acc, point, index) => {
+  // Calculate stats and chart dimensions
+  const { stats, chartData } = useMemo(() => {
+    const totalGain = data.reduce((acc, point, index) => {
       if (index === 0) return 0;
       const diff = point.elevation - data[index - 1].elevation;
       return acc + (diff > 0 ? diff : 0);
-    }, 0),
-    totalLoss: data.reduce((acc, point, index) => {
+    }, 0);
+
+    const totalLoss = data.reduce((acc, point, index) => {
       if (index === 0) return 0;
       const diff = point.elevation - data[index - 1].elevation;
       return acc + (diff < 0 ? Math.abs(diff) : 0);
-    }, 0),
-    totalDistance: data[data.length - 1]?.distance || 0
-  };
+    }, 0);
 
-  // Handle resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (containerRef.current) {
-        const { width } = containerRef.current.getBoundingClientRect();
-        setDimensions({ width: width - 48, height: 300 }); // 48px for padding
+    const totalDistance = data[data.length - 1]?.distance || 0;
+
+    // Chart dimensions and scales
+    const width = 600;
+    const height = 200;
+    const padding = { top: 20, right: 20, bottom: 40, left: 60 };
+    
+    const minDistance = Math.min(...data.map(d => d.distance));
+    const maxDistance = Math.max(...data.map(d => d.distance));
+    const minElevation = Math.min(...data.map(d => d.elevation));
+    const maxElevation = Math.max(...data.map(d => d.elevation));
+    
+    const xScale = (distance: number) => 
+      padding.left + ((distance - minDistance) / (maxDistance - minDistance)) * (width - padding.left - padding.right);
+    
+    const yScale = (elevation: number) => 
+      padding.top + ((maxElevation - elevation) / (maxElevation - minElevation)) * (height - padding.top - padding.bottom);
+
+    // Generate path data
+    const pathData = data.map((point, index) => {
+      const x = xScale(point.distance);
+      const y = yScale(point.elevation);
+      return index === 0 ? `M ${x} ${y}` : `L ${x} ${y}`;
+    }).join(' ');
+
+    // Generate area path data
+    const areaData = pathData + ` L ${xScale(data[data.length - 1].distance)} ${height - padding.bottom} L ${xScale(data[0].distance)} ${height - padding.bottom} Z`;
+
+    return {
+      stats: { totalGain, totalLoss, totalDistance },
+      chartData: {
+        width,
+        height,
+        padding,
+        xScale,
+        yScale,
+        pathData,
+        areaData,
+        minDistance,
+        maxDistance,
+        minElevation,
+        maxElevation
       }
     };
+  }, [data]);
 
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const { width, height, padding, xScale, yScale, pathData, areaData, minDistance, maxDistance, minElevation, maxElevation } = chartData;
 
-  // D3 chart rendering
-  useEffect(() => {
-    if (!svgRef.current || dimensions.width === 0) return;
+  // Generate grid lines
+  const gridLines = useMemo(() => {
+    const xTicks = 5;
+    const yTicks = 4;
+    const xLines = [];
+    const yLines = [];
 
-    const svg = d3.select(svgRef.current);
-    svg.selectAll("*").remove();
-
-    const margin = { top: 20, right: 20, bottom: 40, left: 60 };
-    const width = dimensions.width - margin.left - margin.right;
-    const height = dimensions.height - margin.top - margin.bottom;
-
-    const g = svg.append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
-
-    // Scales
-    const xScale = d3.scaleLinear()
-      .domain(d3.extent(data, d => d.distance) as [number, number])
-      .range([0, width]);
-
-    const yScale = d3.scaleLinear()
-      .domain(d3.extent(data, d => d.elevation) as [number, number])
-      .nice()
-      .range([height, 0]);
-
-    // Line generator
-    const line = d3.line<ElevationPoint>()
-      .x(d => xScale(d.distance))
-      .y(d => yScale(d.elevation))
-      .curve(d3.curveCardinal);
-
-    // Area generator for gradient fill
-    const area = d3.area<ElevationPoint>()
-      .x(d => xScale(d.distance))
-      .y0(height)
-      .y1(d => yScale(d.elevation))
-      .curve(d3.curveCardinal);
-
-    // Gradient definition
-    const gradient = svg.append("defs")
-      .append("linearGradient")
-      .attr("id", "elevationGradient")
-      .attr("gradientUnits", "userSpaceOnUse")
-      .attr("x1", 0).attr("y1", 0)
-      .attr("x2", 0).attr("y2", height);
-
-    gradient.append("stop")
-      .attr("offset", "0%")
-      .attr("stop-color", "rgb(34, 197, 94)")
-      .attr("stop-opacity", 0.6);
-
-    gradient.append("stop")
-      .attr("offset", "100%")
-      .attr("stop-color", "rgb(34, 197, 94)")
-      .attr("stop-opacity", 0.1);
-
-    // Grid lines
-    g.selectAll(".grid-line-y")
-      .data(yScale.ticks(5))
-      .enter()
-      .append("line")
-      .attr("class", "grid-line-y")
-      .attr("x1", 0)
-      .attr("x2", width)
-      .attr("y1", d => yScale(d))
-      .attr("y2", d => yScale(d))
-      .attr("stroke", "rgb(203, 213, 225)")
-      .attr("stroke-width", 0.5)
-      .attr("opacity", 0.5);
-
-    g.selectAll(".grid-line-x")
-      .data(xScale.ticks(8))
-      .enter()
-      .append("line")
-      .attr("class", "grid-line-x")
-      .attr("x1", d => xScale(d))
-      .attr("x2", d => xScale(d))
-      .attr("y1", 0)
-      .attr("y2", height)
-      .attr("stroke", "rgb(203, 213, 225)")
-      .attr("stroke-width", 0.5)
-      .attr("opacity", 0.3);
-
-    // Area fill
-    g.append("path")
-      .datum(data)
-      .attr("fill", "url(#elevationGradient)")
-      .attr("d", area);
-
-    // Elevation line
-    g.append("path")
-      .datum(data)
-      .attr("fill", "none")
-      .attr("stroke", "rgb(34, 197, 94)")
-      .attr("stroke-width", 2)
-      .attr("d", line);
-
-    // Data points
-    g.selectAll(".data-point")
-      .data(data)
-      .enter()
-      .append("circle")
-      .attr("class", "data-point")
-      .attr("cx", d => xScale(d.distance))
-      .attr("cy", d => yScale(d.elevation))
-      .attr("r", 4)
-      .attr("fill", d => d.segmentIndex === hoveredSegment ? "rgb(239, 68, 68)" : "rgb(34, 197, 94)")
-      .attr("stroke", "white")
-      .attr("stroke-width", 2)
-      .style("cursor", "pointer")
-      .on("mouseover", function(event, d) {
-        d3.select(this).attr("r", 6);
-        if (onPointHover && d.segmentIndex !== undefined) {
-          onPointHover(d.segmentIndex);
-        }
-      })
-      .on("mouseout", function(event, d) {
-        d3.select(this).attr("r", 4);
-        if (onPointHover) {
-          onPointHover(null);
-        }
+    // X grid lines
+    for (let i = 0; i <= xTicks; i++) {
+      const distance = minDistance + (maxDistance - minDistance) * (i / xTicks);
+      const x = xScale(distance);
+      xLines.push({
+        x1: x,
+        y1: padding.top,
+        x2: x,
+        y2: height - padding.bottom,
+        label: distance.toFixed(1)
       });
+    }
 
-    // X Axis
-    g.append("g")
-      .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(xScale))
-      .append("text")
-      .attr("x", width / 2)
-      .attr("y", 35)
-      .attr("fill", "currentColor")
-      .style("text-anchor", "middle")
-      .text("Distance (km)");
+    // Y grid lines
+    for (let i = 0; i <= yTicks; i++) {
+      const elevation = minElevation + (maxElevation - minElevation) * (i / yTicks);
+      const y = yScale(elevation);
+      yLines.push({
+        x1: padding.left,
+        y1: y,
+        x2: width - padding.right,
+        y2: y,
+        label: Math.round(elevation).toString()
+      });
+    }
 
-    // Y Axis
-    g.append("g")
-      .call(d3.axisLeft(yScale))
-      .append("text")
-      .attr("transform", "rotate(-90)")
-      .attr("y", -40)
-      .attr("x", -height / 2)
-      .attr("fill", "currentColor")
-      .style("text-anchor", "middle")
-      .text("Elevation (m)");
-
-  }, [data, dimensions, hoveredSegment]);
+    return { xLines, yLines };
+  }, [xScale, yScale, minDistance, maxDistance, minElevation, maxElevation, width, height, padding]);
 
   return (
-    <div ref={containerRef} className="h-80 bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 p-6">
+    <div className="h-80 bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 p-6">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
           Elevation Profile
@@ -223,12 +141,130 @@ export const ElevationChart: React.FC<ElevationChartProps> = ({
         </div>
       </div>
       
-      <svg
-        ref={svgRef}
-        width={dimensions.width}
-        height={dimensions.height}
-        className="w-full"
-      />
+      <div className="w-full h-64 overflow-hidden">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full h-full"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* Gradient definition */}
+          <defs>
+            <linearGradient id="elevationGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="rgb(34, 197, 94)" stopOpacity={0.6} />
+              <stop offset="100%" stopColor="rgb(34, 197, 94)" stopOpacity={0.1} />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines */}
+          {gridLines.yLines.map((line, index) => (
+            <line
+              key={`y-grid-${index}`}
+              x1={line.x1}
+              y1={line.y1}
+              x2={line.x2}
+              y2={line.y2}
+              stroke="rgb(203, 213, 225)"
+              strokeWidth={0.5}
+              opacity={0.5}
+            />
+          ))}
+          {gridLines.xLines.map((line, index) => (
+            <line
+              key={`x-grid-${index}`}
+              x1={line.x1}
+              y1={line.y1}
+              x2={line.x2}
+              y2={line.y2}
+              stroke="rgb(203, 213, 225)"
+              strokeWidth={0.5}
+              opacity={0.3}
+            />
+          ))}
+
+          {/* Area fill */}
+          <path
+            d={areaData}
+            fill="url(#elevationGradient)"
+          />
+
+          {/* Elevation line */}
+          <path
+            d={pathData}
+            fill="none"
+            stroke="rgb(34, 197, 94)"
+            strokeWidth={2}
+          />
+
+          {/* Data points */}
+          {data.map((point, index) => (
+            <circle
+              key={index}
+              cx={xScale(point.distance)}
+              cy={yScale(point.elevation)}
+              r={point.segmentIndex === hoveredSegment ? 6 : 4}
+              fill={point.segmentIndex === hoveredSegment ? "rgb(239, 68, 68)" : "rgb(34, 197, 94)"}
+              stroke="white"
+              strokeWidth={2}
+              className="cursor-pointer hover:r-6 transition-all"
+              onMouseEnter={() => onPointHover?.(point.segmentIndex ?? null)}
+              onMouseLeave={() => onPointHover?.(null)}
+            />
+          ))}
+
+          {/* X Axis labels */}
+          {gridLines.xLines.map((line, index) => (
+            <text
+              key={`x-label-${index}`}
+              x={line.x1}
+              y={height - padding.bottom + 20}
+              textAnchor="middle"
+              fontSize="12"
+              fill="currentColor"
+              className="text-mountain-600 dark:text-mountain-400"
+            >
+              {line.label}km
+            </text>
+          ))}
+
+          {/* Y Axis labels */}
+          {gridLines.yLines.map((line, index) => (
+            <text
+              key={`y-label-${index}`}
+              x={padding.left - 10}
+              y={line.y1 + 4}
+              textAnchor="end"
+              fontSize="12"
+              fill="currentColor"
+              className="text-mountain-600 dark:text-mountain-400"
+            >
+              {line.label}m
+            </text>
+          ))}
+
+          {/* Axis labels */}
+          <text
+            x={width / 2}
+            y={height - 5}
+            textAnchor="middle"
+            fontSize="14"
+            fill="currentColor"
+            className="text-mountain-700 dark:text-mountain-300"
+          >
+            Distance (km)
+          </text>
+          <text
+            x={15}
+            y={height / 2}
+            textAnchor="middle"
+            fontSize="14"
+            fill="currentColor"
+            className="text-mountain-700 dark:text-mountain-300"
+            transform={`rotate(-90, 15, ${height / 2})`}
+          >
+            Elevation (m)
+          </text>
+        </svg>
+      </div>
     </div>
   );
 };
