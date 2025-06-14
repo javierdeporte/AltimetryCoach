@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { DashboardLayout } from '../../components/dashboard/dashboard-layout';
@@ -6,14 +5,22 @@ import { InteractiveMap } from '../../components/route/interactive-map';
 import { ElevationChart } from '../../components/route/elevation-chart';
 import { SegmentsTable } from '../../components/route/segments-table';
 import { Button } from '../../components/ui/button';
-import { ArrowUp, Map, Settings } from 'lucide-react';
+import { ArrowUp, Map, Settings, ArrowLeft } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
+import { useNavigate } from 'react-router-dom';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
+  const navigate = useNavigate();
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   
+  console.log('RouteDetail mounted with routeId:', routeId);
+  
   const { route, segments, elevationData, isLoading, error } = useRouteData(routeId || '');
+
+  const handleBackToRoutes = () => {
+    navigate('/dashboard/upload');
+  };
 
   if (isLoading) {
     return (
@@ -36,9 +43,15 @@ const RouteDetail = () => {
             <p className="text-red-600 dark:text-red-400 mb-4">
               {error || 'Ruta no encontrada'}
             </p>
-            <Button onClick={() => window.history.back()}>
-              Volver
-            </Button>
+            <div className="flex gap-2 justify-center">
+              <Button onClick={handleBackToRoutes} variant="outline">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Volver a Rutas
+              </Button>
+              <Button onClick={() => window.location.reload()}>
+                Reintentar
+              </Button>
+            </div>
           </div>
         </div>
       </DashboardLayout>
@@ -78,9 +91,19 @@ const RouteDetail = () => {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200 mb-2">
-              {route.name}
-            </h1>
+            <div className="flex items-center gap-2 mb-2">
+              <Button 
+                onClick={handleBackToRoutes} 
+                variant="ghost" 
+                size="sm"
+                className="p-1"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200">
+                {route.name}
+              </h1>
+            </div>
             <div className="flex flex-wrap gap-6 text-sm text-mountain-600 dark:text-mountain-400">
               <span className="flex items-center gap-1">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

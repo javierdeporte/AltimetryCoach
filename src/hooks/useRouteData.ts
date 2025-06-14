@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -39,8 +38,9 @@ export const useRouteData = (routeId: string) => {
   const [error, setError] = useState<string | null>(null);
 
   const loadRouteData = useCallback(async () => {
-    if (!routeId) {
-      console.log('No routeId provided');
+    // Validar que tenemos un routeId válido
+    if (!routeId || routeId.trim() === '' || routeId === 'undefined' || routeId === 'null') {
+      console.log('No valid routeId provided:', routeId);
       setIsLoading(false);
       setError('ID de ruta no válido');
       return;
@@ -52,7 +52,7 @@ export const useRouteData = (routeId: string) => {
       
       console.log('Loading route data for ID:', routeId);
       
-      // Cargar datos de la ruta con mejor manejo de errores
+      // Cargar datos de la ruta
       const { data: routeData, error: routeError } = await supabase
         .from('routes')
         .select('*')
@@ -72,7 +72,7 @@ export const useRouteData = (routeId: string) => {
       console.log('Route data loaded successfully:', routeData.name);
       setRoute(routeData);
 
-      // Cargar segmentos con mejor manejo de errores
+      // Cargar segmentos
       const { data: segmentsData, error: segmentsError } = await supabase
         .from('segments')
         .select('*')
@@ -87,7 +87,7 @@ export const useRouteData = (routeId: string) => {
         setSegments(segmentsData || []);
       }
 
-      // Procesar datos GPX sin limitación de puntos
+      // Procesar datos GPX
       if (routeData.gpx_data) {
         console.log('Processing GPX data...');
         try {
@@ -135,7 +135,6 @@ function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPo
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(gpxData, 'text/xml');
     
-    // Verificar si hay errores en el parsing
     const parseError = xmlDoc.querySelector('parsererror');
     if (parseError) {
       console.error('XML parsing error:', parseError.textContent);
@@ -155,7 +154,6 @@ function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPo
     let previousLat: number | null = null;
     let previousLon: number | null = null;
 
-    // PROCESAMOS TODOS LOS PUNTOS SIN LIMITACIÓN
     console.log('Processing ALL', trackPoints.length, 'points...');
 
     for (let index = 0; index < trackPoints.length; index++) {
@@ -178,7 +176,6 @@ function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPo
         const elevationEl = point.querySelector('ele');
         const elevation = elevationEl ? parseFloat(elevationEl.textContent || '0') : 0;
 
-        // Calcular distancia acumulada
         if (index > 0 && previousLat !== null && previousLon !== null) {
           const distance = calculateDistance(previousLat, previousLon, lat, lon);
           if (!isNaN(distance) && distance > 0) {
@@ -186,7 +183,6 @@ function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPo
           }
         }
 
-        // Determinar el índice del segmento basado en la distancia
         let segmentIndex = 0;
         if (segments.length > 0) {
           let accumulatedDistance = 0;
@@ -209,7 +205,6 @@ function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPo
         previousLat = lat;
         previousLon = lon;
 
-        // Log de progreso cada 1000 puntos
         if (index % 1000 === 0 && index > 0) {
           console.log(`Processed ${index} points...`);
         }
@@ -230,7 +225,7 @@ function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPo
 // Función para calcular distancia entre dos puntos
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   try {
-    const R = 6371; // Radio de la Tierra en km
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = 
