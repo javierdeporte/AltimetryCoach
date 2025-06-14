@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -7,8 +8,10 @@ interface RouteData {
   description?: string;
   distance_km: number;
   elevation_gain_m: number;
+  elevation_loss_m?: number;
   difficulty_level: string;
   created_at: string;
+  gpx_capture_date?: string;
   gpx_data?: string;
 }
 
