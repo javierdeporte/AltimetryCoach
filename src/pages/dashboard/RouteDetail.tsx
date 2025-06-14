@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { DashboardLayout } from '../../components/dashboard/dashboard-layout';
 import { InteractiveMap } from '../../components/route/interactive-map';
 import { ElevationChart } from '../../components/route/elevation-chart';
@@ -8,6 +8,8 @@ import { Button } from '../../components/ui/button';
 import { ArrowUp, Map, Settings } from 'lucide-react';
 
 const RouteDetail = () => {
+  const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
+
   const routeInfo = {
     name: 'Mountain Trail Loop',
     distance: 16.2,
@@ -18,6 +20,21 @@ const RouteDetail = () => {
     maxElevation: 1620,
     minElevation: 1100
   };
+
+  // Mock elevation data that corresponds to segments
+  const elevationData = [
+    { distance: 0, elevation: 1200, segmentIndex: 0 },
+    { distance: 1.6, elevation: 1275, segmentIndex: 0 },
+    { distance: 3.2, elevation: 1350, segmentIndex: 0 },
+    { distance: 4.5, elevation: 1480, segmentIndex: 1 },
+    { distance: 6.0, elevation: 1630, segmentIndex: 1 },
+    { distance: 7.8, elevation: 1590, segmentIndex: 2 },
+    { distance: 10.1, elevation: 1510, segmentIndex: 2 },
+    { distance: 11.9, elevation: 1380, segmentIndex: 3 },
+    { distance: 13.6, elevation: 1270, segmentIndex: 3 },
+    { distance: 15.0, elevation: 1365, segmentIndex: 4 },
+    { distance: 16.0, elevation: 1460, segmentIndex: 4 },
+  ];
 
   return (
     <DashboardLayout>
@@ -92,11 +109,18 @@ const RouteDetail = () => {
         {/* Map and Chart */}
         <div className="grid lg:grid-cols-2 gap-6">
           <InteractiveMap routeData={{}} />
-          <ElevationChart elevationData={[]} />
+          <ElevationChart 
+            elevationData={elevationData}
+            onPointHover={setHoveredSegment}
+            hoveredSegment={hoveredSegment}
+          />
         </div>
 
         {/* Segments Table */}
-        <SegmentsTable />
+        <SegmentsTable 
+          onSegmentHover={setHoveredSegment}
+          hoveredSegment={hoveredSegment}
+        />
       </div>
     </DashboardLayout>
   );

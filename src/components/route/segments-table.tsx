@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 interface Segment {
@@ -10,6 +10,12 @@ interface Segment {
   elevationLoss: number;
   avgGrade: number;
   maxGrade: number;
+  segmentIndex: number;
+}
+
+interface SegmentsTableProps {
+  onSegmentHover?: (segmentIndex: number | null) => void;
+  hoveredSegment?: number | null;
 }
 
 const mockSegments: Segment[] = [
@@ -20,7 +26,8 @@ const mockSegments: Segment[] = [
     elevationGain: 150,
     elevationLoss: 30,
     avgGrade: 4.2,
-    maxGrade: 8.5
+    maxGrade: 8.5,
+    segmentIndex: 0
   },
   {
     id: '2',
@@ -29,7 +36,8 @@ const mockSegments: Segment[] = [
     elevationGain: 280,
     elevationLoss: 10,
     avgGrade: 9.8,
-    maxGrade: 15.2
+    maxGrade: 15.2,
+    segmentIndex: 1
   },
   {
     id: '3',
@@ -38,7 +46,8 @@ const mockSegments: Segment[] = [
     elevationGain: 80,
     elevationLoss: 120,
     avgGrade: -1.2,
-    maxGrade: 6.3
+    maxGrade: 6.3,
+    segmentIndex: 2
   },
   {
     id: '4',
@@ -47,7 +56,8 @@ const mockSegments: Segment[] = [
     elevationGain: 20,
     elevationLoss: 240,
     avgGrade: -6.8,
-    maxGrade: 12.1
+    maxGrade: 12.1,
+    segmentIndex: 3
   },
   {
     id: '5',
@@ -56,11 +66,15 @@ const mockSegments: Segment[] = [
     elevationGain: 190,
     elevationLoss: 15,
     avgGrade: 7.1,
-    maxGrade: 13.8
+    maxGrade: 13.8,
+    segmentIndex: 4
   }
 ];
 
-export const SegmentsTable: React.FC = () => {
+export const SegmentsTable: React.FC<SegmentsTableProps> = ({ 
+  onSegmentHover, 
+  hoveredSegment 
+}) => {
   const getGradeColor = (grade: number) => {
     if (grade > 8) return 'text-red-600 dark:text-red-400';
     if (grade > 4) return 'text-earth-600 dark:text-earth-400';
@@ -95,7 +109,13 @@ export const SegmentsTable: React.FC = () => {
             {mockSegments.map((segment) => (
               <TableRow 
                 key={segment.id} 
-                className="border-primary-200 dark:border-mountain-700 hover:bg-primary-50 dark:hover:bg-mountain-700 cursor-pointer"
+                className={`border-primary-200 dark:border-mountain-700 cursor-pointer transition-colors ${
+                  hoveredSegment === segment.segmentIndex
+                    ? 'bg-primary-100 dark:bg-primary-900/20'
+                    : 'hover:bg-primary-50 dark:hover:bg-mountain-700'
+                }`}
+                onMouseEnter={() => onSegmentHover?.(segment.segmentIndex)}
+                onMouseLeave={() => onSegmentHover?.(null)}
               >
                 <TableCell className="font-medium text-mountain-800 dark:text-mountain-200">
                   {segment.name}
