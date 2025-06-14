@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -24,6 +23,7 @@ interface GPXData {
   name: string;
   description?: string;
   captureDate?: Date;
+  dateSource: 'gps_metadata' | 'file' | 'manual';
 }
 
 // Función para calcular la distancia entre dos puntos
@@ -46,8 +46,10 @@ function calculateDifficulty(elevationGain: number): string {
   return 'hard';
 }
 
-// Función para extraer fecha de captura del GPX
-function extractGPXCaptureDate(xmlDoc: Document, originalFile: File): Date | undefined {
+// Función mejorada para extraer fecha de captura del GPX con detección de fuente
+function extractGPXCaptureDate(xmlDoc: Document, originalFile: File): { date: Date | undefined, source: 'gps_metadata' | 'file' } {
+  console.log('Analyzing GPX date sources...');
+  
   // 1. Buscar en metadatos de tiempo del primer punto
   const firstTimeEl = xmlDoc.querySelector('trkpt time');
   if (firstTimeEl?.textContent) {
@@ -55,7 +57,8 @@ function extractGPXCaptureDate(xmlDoc: Document, originalFile: File): Date | und
     if (timeStr) {
       const date = new Date(timeStr);
       if (!isNaN(date.getTime())) {
-        return date;
+        console.log('Found GPS time in first track point:', timeStr);
+        return { date, source: 'gps_metadata' };
       }
     }
   }
@@ -67,15 +70,41 @@ function extractGPXCaptureDate(xmlDoc: Document, originalFile: File): Date | und
     if (timeStr) {
       const date = new Date(timeStr);
       if (!isNaN(date.getTime())) {
-        return date;
+        console.log('Found GPS time in track metadata:', timeStr);
+        return { date, source: 'gps_metadata' };
       }
     }
   }
 
-  // 3. Buscar patrones de fecha en la descripción
+  // 3. Verificar si hay múltiples puntos con tiempo (indicativo de GPS real)
+  const timeElements = xmlDoc.querySelectorAll('trkpt time');
+  if (timeElements.length > 1) {
+    // Si hay al menos 2 puntos con tiempo, probablemente es GPS real
+    const times = Array.from(timeElements)
+      .map(el => el.textContent?.trim())
+      .filter(Boolean)
+      .map(timeStr => new Date(timeStr!))
+      .filter(date => !isNaN(date.getTime()));
+    
+    if (times.length >= 2) {
+      // Verificar que las fechas son secuenciales y realistas
+      const timeDiffs = times.slice(1).map((time, i) => time.getTime() - times[i].getTime());
+      const avgDiff = timeDiffs.reduce((acc, diff) => acc + diff, 0) / timeDiffs.length;
+      
+      // Si el promedio de diferencia está entre 1 segundo y 1 hora, es probablemente GPS real
+      if (avgDiff > 1000 && avgDiff < 3600000) {
+        console.log('Found sequential GPS timestamps indicating real GPS data');
+        return { date: times[0], source: 'gps_metadata' };
+      }
+    }
+  }
+
+  // 4. Buscar patrones de fecha en la descripción
   const descElement = xmlDoc.querySelector('trk desc, metadata desc');
   if (descElement?.textContent) {
     const desc = descElement.textContent;
+    console.log('Checking description for date patterns:', desc);
+    
     // Buscar patrones comunes de fecha
     const datePatterns = [
       /(\d{4}-\d{2}-\d{2})/,  // YYYY-MM-DD
@@ -88,14 +117,51 @@ function extractGPXCaptureDate(xmlDoc: Document, originalFile: File): Date | und
       if (match) {
         const date = new Date(match[1]);
         if (!isNaN(date.getTime())) {
-          return date;
+          console.log('Found date pattern in description:', match[1]);
+          return { date, source: 'gps_metadata' };
         }
       }
     }
   }
 
-  // 4. Usar fecha de modificación del archivo como fallback
-  return new Date(originalFile.lastModified);
+  // 5. Como último recurso, usar fecha de modificación del archivo
+  console.log('No GPS metadata found, using file date as fallback');
+  return { date: new Date(originalFile.lastModified), source: 'file' };
+}
+
+// Función para detectar automáticamente el tipo de ruta
+function detectRouteType(xmlDoc: Document, dateSource: 'gps_metadata' | 'file', hasRealGPSData: boolean): string {
+  const name = xmlDoc.querySelector('trk name')?.textContent?.toLowerCase() || '';
+  const desc = xmlDoc.querySelector('trk desc, metadata desc')?.textContent?.toLowerCase() || '';
+  
+  // Palabras clave para diferentes tipos
+  const raceKeywords = ['carrera', 'race', 'altimetría', 'altimetria', 'perfil', 'profile', 'competición', 'competition'];
+  const planningKeywords = ['planificación', 'planificacion', 'planning', 'ruta', 'route', 'plan'];
+  const trainingKeywords = ['entrenamiento', 'training', 'workout', 'run', 'corrida'];
+  
+  const text = `${name} ${desc}`;
+  
+  // Si no tiene datos GPS reales (dateSource = 'file'), probablemente es altimetría
+  if (dateSource === 'file' && !hasRealGPSData) {
+    // Verificar si parece altimetría de carrera
+    if (raceKeywords.some(keyword => text.includes(keyword))) {
+      return 'race_profile';
+    }
+    // Si no tiene palabras de carrera pero tampoco GPS real, podría ser planificación
+    return 'route_planning';
+  }
+  
+  // Si tiene datos GPS reales, analizar contenido
+  if (raceKeywords.some(keyword => text.includes(keyword))) {
+    return 'race_profile';
+  }
+  
+  if (planningKeywords.some(keyword => text.includes(keyword)) && !trainingKeywords.some(keyword => text.includes(keyword))) {
+    return 'route_planning';
+  }
+  
+  // Por defecto, si tiene GPS real, es entrenamiento
+  return hasRealGPSData ? 'training' : 'route_planning';
 }
 
 export const useGPXParser = () => {
@@ -121,8 +187,23 @@ export const useGPXParser = () => {
       const trackName = xmlDoc.querySelector('trk name')?.textContent || file.name.replace('.gpx', '');
       const trackDesc = xmlDoc.querySelector('trk desc')?.textContent || '';
 
-      // Extraer fecha de captura
-      const captureDate = extractGPXCaptureDate(xmlDoc, file);
+      // Extraer fecha de captura y determinar fuente
+      const { date: captureDate, source: dateSource } = extractGPXCaptureDate(xmlDoc, file);
+
+      // Verificar si hay datos GPS reales (múltiples puntos con tiempo)
+      const timeElements = xmlDoc.querySelectorAll('trkpt time');
+      const hasRealGPSData = timeElements.length > 1;
+
+      // Detectar automáticamente el tipo de ruta
+      const detectedRouteType = detectRouteType(xmlDoc, dateSource, hasRealGPSData);
+
+      console.log('Route analysis:', {
+        name: trackName,
+        dateSource,
+        hasRealGPSData,
+        detectedRouteType,
+        timeElementsCount: timeElements.length
+      });
 
       // Extraer puntos del track
       const trackPoints = xmlDoc.querySelectorAll('trkpt');
@@ -192,7 +273,8 @@ export const useGPXParser = () => {
         },
         name: trackName,
         description: trackDesc,
-        captureDate
+        captureDate,
+        dateSource
       };
 
       setIsLoading(false);
@@ -215,6 +297,14 @@ export const useGPXParser = () => {
       // Calcular dificultad con nuevos criterios
       const difficulty = calculateDifficulty(gpxData.totalElevationGain);
 
+      // Detectar automáticamente el tipo de ruta basado en análisis GPX
+      const timeElements = originalFile.text ? (new DOMParser().parseFromString(await originalFile.text(), 'text/xml')).querySelectorAll('trkpt time') : [];
+      const hasRealGPSData = timeElements.length > 1;
+      
+      const autoRouteType = gpxData.dateSource === 'gps_metadata' && hasRealGPSData ? 'training' : 'route_planning';
+
+      console.log('Saving route with detected type:', autoRouteType);
+
       // Guardar la ruta en la base de datos con los nuevos campos
       const { data: route, error: routeError } = await supabase
         .from('routes')
@@ -227,7 +317,9 @@ export const useGPXParser = () => {
           elevation_loss_m: Math.round(gpxData.totalElevationLoss),
           gpx_capture_date: gpxData.captureDate?.toISOString(),
           gpx_data: await originalFile.text(),
-          difficulty_level: difficulty
+          difficulty_level: difficulty,
+          route_type: autoRouteType,
+          date_source: gpxData.dateSource
         })
         .select()
         .single();
