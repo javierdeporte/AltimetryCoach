@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Map, ArrowUp, ArrowDown, Plus, Calendar, MapPin, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate } from '@/utils/routeUtils';
 
 const DashboardHome = () => {
   const { user } = useAuth();
@@ -20,15 +21,22 @@ const DashboardHome = () => {
         totalRoutes: 0,
         totalDistance: 0,
         totalElevation: 0,
-        totalElevationLoss: 0
+        totalElevationLoss: 0,
+        trainingRoutes: 0,
+        raceProfiles: 0
       };
     }
+
+    const trainingRoutes = routes.filter(route => (route.route_type || 'training') === 'training');
+    const raceProfiles = routes.filter(route => route.route_type === 'race_profile');
 
     return {
       totalRoutes: routes.length,
       totalDistance: routes.reduce((acc, route) => acc + (route.distance_km || 0), 0),
       totalElevation: routes.reduce((acc, route) => acc + (route.elevation_gain_m || 0), 0),
-      totalElevationLoss: routes.reduce((acc, route) => acc + (route.elevation_loss_m || 0), 0)
+      totalElevationLoss: routes.reduce((acc, route) => acc + (route.elevation_loss_m || 0), 0),
+      trainingRoutes: trainingRoutes.length,
+      raceProfiles: raceProfiles.length
     };
   }, [routes]);
 
@@ -47,17 +55,6 @@ const DashboardHome = () => {
 
   const handleViewRoute = (routeId: string) => {
     navigate(`/dashboard/routes/${routeId}`);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES');
-  };
-
-  const formatGPXCaptureDate = (route: any) => {
-    if (route.gpx_capture_date) {
-      return `GPX: ${formatDate(route.gpx_capture_date)}`;
-    }
-    return `Subida: ${formatDate(route.created_at)}`;
   };
 
   if (isLoading) {
@@ -92,21 +89,40 @@ const DashboardHome = () => {
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Enhanced Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <Card className="border-primary-200 dark:border-mountain-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-mountain-600 dark:text-mountain-400">
-              Total Rutas
+              Entrenamientos
             </CardTitle>
-            <Map className="h-4 w-4 text-primary-600" />
+            <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-mountain-800 dark:text-mountain-200">
-              {stats.totalRoutes}
+              {stats.trainingRoutes}
             </div>
             <p className="text-xs text-mountain-500 dark:text-mountain-500">
-              Plan gratuito: límite de 3 rutas
+              Actividades registradas
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary-200 dark:border-mountain-700">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-mountain-600 dark:text-mountain-400">
+              Altimetrías
+            </CardTitle>
+            <Map className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-mountain-800 dark:text-mountain-200">
+              {stats.raceProfiles}
+            </div>
+            <p className="text-xs text-mountain-500 dark:text-mountain-500">
+              Perfiles de carrera
             </p>
           </CardContent>
         </Card>
@@ -181,10 +197,13 @@ const DashboardHome = () => {
                   className="flex items-center justify-between p-4 border border-mountain-200 dark:border-mountain-700 rounded-lg hover:bg-mountain-50 dark:hover:bg-mountain-800/50 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
                       <h4 className="font-medium text-mountain-800 dark:text-mountain-200 truncate">
                         {route.name}
                       </h4>
+                      <Badge className={`${getRouteTypeColor(route.route_type)} text-xs`}>
+                        {getRouteTypeLabel(route.route_type)}
+                      </Badge>
                       <Badge className={`${getDifficultyColor(route.difficulty_level)} text-xs`}>
                         {route.difficulty_level}
                       </Badge>
@@ -207,7 +226,7 @@ const DashboardHome = () => {
                       )}
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {formatGPXCaptureDate(route)}
+                        {getDisplayDate(route)}
                       </span>
                     </div>
                     

@@ -1,13 +1,14 @@
-
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
 import { ElevationChart } from '../../components/route/elevation-chart';
 import { SegmentsTable } from '../../components/route/segments-table';
 import { Button } from '../../components/ui/button';
+import { Badge } from '../../components/ui/badge';
 import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
+import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -113,7 +114,7 @@ const RouteDetail = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Enhanced Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
@@ -129,6 +130,20 @@ const RouteDetail = () => {
               {route.name}
             </h1>
           </div>
+          
+          {/* Route type and date info */}
+          <div className="flex items-center gap-3 mb-3">
+            <Badge className={`${getRouteTypeColor(route.route_type)} text-sm`}>
+              {getRouteTypeLabel(route.route_type)}
+            </Badge>
+            <span className="text-sm text-mountain-600 dark:text-mountain-400" title={getDateSourceLabel(route.date_source)}>
+              {getDisplayDate(route)}
+            </span>
+            <span className="text-sm text-mountain-600 dark:text-mountain-400">
+              Dificultad: {route.difficulty_level}
+            </span>
+          </div>
+          
           <div className="flex flex-wrap gap-6 text-sm text-mountain-600 dark:text-mountain-400">
             <span className="flex items-center gap-1">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -152,8 +167,6 @@ const RouteDetail = () => {
               </svg>
               {totalTime}
             </span>
-            <span>Dificultad: {route.difficulty_level}</span>
-            <span>{formatGPXCaptureDate(route)}</span>
           </div>
           {route.description && (
             <p className="text-mountain-600 dark:text-mountain-400 mt-2">

@@ -1,14 +1,16 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRoutes } from '@/hooks/useRoutes';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { ArrowUp, ArrowDown, Calendar, MapPin, Eye } from 'lucide-react';
+import { ArrowUp, ArrowDown, Calendar, MapPin, Eye, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate } from '@/utils/routeUtils';
 
 export const RoutesList: React.FC = () => {
   const { routes, isLoading, error } = useRoutes();
   const navigate = useNavigate();
+  const [selectedRouteType, setSelectedRouteType] = useState<string>('all');
 
   const handleViewRoute = (routeId: string) => {
     navigate(`/dashboard/routes/${routeId}`);
@@ -27,16 +29,11 @@ export const RoutesList: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES');
-  };
-
-  const formatGPXCaptureDate = (route: any) => {
-    if (route.gpx_capture_date) {
-      return `GPX: ${formatDate(route.gpx_capture_date)}`;
-    }
-    return `Subida: ${formatDate(route.created_at)}`;
-  };
+  // Filter routes by type
+  const filteredRoutes = routes.filter(route => {
+    if (selectedRouteType === 'all') return true;
+    return (route.route_type || 'training') === selectedRouteType;
+  });
 
   if (isLoading) {
     return (
@@ -92,21 +89,40 @@ export const RoutesList: React.FC = () => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-          Rutas Existentes ({routes.length})
+          Rutas Existentes ({filteredRoutes.length})
         </h3>
+        
+        {/* Route type filter */}
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-mountain-600" />
+          <select
+            value={selectedRouteType}
+            onChange={(e) => setSelectedRouteType(e.target.value)}
+            className="text-sm border border-mountain-300 dark:border-mountain-600 rounded-md px-2 py-1 bg-white dark:bg-mountain-800 text-mountain-800 dark:text-mountain-200"
+          >
+            <option value="all">Todas las rutas</option>
+            <option value="training">Entrenamientos</option>
+            <option value="race_profile">Altimetrías de Carrera</option>
+            <option value="route_planning">Planificación</option>
+            <option value="custom">Personalizadas</option>
+          </select>
+        </div>
       </div>
       
       <div className="space-y-3">
-        {routes.map((route) => (
+        {filteredRoutes.map((route) => (
           <div 
             key={route.id} 
             className="flex items-center justify-between p-4 border border-mountain-200 dark:border-mountain-700 rounded-lg hover:bg-mountain-50 dark:hover:bg-mountain-800/50 transition-colors"
           >
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-3 mb-2 flex-wrap">
                 <h4 className="font-medium text-mountain-800 dark:text-mountain-200 truncate">
                   {route.name}
                 </h4>
+                <Badge className={`${getRouteTypeColor(route.route_type)} text-xs`}>
+                  {getRouteTypeLabel(route.route_type)}
+                </Badge>
                 <Badge className={`${getDifficultyColor(route.difficulty_level)} text-xs`}>
                   {route.difficulty_level}
                 </Badge>
@@ -127,9 +143,9 @@ export const RoutesList: React.FC = () => {
                     -{route.elevation_loss_m}m
                   </span>
                 )}
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1" title={`Tipo de fecha: ${route.date_source || 'file'}`}>
                   <Calendar className="w-3 h-3" />
-                  {formatGPXCaptureDate(route)}
+                  {getDisplayDate(route)}
                 </span>
               </div>
               

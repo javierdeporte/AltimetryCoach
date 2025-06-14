@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -13,6 +12,8 @@ interface RouteData {
   created_at: string;
   gpx_capture_date?: string;
   gpx_data?: string;
+  route_type?: string;
+  date_source?: string;
 }
 
 interface Segment {
@@ -44,7 +45,6 @@ export const useRouteData = (routeId: string) => {
     console.log('useRouteData called with routeId:', routeId);
     console.log('RouteId type:', typeof routeId, 'length:', routeId?.length);
     
-    // Validar que tenemos un routeId válido
     if (!routeId || routeId.trim() === '' || routeId === 'undefined' || routeId === 'null') {
       console.error('No valid routeId provided:', routeId);
       setIsLoading(false);
@@ -58,7 +58,6 @@ export const useRouteData = (routeId: string) => {
       
       console.log('Loading route data for ID:', routeId);
       
-      // Cargar datos de la ruta
       const { data: routeData, error: routeError } = await supabase
         .from('routes')
         .select('*')
@@ -80,7 +79,6 @@ export const useRouteData = (routeId: string) => {
       console.log('Route data loaded successfully:', routeData.name);
       setRoute(routeData);
 
-      // Cargar segmentos
       const { data: segmentsData, error: segmentsError } = await supabase
         .from('segments')
         .select('*')
@@ -95,7 +93,6 @@ export const useRouteData = (routeId: string) => {
         setSegments(segmentsData || []);
       }
 
-      // Procesar datos GPX
       if (routeData.gpx_data) {
         console.log('Processing GPX data...');
         try {
@@ -130,7 +127,6 @@ export const useRouteData = (routeId: string) => {
   return { route, segments, elevationData, isLoading, error };
 };
 
-// Función auxiliar para parsear GPX y extraer puntos de elevación SIN LIMITACIÓN
 function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPoint[] {
   if (!gpxData || typeof gpxData !== 'string') {
     console.warn('Invalid GPX data provided');
@@ -230,7 +226,6 @@ function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPo
   }
 }
 
-// Función para calcular distancia entre dos puntos
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   try {
     const R = 6371;

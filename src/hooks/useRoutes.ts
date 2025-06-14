@@ -13,6 +13,8 @@ interface Route {
   created_at: string;
   gpx_capture_date?: string;
   gpx_data?: string;
+  route_type?: string;
+  date_source?: string;
 }
 
 export const useRoutes = () => {
