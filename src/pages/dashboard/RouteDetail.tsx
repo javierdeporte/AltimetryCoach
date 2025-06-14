@@ -1,40 +1,76 @@
 
 import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { DashboardLayout } from '../../components/dashboard/dashboard-layout';
 import { InteractiveMap } from '../../components/route/interactive-map';
 import { ElevationChart } from '../../components/route/elevation-chart';
 import { SegmentsTable } from '../../components/route/segments-table';
 import { Button } from '../../components/ui/button';
 import { ArrowUp, Map, Settings } from 'lucide-react';
+import { useRouteData } from '../../hooks/useRouteData';
 
 const RouteDetail = () => {
+  const { routeId } = useParams<{ routeId: string }>();
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
+  
+  const { route, segments, elevationData, isLoading, error } = useRouteData(routeId || '');
 
-  const routeInfo = {
-    name: 'Mountain Trail Loop',
-    distance: 16.2,
-    totalTime: '2h 45m',
-    elevationGain: 520,
-    elevationLoss: 520,
-    avgPace: '10:12/km',
-    maxElevation: 1620,
-    minElevation: 1100
-  };
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-mountain-600 dark:text-mountain-400">Cargando datos de la ruta...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
-  // Mock elevation data that corresponds to segments
-  const elevationData = [
-    { distance: 0, elevation: 1200, segmentIndex: 0 },
-    { distance: 1.6, elevation: 1275, segmentIndex: 0 },
-    { distance: 3.2, elevation: 1350, segmentIndex: 0 },
-    { distance: 4.5, elevation: 1480, segmentIndex: 1 },
-    { distance: 6.0, elevation: 1630, segmentIndex: 1 },
-    { distance: 7.8, elevation: 1590, segmentIndex: 2 },
-    { distance: 10.1, elevation: 1510, segmentIndex: 2 },
-    { distance: 11.9, elevation: 1380, segmentIndex: 3 },
-    { distance: 13.6, elevation: 1270, segmentIndex: 3 },
-    { distance: 15.0, elevation: 1365, segmentIndex: 4 },
-    { distance: 16.0, elevation: 1460, segmentIndex: 4 },
-  ];
+  if (error || !route) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-600 dark:text-red-400 mb-4">
+              {error || 'Ruta no encontrada'}
+            </p>
+            <Button onClick={() => window.history.back()}>
+              Volver
+            </Button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Calcular estadísticas adicionales
+  const totalElevationLoss = elevationData.reduce((acc, point, index) => {
+    if (index === 0) return 0;
+    const diff = point.elevation - elevationData[index - 1].elevation;
+    return acc + (diff < 0 ? Math.abs(diff) : 0);
+  }, 0);
+
+  const maxElevation = elevationData.length > 0 ? Math.max(...elevationData.map(p => p.elevation)) : 0;
+  const minElevation = elevationData.length > 0 ? Math.min(...elevationData.map(p => p.elevation)) : 0;
+  
+  // Calcular gradientes para estadísticas
+  const grades = elevationData.map((point, index) => {
+    if (index === 0) return 0;
+    const elevationDiff = point.elevation - elevationData[index - 1].elevation;
+    const distanceDiff = (point.distance - elevationData[index - 1].distance) * 1000; // convertir a metros
+    return distanceDiff > 0 ? (elevationDiff / distanceDiff) * 100 : 0;
+  });
+
+  const avgGrade = grades.length > 0 ? grades.reduce((acc, grade) => acc + grade, 0) / grades.length : 0;
+  const maxGrade = grades.length > 0 ? Math.max(...grades.map(g => Math.abs(g))) : 0;
+
+  // Calcular tiempo estimado (asumiendo velocidad promedio)
+  const estimatedTime = (route.distance_km / 5) * 60; // 5 km/h promedio en montaña
+  const hours = Math.floor(estimatedTime / 60);
+  const minutes = Math.round(estimatedTime % 60);
+  const totalTime = `${hours}h ${minutes}m`;
 
   return (
     <DashboardLayout>
@@ -43,27 +79,32 @@ const RouteDetail = () => {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200 mb-2">
-              {routeInfo.name}
+              {route.name}
             </h1>
             <div className="flex flex-wrap gap-6 text-sm text-mountain-600 dark:text-mountain-400">
               <span className="flex items-center gap-1">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                {routeInfo.distance} km
+                {route.distance_km.toFixed(1)} km
               </span>
               <span className="flex items-center gap-1">
                 <ArrowUp className="w-4 h-4" />
-                +{routeInfo.elevationGain}m
+                +{route.elevation_gain_m}m
               </span>
               <span className="flex items-center gap-1">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {routeInfo.totalTime}
+                {totalTime}
               </span>
-              <span>Pace: {routeInfo.avgPace}</span>
+              <span>Dificultad: {route.difficulty_level}</span>
             </div>
+            {route.description && (
+              <p className="text-mountain-600 dark:text-mountain-400 mt-2">
+                {route.description}
+              </p>
+            )}
           </div>
           
           <div className="flex gap-3">
@@ -82,25 +123,25 @@ const RouteDetail = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
             <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-              {routeInfo.maxElevation}m
+              {Math.round(maxElevation)}m
             </div>
             <div className="text-sm text-mountain-600 dark:text-mountain-400">Max Elevation</div>
           </div>
           <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {routeInfo.minElevation}m
+              {Math.round(minElevation)}m
             </div>
             <div className="text-sm text-mountain-600 dark:text-mountain-400">Min Elevation</div>
           </div>
           <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
             <div className="text-2xl font-bold text-earth-600 dark:text-earth-400">
-              8.2%
+              {avgGrade.toFixed(1)}%
             </div>
             <div className="text-sm text-mountain-600 dark:text-mountain-400">Avg Grade</div>
           </div>
           <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
             <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-              15.2%
+              {maxGrade.toFixed(1)}%
             </div>
             <div className="text-sm text-mountain-600 dark:text-mountain-400">Max Grade</div>
           </div>
@@ -108,7 +149,7 @@ const RouteDetail = () => {
 
         {/* Map and Chart */}
         <div className="grid lg:grid-cols-2 gap-6">
-          <InteractiveMap routeData={{}} />
+          <InteractiveMap routeData={route} />
           <ElevationChart 
             elevationData={elevationData}
             onPointHover={setHoveredSegment}
@@ -118,6 +159,7 @@ const RouteDetail = () => {
 
         {/* Segments Table */}
         <SegmentsTable 
+          segments={segments}
           onSegmentHover={setHoveredSegment}
           hoveredSegment={hoveredSegment}
         />

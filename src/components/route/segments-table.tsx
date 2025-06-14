@@ -1,95 +1,84 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 interface Segment {
   id: string;
-  name: string;
-  distance: number;
-  elevationGain: number;
-  elevationLoss: number;
-  avgGrade: number;
-  maxGrade: number;
-  segmentIndex: number;
+  segment_index: number;
+  distance_km: number;
+  elevation_gain_m: number;
+  avg_grade_percent: number;
 }
 
 interface SegmentsTableProps {
+  segments: Segment[];
   onSegmentHover?: (segmentIndex: number | null) => void;
   hoveredSegment?: number | null;
 }
 
-const mockSegments: Segment[] = [
-  {
-    id: '1',
-    name: 'Forest Approach',
-    distance: 3.2,
-    elevationGain: 150,
-    elevationLoss: 30,
-    avgGrade: 4.2,
-    maxGrade: 8.5,
-    segmentIndex: 0
-  },
-  {
-    id: '2',
-    name: 'Steep Ascent',
-    distance: 2.8,
-    elevationGain: 280,
-    elevationLoss: 10,
-    avgGrade: 9.8,
-    maxGrade: 15.2,
-    segmentIndex: 1
-  },
-  {
-    id: '3',
-    name: 'Ridge Walk',
-    distance: 4.1,
-    elevationGain: 80,
-    elevationLoss: 120,
-    avgGrade: -1.2,
-    maxGrade: 6.3,
-    segmentIndex: 2
-  },
-  {
-    id: '4',
-    name: 'Technical Descent',
-    distance: 3.5,
-    elevationGain: 20,
-    elevationLoss: 240,
-    avgGrade: -6.8,
-    maxGrade: 12.1,
-    segmentIndex: 3
-  },
-  {
-    id: '5',
-    name: 'Final Push',
-    distance: 2.4,
-    elevationGain: 190,
-    elevationLoss: 15,
-    avgGrade: 7.1,
-    maxGrade: 13.8,
-    segmentIndex: 4
-  }
-];
-
 export const SegmentsTable: React.FC<SegmentsTableProps> = ({ 
+  segments,
   onSegmentHover, 
   hoveredSegment 
 }) => {
   const getGradeColor = (grade: number) => {
-    if (grade > 8) return 'text-red-600 dark:text-red-400';
-    if (grade > 4) return 'text-earth-600 dark:text-earth-400';
-    if (grade > 0) return 'text-primary-600 dark:text-primary-400';
+    const absGrade = Math.abs(grade);
+    if (absGrade > 8) return 'text-red-600 dark:text-red-400';
+    if (absGrade > 4) return 'text-earth-600 dark:text-earth-400';
+    if (absGrade > 0) return 'text-primary-600 dark:text-primary-400';
     return 'text-blue-600 dark:text-blue-400';
   };
+
+  const getSegmentName = (index: number) => {
+    const names = [
+      'Inicio del sendero',
+      'Ascenso principal',
+      'Tramo intermedio',
+      'Descenso técnico',
+      'Tramo final',
+      'Regreso'
+    ];
+    return names[index] || `Segmento ${index + 1}`;
+  };
+
+  // Calcular pérdida de elevación estimada (simplificado)
+  const calculateElevationLoss = (segment: Segment) => {
+    // Si el gradiente promedio es negativo, usar eso como pérdida
+    if (segment.avg_grade_percent < 0) {
+      return Math.abs((segment.avg_grade_percent / 100) * segment.distance_km * 1000);
+    }
+    // Si es positivo, asumir pérdida mínima
+    return Math.round(segment.distance_km * 5); // 5m de pérdida por km como estimación
+  };
+
+  if (segments.length === 0) {
+    return (
+      <div className="bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 overflow-hidden">
+        <div className="p-6 border-b border-primary-200 dark:border-mountain-700">
+          <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
+            Análisis de Segmentos de Ruta
+          </h3>
+          <p className="text-sm text-mountain-600 dark:text-mountain-400 mt-1">
+            No hay segmentos disponibles para esta ruta
+          </p>
+        </div>
+        <div className="p-6 text-center">
+          <p className="text-mountain-600 dark:text-mountain-400">
+            Los segmentos se generarán automáticamente al procesar el archivo GPX
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 overflow-hidden">
       <div className="p-6 border-b border-primary-200 dark:border-mountain-700">
         <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-          Route Segments Analysis
+          Análisis de Segmentos de Ruta
         </h3>
         <p className="text-sm text-mountain-600 dark:text-mountain-400 mt-1">
-          Detailed breakdown of elevation changes and gradients
+          Desglose detallado de cambios de elevación y gradientes
         </p>
       </div>
       
@@ -97,43 +86,39 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
         <Table>
           <TableHeader>
             <TableRow className="border-primary-200 dark:border-mountain-700">
-              <TableHead className="text-mountain-700 dark:text-mountain-300">Segment</TableHead>
-              <TableHead className="text-mountain-700 dark:text-mountain-300">Distance</TableHead>
-              <TableHead className="text-mountain-700 dark:text-mountain-300">Gain</TableHead>
-              <TableHead className="text-mountain-700 dark:text-mountain-300">Loss</TableHead>
-              <TableHead className="text-mountain-700 dark:text-mountain-300">Avg Grade</TableHead>
-              <TableHead className="text-mountain-700 dark:text-mountain-300">Max Grade</TableHead>
+              <TableHead className="text-mountain-700 dark:text-mountain-300">Segmento</TableHead>
+              <TableHead className="text-mountain-700 dark:text-mountain-300">Distancia</TableHead>
+              <TableHead className="text-mountain-700 dark:text-mountain-300">Ganancia</TableHead>
+              <TableHead className="text-mountain-700 dark:text-mountain-300">Pérdida</TableHead>
+              <TableHead className="text-mountain-700 dark:text-mountain-300">Gradiente Promedio</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockSegments.map((segment) => (
+            {segments.map((segment) => (
               <TableRow 
                 key={segment.id} 
                 className={`border-primary-200 dark:border-mountain-700 cursor-pointer transition-colors ${
-                  hoveredSegment === segment.segmentIndex
+                  hoveredSegment === segment.segment_index
                     ? 'bg-primary-100 dark:bg-primary-900/20'
                     : 'hover:bg-primary-50 dark:hover:bg-mountain-700'
                 }`}
-                onMouseEnter={() => onSegmentHover?.(segment.segmentIndex)}
+                onMouseEnter={() => onSegmentHover?.(segment.segment_index)}
                 onMouseLeave={() => onSegmentHover?.(null)}
               >
                 <TableCell className="font-medium text-mountain-800 dark:text-mountain-200">
-                  {segment.name}
+                  {getSegmentName(segment.segment_index)}
                 </TableCell>
                 <TableCell className="text-mountain-600 dark:text-mountain-400">
-                  {segment.distance.toFixed(1)} km
+                  {segment.distance_km.toFixed(1)} km
                 </TableCell>
                 <TableCell className="text-primary-600 dark:text-primary-400">
-                  +{segment.elevationGain}m
+                  +{Math.round(segment.elevation_gain_m)}m
                 </TableCell>
                 <TableCell className="text-blue-600 dark:text-blue-400">
-                  -{segment.elevationLoss}m
+                  -{Math.round(calculateElevationLoss(segment))}m
                 </TableCell>
-                <TableCell className={getGradeColor(segment.avgGrade)}>
-                  {segment.avgGrade > 0 ? '+' : ''}{segment.avgGrade.toFixed(1)}%
-                </TableCell>
-                <TableCell className={getGradeColor(segment.maxGrade)}>
-                  {segment.maxGrade.toFixed(1)}%
+                <TableCell className={getGradeColor(segment.avg_grade_percent)}>
+                  {segment.avg_grade_percent > 0 ? '+' : ''}{segment.avg_grade_percent.toFixed(1)}%
                 </TableCell>
               </TableRow>
             ))}
