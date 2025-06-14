@@ -1,8 +1,9 @@
 
 import React, { useCallback, useState } from 'react';
 import { Button } from '../ui/button';
-import { Upload, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
 import { useGPXParser } from '@/hooks/useGPXParser';
+import { useRoutes } from '@/hooks/useRoutes';
 import { useNavigate } from 'react-router-dom';
 
 interface GPXDropzoneProps {
@@ -11,9 +12,13 @@ interface GPXDropzoneProps {
 
 export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error' | 'duplicate'>('idle');
   const [uploadMessage, setUploadMessage] = useState('');
+  const [duplicateRoute, setDuplicateRoute] = useState<any>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  
   const { parseGPX, saveRouteToDatabase, isLoading, error } = useGPXParser();
+  const { routes, refreshRoutes } = useRoutes();
   const navigate = useNavigate();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -53,7 +58,35 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
     }
   }, []);
 
+  const checkForDuplicates = async (file: File) => {
+    // Check by filename first
+    const existingRoute = routes.find(route => 
+      route.name === file.name.replace('.gpx', '') ||
+      route.name.toLowerCase() === file.name.toLowerCase().replace('.gpx', '')
+    );
+    
+    if (existingRoute) {
+      setDuplicateRoute(existingRoute);
+      setUploadStatus('duplicate');
+      setUploadMessage(`Ya existe una ruta con el nombre "${existingRoute.name}". ¿Deseas continuar?`);
+      setPendingFile(file);
+      return true;
+    }
+    
+    return false;
+  };
+
   const handleFileUpload = async (file: File) => {
+    // Check for duplicates first
+    const isDuplicate = await checkForDuplicates(file);
+    if (isDuplicate) {
+      return;
+    }
+
+    await processFile(file);
+  };
+
+  const processFile = async (file: File) => {
     try {
       setUploadStatus('uploading');
       setUploadMessage('Procesando archivo GPX...');
@@ -76,6 +109,9 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
       
       onFileUpload(file);
       
+      // Actualizar la lista de rutas
+      await refreshRoutes();
+      
       // Redirigir al detalle de la ruta después de 2 segundos
       setTimeout(() => {
         navigate(`/dashboard/routes/${savedRoute.id}`);
@@ -88,6 +124,27 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
     }
   };
 
+  const handleContinueUpload = async () => {
+    if (pendingFile) {
+      await processFile(pendingFile);
+      setPendingFile(null);
+      setDuplicateRoute(null);
+    }
+  };
+
+  const handleViewExisting = () => {
+    if (duplicateRoute) {
+      navigate(`/dashboard/routes/${duplicateRoute.id}`);
+    }
+  };
+
+  const resetUpload = () => {
+    setUploadStatus('idle');
+    setUploadMessage('');
+    setPendingFile(null);
+    setDuplicateRoute(null);
+  };
+
   const getStatusIcon = () => {
     switch (uploadStatus) {
       case 'uploading':
@@ -96,6 +153,8 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
         return <CheckCircle className="h-8 w-8 text-green-500" />;
       case 'error':
         return <AlertCircle className="h-8 w-8 text-red-500" />;
+      case 'duplicate':
+        return <AlertTriangle className="h-8 w-8 text-yellow-500" />;
       default:
         return <Upload className={`h-8 w-8 ${isDragOver ? 'text-primary-600' : 'text-primary-500'}`} />;
     }
@@ -109,10 +168,27 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
         return 'border-green-500 bg-green-50 dark:bg-green-900/20';
       case 'error':
         return 'border-red-500 bg-red-50 dark:bg-red-900/20';
+      case 'duplicate':
+        return 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20';
       default:
         return isDragOver
           ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
           : 'border-primary-300 dark:border-primary-700 bg-white dark:bg-mountain-800';
+    }
+  };
+
+  const getStatusTitle = () => {
+    switch (uploadStatus) {
+      case 'uploading':
+        return 'Procesando tu ruta...';
+      case 'success':
+        return '¡Éxito!';
+      case 'error':
+        return 'Error';
+      case 'duplicate':
+        return 'Posible Duplicado';
+      default:
+        return 'Sube tu archivo GPX';
     }
   };
 
@@ -129,6 +205,7 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
             uploadStatus === 'uploading' ? 'bg-primary-100 dark:bg-primary-900' : 
             uploadStatus === 'success' ? 'bg-green-100 dark:bg-green-900' :
             uploadStatus === 'error' ? 'bg-red-100 dark:bg-red-900' :
+            uploadStatus === 'duplicate' ? 'bg-yellow-100 dark:bg-yellow-900' :
             isDragOver ? 'bg-primary-100 dark:bg-primary-900' : 'bg-primary-50 dark:bg-mountain-700'
           }`}>
             {getStatusIcon()}
@@ -136,10 +213,7 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
           
           <div>
             <h3 className="text-xl font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-              {uploadStatus === 'uploading' ? 'Procesando tu ruta...' : 
-               uploadStatus === 'success' ? '¡Éxito!' :
-               uploadStatus === 'error' ? 'Error' :
-               'Sube tu archivo GPX'}
+              {getStatusTitle()}
             </h3>
             <p className="text-mountain-600 dark:text-mountain-400 mb-4">
               {uploadMessage || (uploadStatus === 'idle' ? 'Arrastra y suelta tu archivo GPX aquí, o haz clic para explorar' : '')}
@@ -176,30 +250,42 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
             </div>
           )}
 
+          {uploadStatus === 'duplicate' && (
+            <div className="space-y-3">
+              <div className="flex gap-3 justify-center">
+                <Button
+                  onClick={handleViewExisting}
+                  variant="outline"
+                  className="border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+                >
+                  Ver Existente
+                </Button>
+                <Button
+                  onClick={handleContinueUpload}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                >
+                  Subir Igualmente
+                </Button>
+              </div>
+              <Button
+                onClick={resetUpload}
+                variant="ghost"
+                size="sm"
+              >
+                Cancelar
+              </Button>
+            </div>
+          )}
+
           {uploadStatus === 'error' && (
             <Button
-              onClick={() => {
-                setUploadStatus('idle');
-                setUploadMessage('');
-              }}
+              onClick={resetUpload}
               variant="outline"
               className="mt-4"
             >
               Intentar de nuevo
             </Button>
           )}
-        </div>
-      </div>
-
-      {/* Recent Uploads */}
-      <div className="mt-8 bg-white dark:bg-mountain-800 rounded-xl p-6 border border-primary-200 dark:border-mountain-700">
-        <h4 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 mb-4">
-          Rutas Recientes (Plan Gratuito)
-        </h4>
-        <div className="text-center py-8">
-          <p className="text-mountain-600 dark:text-mountain-400">
-            Tus rutas subidas aparecerán aquí
-          </p>
         </div>
       </div>
     </div>
