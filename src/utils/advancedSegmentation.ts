@@ -400,7 +400,7 @@ function getSegmentType(slope: number): 'asc' | 'desc' | 'hor' {
  * Priority Logic:
  * 1. Inflection points (highest priority for sports relevance)
  * 2. Accumulated slope consistency (enhanced by early warnings)
- * 3. R² quality as ultimate fallback
+ * Note: R² removed as cutting criterion - only used for visualization
  */
 function shouldCutSegment(
   currentIndex: number,
@@ -458,30 +458,7 @@ function shouldCutSegment(
     }
   }
   
-  // PRIORITY 3: Check R-squared quality as fallback (only after practical minimum)
-  if (segmentDistance >= 0.15) { // 150m minimum for R² check
-    const segmentPoints = elevationData.slice(segmentStartIndex, currentIndex + 1);
-    const regressionPoints = segmentPoints
-      .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
-      .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-      
-    if (regressionPoints.length >= 2) {
-      const regression = calculateLinearRegression(regressionPoints);
-      
-      // Stricter R² requirement if we have early warning
-      const effectiveThreshold = hasEarlyWarning 
-        ? params.rSquaredThreshold + 0.02 // More demanding when warned
-        : params.rSquaredThreshold;
-        
-      if (regression.rSquared < effectiveThreshold) {
-        return { 
-          shouldCut: true, 
-          reason: `Calidad baja (R²=${regression.rSquared.toFixed(3)}${hasEarlyWarning ? ', alerta confirmada' : ''})` 
-        };
-      }
-    }
-  }
-  
+  // No R² criterion - only sports-relevant criteria for cutting
   return { shouldCut: false, reason: 'Criteria not met' };
 }
 
@@ -618,12 +595,12 @@ export function segmentProfileAdvanced(
 }
 
 /**
- * Updated default parameters optimized for early warning system
+ * Updated default parameters optimized for sports-relevant segmentation
  */
 export const DEFAULT_ADVANCED_SEGMENTATION_PARAMS: AdvancedSegmentationParams = {
-  rSquaredThreshold: 0.88, // Slightly more lenient since slope warning helps
-  minSegmentDistance: 0.3, // 300m - more practical minimum for sports relevance
-  slopeChangeThreshold: 8.0, // Higher threshold since it's now early warning, not direct cut
+  rSquaredThreshold: 0.85, // Only for visualization, not cutting
+  minSegmentDistance: 0.3, // 300m - practical minimum for sports relevance
+  slopeChangeThreshold: 6.0, // Lowered since R² won't catch edge cases anymore
   inflectionSensitivity: 2.5, // Balanced inflection detection
   detectInflectionPoints: true // enable inflection point detection
 };
