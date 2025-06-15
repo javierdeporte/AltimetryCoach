@@ -1,51 +1,10 @@
-import { ElevationPoint, AdvancedSegment, AdvancedSegmentationParams, RegressionResult, AdvancedSegmentationResult } from './types';
+import { ElevationPoint, AdvancedSegment, AdvancedSegmentationParams, AdvancedSegmentationResult } from './types';
 
 const SEGMENT_COLORS = {
   asc: '#22c55e',   // Green for ascent
   desc: '#3b82f6',  // Blue for descent  
   hor: '#6b7280'    // Gray for horizontal
 };
-
-/**
- * Calculates linear regression for a set of points
- */
-function calculateLinearRegression(points: Array<{x: number, y: number}>): RegressionResult {
-  const n = points.length;
-  
-  if (n < 2) {
-    return { 
-      slope: 0, 
-      intercept: points[0]?.y || 0, 
-      rSquared: 1 
-    };
-  }
-
-  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
-
-  for (const p of points) {
-    sumX += p.x;
-    sumY += p.y;
-    sumXY += p.x * p.y;
-    sumX2 += p.x * p.x;
-    sumY2 += p.y * p.y;
-  }
-
-  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-  const intercept = (sumY - slope * sumX) / n;
-  
-  // Calculate R-squared
-  const rNumerator = (n * sumXY - sumX * sumY);
-  const rDenominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
-  
-  if (rDenominator === 0) {
-    return { slope, intercept, rSquared: 1 };
-  }
-  
-  const r = rNumerator / rDenominator;
-  const rSquared = r * r;
-
-  return { slope, intercept, rSquared };
-}
 
 /**
  * Determines segment type based on slope
@@ -60,18 +19,29 @@ function getSegmentType(slope: number): 'asc' | 'desc' | 'hor' {
 }
 
 /**
- * Creates a segment object from a set of points and regression results.
- * The startIndex and endIndex are relative to the entire elevationData array.
+ * Calculates the slope between two elevation points.
+ * @returns {number} Slope value (e.g., 0.1 for 10%).
+ */
+function calculateSlope(p1: ElevationPoint, p2: ElevationPoint): number {
+  const distanceDiff = p2.displayDistance - p1.displayDistance;
+  if (distanceDiff === 0) return 0;
+  return (p2.displayElevation - p1.displayElevation) / (distanceDiff * 1000);
+}
+
+/**
+ * Creates a segment object from a set of points.
+ * No longer uses linear regression.
  */
 function createSegment(
   points: ElevationPoint[],
-  regression: RegressionResult,
   startIndex: number,
   endIndex: number
 ): AdvancedSegment {
   const startPoint = points[0];
   const endPoint = points[points.length - 1];
-  const segmentType = getSegmentType(regression.slope);
+  
+  const slope = calculateSlope(startPoint, endPoint);
+  const segmentType = getSegmentType(slope);
   const elevationChange = endPoint.displayElevation - startPoint.displayElevation;
 
   return {
@@ -79,9 +49,7 @@ function createSegment(
     endIndex,
     startPoint,
     endPoint,
-    slope: regression.slope,
-    intercept: regression.intercept,
-    rSquared: regression.rSquared,
+    slope: slope,
     distance: endPoint.displayDistance - startPoint.displayDistance,
     elevationGain: elevationChange > 0 ? elevationChange : 0,
     elevationLoss: elevationChange < 0 ? Math.abs(elevationChange) : 0,
@@ -91,57 +59,8 @@ function createSegment(
 }
 
 /**
- * Phase 2: Generates micro-segments within a larger macro-segment based on distance.
- * These small segments will be later merged based on slope similarity.
- */
-function generateMicroSegments(
-  macroSegmentData: ElevationPoint[],
-  elevationData: ElevationPoint[],
-  params: AdvancedSegmentationParams,
-  globalIndexOffset: number
-): AdvancedSegment[] {
-  const segments: AdvancedSegment[] = [];
-  if (macroSegmentData.length < 2) return [];
-
-  let currentSegmentStartIndex = 0;
-  for (let i = 1; i < macroSegmentData.length; i++) {
-    const currentPoint = macroSegmentData[i];
-    const startPoint = macroSegmentData[currentSegmentStartIndex];
-    
-    const segmentDistance = currentPoint.displayDistance - startPoint.displayDistance;
-
-    // Split if distance threshold is met, or it's the last point
-    const isLastPoint = i === macroSegmentData.length - 1;
-    if (segmentDistance >= params.microMinDistance || isLastPoint) {
-      const segmentPoints = macroSegmentData.slice(currentSegmentStartIndex, i + (isLastPoint ? 1 : 0));
-      
-      if (segmentPoints.length >= 2) { // Need at least 2 points for regression
-        const regressionPoints = segmentPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-        const regression = calculateLinearRegression(regressionPoints);
-        segments.push(createSegment(
-          segmentPoints,
-          regression,
-          globalIndexOffset + currentSegmentStartIndex,
-          globalIndexOffset + i - (isLastPoint ? 0 : 1)
-        ));
-        currentSegmentStartIndex = i;
-      }
-    }
-  }
-
-  if (segments.length === 0 && macroSegmentData.length >= 2) {
-      // The whole macro segment is smaller than microMinDistance, treat as one segment
-      const regressionPoints = macroSegmentData.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-      const regression = calculateLinearRegression(regressionPoints);
-      segments.push(createSegment(macroSegmentData, regression, globalIndexOffset, globalIndexOffset + macroSegmentData.length - 1));
-  }
-
-  return segments;
-}
-
-/**
- * Phase 1: Finds significant peaks and valleys to define macro-segments based on trend reversals.
- * This version identifies peaks/valleys based on significant elevation changes from a trend.
+ * Phase 1: Finds significant peaks and valleys to define macro-segments.
+ * (This function remains unchanged)
  */
 function findSignificantExtrema(
   points: ElevationPoint[],
@@ -202,12 +121,36 @@ function findSignificantExtrema(
 }
 
 /**
- * Phase 3: Merges adjacent micro-segments if their slopes are similar.
+ * Phase 2 (New): Generates very small, "raw" segments that will be merged later.
+ * This captures the profile's fine details before simplification.
+ */
+function generateRawSegments(
+  macroSegmentData: ElevationPoint[],
+  globalIndexOffset: number
+): AdvancedSegment[] {
+  const segments: AdvancedSegment[] = [];
+  if (macroSegmentData.length < 2) return [];
+
+  // Create segments from every 2 points to get maximum detail initially
+  for (let i = 0; i < macroSegmentData.length - 1; i++) {
+    const segmentPoints = macroSegmentData.slice(i, i + 2);
+    segments.push(createSegment(
+      segmentPoints,
+      globalIndexOffset + i,
+      globalIndexOffset + i + 1
+    ));
+  }
+  return segments;
+}
+
+/**
+ * Phase 3: Merges adjacent segments if their slopes are similar.
+ * This version does not use linear regression.
  */
 function mergeSimilarSegments(
   segments: AdvancedSegment[],
-  elevationData: ElevationPoint[],
-  slopeThreshold: number
+  slopeThreshold: number,
+  elevationData: ElevationPoint[]
 ): AdvancedSegment[] {
     if (segments.length < 2) return segments;
 
@@ -218,15 +161,11 @@ function mergeSimilarSegments(
         const nextSegment = segments[i];
         const slopeDifference = Math.abs(currentSegment.slope - nextSegment.slope);
 
-        // Merge if types are the same and slope difference is below threshold
+        // Merge if types are same and slope difference is below threshold
         if (currentSegment.type === nextSegment.type && slopeDifference < slopeThreshold) {
             const combinedPointsData = elevationData.slice(currentSegment.startIndex, nextSegment.endIndex + 1);
-            const regressionPoints = combinedPointsData.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-            const newRegression = calculateLinearRegression(regressionPoints);
-            
             currentSegment = createSegment(
                 combinedPointsData,
-                newRegression,
                 currentSegment.startIndex,
                 nextSegment.endIndex
             );
@@ -240,60 +179,113 @@ function mergeSimilarSegments(
 }
 
 /**
- * Advanced hybrid segmentation using a three-phase approach.
+ * Phase 4: Consolidates segments that are shorter than the minimum distance.
+ */
+function consolidateShortSegments(
+  segments: AdvancedSegment[],
+  minDistance: number,
+  elevationData: ElevationPoint[]
+): AdvancedSegment[] {
+  if (segments.length < 2) return segments;
+
+  const consolidated = [...segments];
+
+  let i = 0;
+  while (i < consolidated.length) {
+    if (consolidated[i].distance < minDistance) {
+      // Find which neighbor to merge with (the shorter one, or left if equal)
+      const leftNeighbor = i > 0 ? consolidated[i - 1] : null;
+      const rightNeighbor = i < consolidated.length - 1 ? consolidated[i + 1] : null;
+
+      let mergeWithIndex = -1;
+
+      if (leftNeighbor && rightNeighbor) {
+        mergeWithIndex = leftNeighbor.distance <= rightNeighbor.distance ? i - 1 : i;
+      } else if (leftNeighbor) {
+        mergeWithIndex = i - 1;
+      } else if (rightNeighbor) {
+        mergeWithIndex = i;
+      }
+      
+      if (mergeWithIndex !== -1) {
+        const toMergeA = consolidated[mergeWithIndex];
+        const toMergeB = consolidated[mergeWithIndex + 1];
+        
+        const combinedPoints = elevationData.slice(toMergeA.startIndex, toMergeB.endIndex + 1);
+        const newSegment = createSegment(combinedPoints, toMergeA.startIndex, toMergeB.endIndex);
+        
+        consolidated.splice(mergeWithIndex, 2, newSegment);
+        
+        // Restart scan from the beginning as lengths have changed
+        i = 0; 
+        continue;
+      }
+    }
+    i++;
+  }
+
+  return consolidated;
+}
+
+/**
+ * Advanced simplified segmentation using a multi-phase approach without R².
  */
 export function segmentProfileAdvanced(
   elevationData: ElevationPoint[], 
   params: AdvancedSegmentationParams
 ): AdvancedSegmentationResult {
   
-  // Use a hardcoded minimum of points to avoid processing empty/too small data
   if (!elevationData || elevationData.length < 10) {
     return { segments: [], macroBoundaries: [] };
   }
 
-  // Phase 1: Macro-segmentation
+  // Phase 1: Macro-segmentation (find major peaks and valleys)
   const macroIndices = findSignificantExtrema(elevationData, params.macroProminence);
   
-  let allMicroSegments: AdvancedSegment[] = [];
+  let allRawSegments: AdvancedSegment[] = [];
 
-  // Phase 2: Micro-segmentation within each macro-segment
+  // Phase 2: Generate raw, high-detail segments within each macro-segment
   for (let i = 0; i < macroIndices.length - 1; i++) {
     const macroStart = macroIndices[i];
     const macroEnd = macroIndices[i+1];
     
-    // Ensure the slice is not empty or too small
     if (macroEnd > macroStart) {
         const macroSegmentData = elevationData.slice(macroStart, macroEnd + 1);
-        const microSegments = generateMicroSegments(macroSegmentData, elevationData, params, macroStart);
-        allMicroSegments.push(...microSegments);
+        const rawSegments = generateRawSegments(macroSegmentData, macroStart);
+        allRawSegments.push(...rawSegments);
     }
   }
+  
+  // Phase 3: Merge adjacent segments with similar slopes
+  const mergedSegments = mergeSimilarSegments(allRawSegments, params.slopeChangeThreshold, elevationData);
+  
+  // Phase 4: Consolidate segments that are too short
+  const finalSegments = consolidateShortSegments(mergedSegments, params.minDistance, elevationData);
 
-  // Phase 3: Merge similar adjacent micro-segments
-  const finalSegments = mergeSimilarSegments(allMicroSegments, elevationData, params.slopeChangeThreshold);
 
-  console.log('Generated', finalSegments.length, 'hybrid segments based on slope similarity');
+  console.log('Generated', finalSegments.length, 'simplified segments.');
   return { segments: finalSegments, macroBoundaries: macroIndices };
 }
 
 /**
- * Default advanced segmentation parameters
+ * Default simplified segmentation parameters
  */
 export const DEFAULT_ADVANCED_SEGMENTATION_PARAMS: AdvancedSegmentationParams = {
-  microMinDistance: 0.1, // km
+  minDistance: 0.5, // km
   macroProminence: 40, // meters
-  slopeChangeThreshold: 0.08, // 8% grade difference
+  slopeChangeThreshold: 0.05, // 5% grade difference
   enableExtremeHighlighting: true,
   extremeSlopeThreshold: 15, // 15%
+  highlightStyle: 'dots',
 };
 
 /**
  * Detects points on the profile with a slope greater than the threshold.
+ * (This function remains unchanged)
  */
 export function detectExtremeSlopePoints(
-    elevationData: ElevationPoint[], 
-    threshold: number
+  elevationData: ElevationPoint[], 
+  threshold: number
 ): ElevationPoint[] {
     if (elevationData.length < 2) return [];
 
@@ -319,6 +311,7 @@ export function detectExtremeSlopePoints(
 
 /**
  * Get segment type label in Spanish
+ * (This function remains unchanged)
  */
 export function getAdvancedSegmentTypeLabel(type: 'asc' | 'desc' | 'hor'): string {
   switch (type) {

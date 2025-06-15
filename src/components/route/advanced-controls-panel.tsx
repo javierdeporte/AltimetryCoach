@@ -86,18 +86,18 @@ export const AdvancedControlsPanel: React.FC<AdvancedControlsPanelProps> = ({
           <h4 className="font-medium text-primary-600">Parámetros de Segmentación</h4>
           <ParamSlider 
             label="Distancia Mínima de Segmento"
-            description="Longitud mínima para cualquier segmento final. Controla el nivel de detalle general."
-            value={params.microMinDistance}
-            onValueChange={(val) => setParams(p => ({...p, microMinDistance: val}))}
-            min={0.05} max={0.5} step={0.05}
+            description="Longitud mínima final para cualquier segmento. Fusionará segmentos hasta alcanzar este tamaño."
+            value={params.minDistance}
+            onValueChange={(val) => setParams(p => ({...p, minDistance: val}))}
+            min={0.1} max={1.0} step={0.05}
             formatValue={(val) => `${val.toFixed(2)} km`}
           />
           <ParamSlider 
             label="Sensibilidad al Cambio de Pendiente"
-            description="Define la diferencia de pendiente para crear un nuevo segmento. Un valor más bajo genera más segmentos."
+            description="Diferencia de pendiente para fusionar segmentos. Un valor más bajo genera más segmentos."
             value={params.slopeChangeThreshold}
             onValueChange={(val) => setParams(p => ({...p, slopeChangeThreshold: val}))}
-            min={0.02} max={0.20} step={0.01}
+            min={0.01} max={0.20} step={0.01}
             formatValue={(val) => `${(val * 100).toFixed(0)}%`}
           />
         </div>
@@ -125,19 +125,8 @@ export const AdvancedControlsPanel: React.FC<AdvancedControlsPanelProps> = ({
         {stats && (
           <div className="space-y-3 pt-4">
             <h4 className="text-md font-semibold text-mountain-800 dark:text-mountain-200">
-              Métricas de Calidad
+              Métricas de la Segmentación
             </h4>
-            
-            <div className="bg-primary-50 dark:bg-mountain-700 p-3 rounded-lg">
-              <div className="text-center">
-                <div className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                  {stats.qualityRating}
-                </div>
-                <div className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Calidad del Ajuste (R² = {stats.avgRSquared})
-                </div>
-              </div>
-            </div>
             
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="bg-primary-50 dark:bg-mountain-700 p-2 rounded">

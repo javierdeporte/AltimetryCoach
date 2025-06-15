@@ -6,20 +6,12 @@ export interface ElevationPoint {
   segmentIndex?: number;
 }
 
-export interface RegressionResult {
-  slope: number;
-  intercept: number;
-  rSquared: number;
-}
-
 export interface AdvancedSegment {
   startIndex: number;
   endIndex: number;
   startPoint: ElevationPoint;
   endPoint: ElevationPoint;
   slope: number;
-  intercept: number;
-  rSquared: number;
   distance: number;
   elevationGain: number;
   elevationLoss: number;
@@ -33,11 +25,12 @@ export interface AdvancedSegmentationResult {
 }
 
 export interface AdvancedSegmentationParams {
-  microMinDistance: number; // in km
+  minDistance: number; // in km
   macroProminence: number; // in meters
   slopeChangeThreshold: number; // as a slope value (e.g., 0.1 for 10%)
   
   // Parámetros para el resaltado de pendientes extremas
   enableExtremeHighlighting: boolean;
   extremeSlopeThreshold: number; // en porcentaje (e.g., 15 for 15%)
+  highlightStyle: 'dots' | 'background';
 }

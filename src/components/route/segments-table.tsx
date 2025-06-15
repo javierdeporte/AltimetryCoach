@@ -45,7 +45,6 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
           elevation_gain_m: elevationGain,
           elevation_loss_m: elevationLoss,
           avg_grade_percent: gradePercent,
-          rSquared: advSeg.rSquared,
           type: advSeg.type
         };
       });
@@ -54,7 +53,6 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
     return segments.map(seg => ({
       ...seg,
       elevation_loss_m: calculateElevationLoss(seg),
-      rSquared: null,
       type: null
     }));
   }, [isAdvancedMode, advancedSegments, segments]);
@@ -96,34 +94,6 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
     return Math.round(segment.distance_km * 5);
   }
 
-  const getQualityIndicator = (rSquared: number | null) => {
-    if (rSquared === null) return null;
-    
-    const quality = rSquared * 100;
-    let colorClass = 'text-red-500';
-    let label = 'Baja';
-    
-    if (quality >= 95) {
-      colorClass = 'text-green-600';
-      label = 'Excelente';
-    } else if (quality >= 90) {
-      colorClass = 'text-primary-600';
-      label = 'Muy Buena';
-    } else if (quality >= 85) {
-      colorClass = 'text-yellow-600';
-      label = 'Buena';
-    } else if (quality >= 80) {
-      colorClass = 'text-orange-600';
-      label = 'Regular';
-    }
-    
-    return (
-      <span className={`text-xs ${colorClass} font-medium`} title={`R² = ${rSquared.toFixed(3)}`}>
-        {label}
-      </span>
-    );
-  };
-
   return (
     <div className="bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 overflow-hidden">
       <div className="p-6 border-b border-primary-200 dark:border-mountain-700">
@@ -139,17 +109,12 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
             </h3>
             <p className="text-sm text-mountain-600 dark:text-mountain-400 mt-1">
               {displaySegments.length > 0 
-                ? `${displaySegments.length} segmentos ${isAdvancedMode ? 'generados por regresión lineal' : 'básicos'}` 
+                ? `${displaySegments.length} segmentos ${isAdvancedMode ? 'generados por pendiente' : 'básicos'}` 
                 : 'Los segmentos se generarán automáticamente al procesar el archivo GPX'
               }
             </p>
           </div>
-          {isAdvancedMode && advancedSegments.length > 0 && (
-            <div className="text-right text-sm text-mountain-600 dark:text-mountain-400">
-              <div>R² Promedio: {(advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length).toFixed(3)}</div>
-              <div>Calidad: {Math.round((advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length) * 100)}%</div>
-            </div>
-          )}
+          {/* Remove R-squared stats from header */}
         </div>
       </div>
       
@@ -177,9 +142,6 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
                 <TableHead className="text-mountain-700 dark:text-mountain-300">Ganancia</TableHead>
                 <TableHead className="text-mountain-700 dark:text-mountain-300">Pérdida</TableHead>
                 <TableHead className="text-mountain-700 dark:text-mountain-300">Gradiente Promedio</TableHead>
-                {isAdvancedMode && (
-                  <TableHead className="text-mountain-700 dark:text-mountain-300">Calidad</TableHead>
-                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -220,11 +182,6 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
                   <TableCell className={getGradeColor(segment.avg_grade_percent)}>
                     {segment.avg_grade_percent > 0 ? '+' : ''}{segment.avg_grade_percent.toFixed(1)}%
                   </TableCell>
-                  {isAdvancedMode && (
-                    <TableCell>
-                      {getQualityIndicator(segment.rSquared)}
-                    </TableCell>
-                  )}
                 </TableRow>
               ))}
             </TableBody>
