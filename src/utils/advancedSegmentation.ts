@@ -321,7 +321,6 @@ export const DEFAULT_ADVANCED_SEGMENTATION_PARAMS: AdvancedSegmentationParams = 
   minSegmentPoints: 20,
   microMinDistance: 0.2, // km
   macroProminence: 40, // meters
-  macroMinDistance: 0.5, // km
   slopeChangeThreshold: 0.10, // 10% grade difference
 };
 
