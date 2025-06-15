@@ -1,5 +1,3 @@
-
-
 interface ElevationPoint {
   distance: number;
   elevation: number;
@@ -116,7 +114,7 @@ function calculateSlopeBetweenPoints(point1: ElevationPoint, point2: ElevationPo
 function detectSlopeChanges(
   elevationData: ElevationPoint[], 
   windowSize: number = 10,
-  threshold: number = 3,
+  threshold: number, // Now uses the actual threshold parameter instead of hardcoded 3
   minSustainedDistance: number = 0.2 // km
 ): SlopeChange[] {
   const slopeChanges: SlopeChange[] = [];
@@ -143,6 +141,7 @@ function detectSlopeChanges(
     // Calculate change in slope
     const slopeChange = Math.abs(afterSlope - beforeSlope);
     
+    // Use the actual threshold parameter instead of hardcoded value
     if (slopeChange >= threshold) {
       // Calculate how long this change is sustained
       let sustainedEndIndex = afterEnd;
@@ -362,11 +361,11 @@ export function segmentProfileAdvanced(
   console.log('Starting enhanced sustained-change segmentation with params:', params);
   console.log('Input data points:', elevationData.length);
 
-  // Pre-calculate sustained slope changes and inflection points
+  // Pre-calculate sustained slope changes and inflection points using actual parameters
   const slopeChanges = detectSlopeChanges(
     elevationData, 
     10, 
-    params.slopeChangeThreshold, 
+    params.slopeChangeThreshold, // Now using the actual UI parameter
     params.minSegmentDistance
   );
   const inflectionPoints = params.detectInflectionPoints 
@@ -502,4 +501,3 @@ export function getAdvancedSegmentTypeLabel(type: 'asc' | 'desc' | 'hor'): strin
  * Export sustained change detection for debugging/visualization
  */
 export { detectSlopeChanges, detectInflectionPoints };
-
