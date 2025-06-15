@@ -13,10 +13,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { User, LogOut } from 'lucide-react';
 import { LanguageToggle } from '../ui/language-toggle';
+import { useTranslation } from 'react-i18next';
 
 export const TopBar: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleSignOut = async () => {
     await signOut();
@@ -31,10 +33,10 @@ export const TopBar: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-mountain-800 dark:text-mountain-200">
-            Dashboard
+            {t('dashboard_topbar.title')}
           </h1>
           <p className="text-sm text-mountain-600 dark:text-mountain-400">
-            Welcome back, {userName.split('@')[0]}!
+            {t('dashboard_topbar.welcome', { username: userName.split('@')[0] })}
           </p>
         </div>
         
@@ -57,7 +59,7 @@ export const TopBar: React.FC = () => {
                       {userName.split('@')[0]}
                     </p>
                     <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                      Free Plan
+                      {t('dashboard_topbar.plan')}
                     </p>
                   </div>
                 </Button>
@@ -65,7 +67,7 @@ export const TopBar: React.FC = () => {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
                   <LogOut className="h-4 w-4 mr-2" />
-                  Cerrar sesión
+                  {t('dashboard_topbar.logout')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

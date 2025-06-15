@@ -7,8 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
 
 const SignUp = () => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -32,8 +34,8 @@ const SignUp = () => {
     
     if (formData.password !== formData.confirmPassword) {
       toast({
-        title: "Error",
-        description: "Las contraseñas no coinciden",
+        title: t('signup_page.generic_error_title'),
+        description: t('signup_page.error_passwords_no_match'),
         variant: "destructive"
       });
       return;
@@ -41,8 +43,8 @@ const SignUp = () => {
 
     if (formData.password.length < 6) {
       toast({
-        title: "Error",
-        description: "La contraseña debe tener al menos 6 caracteres",
+        title: t('signup_page.generic_error_title'),
+        description: t('signup_page.error_password_too_short'),
         variant: "destructive"
       });
       return;
@@ -53,14 +55,14 @@ const SignUp = () => {
     
     if (error) {
       toast({
-        title: "Error al crear cuenta",
+        title: t('signup_page.error_title'),
         description: error.message,
         variant: "destructive"
       });
     } else {
       toast({
-        title: "¡Cuenta creada!",
-        description: "Revisa tu email para confirmar tu cuenta",
+        title: t('signup_page.success_title'),
+        description: t('signup_page.success_description'),
       });
       navigate('/dashboard');
     }
@@ -70,17 +72,17 @@ const SignUp = () => {
 
   return (
     <AuthLayout
-      title="Únete a AltimetryCoach"
-      subtitle="Crea tu cuenta y comienza a optimizar tus rutas de montaña"
+      title={t('signup_page.title')}
+      subtitle={t('signup_page.subtitle')}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="fullName">Nombre completo</Label>
+          <Label htmlFor="fullName">{t('signup_page.fullName_label')}</Label>
           <Input
             id="fullName"
             name="fullName"
             type="text"
-            placeholder="Tu nombre"
+            placeholder={t('signup_page.fullName_placeholder')}
             value={formData.fullName}
             onChange={handleChange}
             required
@@ -89,12 +91,12 @@ const SignUp = () => {
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t('signup_page.email_label')}</Label>
           <Input
             id="email"
             name="email"
             type="email"
-            placeholder="tu@email.com"
+            placeholder={t('login_page.email_placeholder')}
             value={formData.email}
             onChange={handleChange}
             required
@@ -103,7 +105,7 @@ const SignUp = () => {
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="password">Contraseña</Label>
+          <Label htmlFor="password">{t('signup_page.password_label')}</Label>
           <Input
             id="password"
             name="password"
@@ -117,7 +119,7 @@ const SignUp = () => {
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
+          <Label htmlFor="confirmPassword">{t('signup_page.confirmPassword_label')}</Label>
           <Input
             id="confirmPassword"
             name="confirmPassword"
@@ -135,13 +137,13 @@ const SignUp = () => {
           className="w-full bg-primary-600 hover:bg-primary-700 text-white" 
           disabled={loading}
         >
-          {loading ? 'Creando cuenta...' : 'Crear cuenta'}
+          {loading ? t('signup_page.loading_button') : t('signup_page.submit_button')}
         </Button>
         
         <div className="text-center text-sm text-mountain-600 dark:text-mountain-400">
-          ¿Ya tienes cuenta?{' '}
-          <Link to="/auth/login" className="text-primary-600 hover:text-primary-700 underline">
-            Iniciar sesión
+          {t('signup_page.has_account')}{' '}
+          <Link to="/login" className="text-primary-600 hover:text-primary-700 underline">
+            {t('signup_page.login_link')}
           </Link>
         </div>
       </form>

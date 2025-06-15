@@ -40,5 +40,30 @@
     "no_account": "Don't have an account?",
     "create_account": "Create account",
     "error_title": "Login Error"
+  },
+  "signup_page": {
+    "title": "Join AltimetryCoach",
+    "subtitle": "Create your account and start optimizing your mountain routes",
+    "fullName_label": "Full name",
+    "fullName_placeholder": "Your name",
+    "email_label": "Email",
+    "password_label": "Password",
+    "confirmPassword_label": "Confirm password",
+    "submit_button": "Create account",
+    "loading_button": "Creating account...",
+    "has_account": "Already have an account?",
+    "login_link": "Log in",
+    "error_passwords_no_match": "Passwords do not match",
+    "error_password_too_short": "Password must be at least 6 characters long",
+    "error_title": "Error creating account",
+    "success_title": "Account created!",
+    "success_description": "Check your email to confirm your account",
+    "generic_error_title": "Error"
+  },
+  "dashboard_topbar": {
+    "logout": "Log Out",
+    "title": "Dashboard",
+    "welcome": "Welcome back, {{username}}!",
+    "plan": "Free Plan"
   }
 }
