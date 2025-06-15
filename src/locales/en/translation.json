@@ -5,19 +5,19 @@
     "start": "Get Started"
   },
   "hero": {
-    "title1": "Elevate Your",
-    "title2": "Mountain Running",
-    "subtitle": "Analyze your GPX routes, visualize elevation profiles, and optimize your mountain adventures with professional insights.",
-    "cta_main": "Start Your Adventure",
-    "cta_demo": "View Demo"
+    "title1": "Unlock the Story",
+    "title2": "of Your Run",
+    "subtitle": "Every run has a story of challenge and triumph. Upload your GPX file and let's uncover the secrets hidden in your mountain routes, turning data into your personal guide for improvement.",
+    "cta_main": "Discover Your Story",
+    "cta_demo": "See an Example"
   },
   "features": {
-    "elevation_analysis_title": "Elevation Analysis",
-    "elevation_analysis_desc": "Detailed elevation profiles with slope analysis and segment breakdown.",
-    "interactive_maps_title": "Interactive Maps",
-    "interactive_maps_desc": "Explore your routes with synchronized map and elevation visualization.",
-    "performance_metrics_title": "Performance Metrics",
-    "performance_metrics_desc": "Get insights on pace, effort, and optimal nutrition strategies."
+    "elevation_analysis_title": "Visualize Your Climb",
+    "elevation_analysis_desc": "See every hill and valley of your run. Understand where you pushed hardest and find opportunities to improve your pacing and effort.",
+    "interactive_maps_title": "Relive Your Route",
+    "interactive_maps_desc": "Follow your path on an interactive map that syncs perfectly with your elevation data. See your journey from a new perspective.",
+    "performance_metrics_title": "Understand Your Performance",
+    "performance_metrics_desc": "Transform complex data into simple insights. Learn about your pace, effort, and how to fuel your next adventure for peak performance."
   },
   "footer": {
     "copyright": "© 2025 AltimetryCoach. All rights reserved."

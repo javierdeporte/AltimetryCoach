@@ -5,19 +5,19 @@
     "start": "Comenzar"
   },
   "hero": {
-    "title1": "Eleva Tu",
-    "title2": "Carrera de Montaña",
-    "subtitle": "Analiza tus rutas GPX, visualiza perfiles de elevación y optimiza tus aventuras en la montaña con información profesional.",
-    "cta_main": "Comienza Tu Aventura",
-    "cta_demo": "Ver Demostración"
+    "title1": "Descubre la Historia",
+    "title2": "de tu Carrera",
+    "subtitle": "Cada carrera tiene una historia de desafío y triunfo. Sube tu archivo GPX y descubramos juntos los secretos de tus rutas de montaña, convirtiendo los datos en tu guía personal de mejora.",
+    "cta_main": "Descubre Tu Historia",
+    "cta_demo": "Ver un Ejemplo"
   },
   "features": {
-    "elevation_analysis_title": "Análisis de Elevación",
-    "elevation_analysis_desc": "Perfiles de elevación detallados con análisis de pendiente y desglose por segmentos.",
-    "interactive_maps_title": "Mapas Interactivos",
-    "interactive_maps_desc": "Explora tus rutas con visualización sincronizada de mapa y elevación.",
-    "performance_metrics_title": "Métricas de Rendimiento",
-    "performance_metrics_desc": "Obtén información sobre ritmo, esfuerzo y estrategias óptimas de nutrición."
+    "elevation_analysis_title": "Visualiza Tu Ascenso",
+    "elevation_analysis_desc": "Observa cada colina y valle de tu recorrido. Entiende dónde te esforzaste más y encuentra oportunidades para mejorar tu ritmo y esfuerzo.",
+    "interactive_maps_title": "Revive Tu Ruta",
+    "interactive_maps_desc": "Sigue tu camino en un mapa interactivo que se sincroniza perfectamente con tus datos de elevación. Contempla tu viaje desde una nueva perspectiva.",
+    "performance_metrics_title": "Entiende Tu Rendimiento",
+    "performance_metrics_desc": "Transforma datos complejos en información sencilla. Aprende sobre tu ritmo, tu esfuerzo y cómo prepararte para tu próxima aventura y alcanzar tu máximo rendimiento."
   },
   "footer": {
     "copyright": "© 2025 AltimetryCoach. Todos los derechos reservados."
