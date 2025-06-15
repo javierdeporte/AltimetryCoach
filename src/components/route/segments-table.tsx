@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
@@ -19,7 +20,6 @@ interface AdvancedSegment {
   rSquared: number;
   type: 'asc' | 'desc' | 'hor';
   color: string;
-  cutReason?: string; // Enhanced with cut reason
 }
 
 interface SegmentsTableProps {
@@ -58,8 +58,7 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
           elevation_loss_m: elevationLoss,
           avg_grade_percent: gradePercent,
           rSquared: advSeg.rSquared,
-          type: advSeg.type,
-          cutReason: advSeg.cutReason // Include cut reason
+          type: advSeg.type
         };
       });
     }
@@ -68,8 +67,7 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
       ...seg,
       elevation_loss_m: calculateElevationLoss(seg),
       rSquared: null,
-      type: null,
-      cutReason: null
+      type: null
     }));
   }, [isAdvancedMode, advancedSegments, segments]);
 
@@ -138,35 +136,6 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
     );
   };
 
-  // Enhanced cut reason indicator
-  const getCutReasonIndicator = (cutReason: string | null | undefined) => {
-    if (!cutReason) return null;
-    
-    let icon = '📊';
-    let colorClass = 'text-gray-600';
-    
-    if (cutReason.includes('Cambio de pendiente')) {
-      icon = '📈';
-      colorClass = 'text-orange-600';
-    } else if (cutReason.includes('Pico') || cutReason.includes('Valle') || cutReason.includes('dirección')) {
-      icon = '🎯';
-      colorClass = 'text-blue-600';
-    } else if (cutReason.includes('Calidad')) {
-      icon = '⚠️';
-      colorClass = 'text-red-600';
-    } else if (cutReason.includes('Final')) {
-      icon = '🏁';
-      colorClass = 'text-green-600';
-    }
-    
-    return (
-      <span className={`text-xs ${colorClass} flex items-center gap-1`} title={cutReason}>
-        <span>{icon}</span>
-        <span className="hidden sm:inline">{cutReason}</span>
-      </span>
-    );
-  };
-
   return (
     <div className="bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 overflow-hidden">
       <div className="p-6 border-b border-primary-200 dark:border-mountain-700">
@@ -176,13 +145,13 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
               Análisis de Segmentos de Ruta
               {isAdvancedMode && (
                 <span className="ml-2 text-sm bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
-                  Modo Multi-Criterio
+                  Modo Avanzado
                 </span>
               )}
             </h3>
             <p className="text-sm text-mountain-600 dark:text-mountain-400 mt-1">
               {displaySegments.length > 0 
-                ? `${displaySegments.length} segmentos ${isAdvancedMode ? 'con análisis multi-criterio deportivo' : 'básicos'}` 
+                ? `${displaySegments.length} segmentos ${isAdvancedMode ? 'generados por regresión lineal' : 'básicos'}` 
                 : 'Los segmentos se generarán automáticamente al procesar el archivo GPX'
               }
             </p>
@@ -190,7 +159,7 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
           {isAdvancedMode && advancedSegments.length > 0 && (
             <div className="text-right text-sm text-mountain-600 dark:text-mountain-400">
               <div>R² Promedio: {(advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length).toFixed(3)}</div>
-              <div>Relevancia Deportiva: {Math.round((advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length) * 100)}%</div>
+              <div>Calidad: {Math.round((advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length) * 100)}%</div>
             </div>
           )}
         </div>
@@ -222,9 +191,6 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
                 <TableHead className="text-mountain-700 dark:text-mountain-300">Gradiente Promedio</TableHead>
                 {isAdvancedMode && (
                   <TableHead className="text-mountain-700 dark:text-mountain-300">Calidad</TableHead>
-                )}
-                {isAdvancedMode && (
-                  <TableHead className="text-mountain-700 dark:text-mountain-300">Razón de Corte</TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -269,11 +235,6 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
                   {isAdvancedMode && (
                     <TableCell>
                       {getQualityIndicator(segment.rSquared)}
-                    </TableCell>
-                  )}
-                  {isAdvancedMode && (
-                    <TableCell>
-                      {getCutReasonIndicator(segment.cutReason)}
                     </TableCell>
                   )}
                 </TableRow>
