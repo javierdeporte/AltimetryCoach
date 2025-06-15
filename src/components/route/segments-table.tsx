@@ -10,18 +10,6 @@ interface Segment {
   avg_grade_percent: number;
 }
 
-interface AdvancedSegment {
-  startIndex: number;
-  endIndex: number;
-  startPoint: { distance: number; elevation: number; displayDistance: number; displayElevation: number };
-  endPoint: { distance: number; elevation: number; displayDistance: number; displayElevation: number };
-  slope: number;
-  intercept: number;
-  rSquared: number;
-  type: 'asc' | 'desc' | 'hor';
-  color: string;
-}
-
 interface SegmentsTableProps {
   segments: Segment[];
   advancedSegments?: AdvancedSegment[];

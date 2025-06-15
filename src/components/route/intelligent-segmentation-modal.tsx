@@ -292,7 +292,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
               
               <div className="flex-1 overflow-auto">
                 <ElevationChartD3
-                  elevationData={processedElevationData}
+                  elevationData={elevationData}
                   advancedSegments={advancedSegments}
                   options={{
                     width: 800,

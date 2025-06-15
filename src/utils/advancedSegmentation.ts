@@ -95,6 +95,7 @@ function createSegment(
  */
 function generateMicroSegments(
   macroSegmentData: ElevationPoint[],
+  elevationData: ElevationPoint[],
   params: AdvancedSegmentationParams,
   globalIndexOffset: number
 ): AdvancedSegment[] {
@@ -157,7 +158,7 @@ function generateMicroSegments(
     } else if (segments.length > 0) {
       // If the last remaining part is too small, merge it with the previous segment.
       const lastFinalSegment = segments[segments.length - 1];
-      const combinedPoints = elevationData.slice(lastFinalSegment.startIndex, globalIndexOffset + macroSegmentData.length);
+      const combinedPoints = elevationData.slice(lastFinalSegment.startIndex, globalIndexOffset + macroSegmentData.length - 1 + 1);
       const combinedRegressionPoints = combinedPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
       const combinedRegression = calculateLinearRegression(combinedRegressionPoints);
       segments[segments.length - 1] = createSegment(
@@ -279,7 +280,7 @@ export function segmentProfileAdvanced(
     // Ensure the slice is not empty or too small
     if (macroEnd > macroStart) {
         const macroSegmentData = elevationData.slice(macroStart, macroEnd + 1);
-        const microSegments = generateMicroSegments(macroSegmentData, params, macroStart);
+        const microSegments = generateMicroSegments(macroSegmentData, elevationData, params, macroStart);
         allMicroSegments.push(...microSegments);
     }
   }
