@@ -82,41 +82,21 @@ export const AdvancedControlsPanel: React.FC<AdvancedControlsPanelProps> = ({
         </div>
 
         <div className="space-y-4 p-4 rounded-lg border border-primary-200 dark:border-mountain-700">
-          <h4 className="font-medium text-primary-600">Micro-Segmentación (Regresión Lineal)</h4>
+          <h4 className="font-medium text-primary-600">Micro-Segmentación (Umbrales)</h4>
           <ParamSlider 
-            label="Calidad de Ajuste (R²)"
-            description="Qué tan recta debe ser una sección para ser un segmento. Más alto = más estricto."
-            value={params.rSquaredThreshold}
-            onValueChange={(val) => setParams(p => ({...p, rSquaredThreshold: val}))}
-            min={0.80} max={0.99} step={0.01}
-            formatValue={(val) => val.toFixed(2)}
-          />
-            <ParamSlider 
-            label="Distancia Mínima (Micro)"
-            description="Distancia mínima para un micro-segmento. Absorbe variaciones cortas."
+            label="Distancia Mínima"
+            description="Longitud mínima para un micro-segmento. Absorbe variaciones cortas y ruidosas."
             value={params.microMinDistance}
             onValueChange={(val) => setParams(p => ({...p, microMinDistance: val}))}
-            min={0.1} max={1.0} step={0.1}
+            min={0.1} max={2.0} step={0.1}
             formatValue={(val) => `${val.toFixed(1)} km`}
           />
           <ParamSlider 
-            label="Puntos Mínimos"
-            description="Número de puntos de datos necesarios. Aumentar si el GPS es ruidoso."
-            value={params.minSegmentPoints}
-            onValueChange={(val) => setParams(p => ({...p, minSegmentPoints: val}))}
-            min={10} max={50} step={1}
-            formatValue={(val) => `${val}`}
-          />
-        </div>
-
-        <div className="space-y-4 p-4 rounded-lg border border-primary-200 dark:border-mountain-700">
-          <h4 className="font-medium text-primary-600">Post-Procesamiento</h4>
-            <ParamSlider 
-            label="Umbral de Fusión de Pendiente"
-            description="Si dos segmentos seguidos tienen pendientes muy parecidas, se unen. Más alto = menos fusiones."
+            label="Umbral Cambio de Pendiente"
+            description="Si dos tramos seguidos tienen pendientes muy diferentes, se dividen. Más alto = menos divisiones."
             value={params.slopeChangeThreshold}
             onValueChange={(val) => setParams(p => ({...p, slopeChangeThreshold: val}))}
-            min={0.05} max={0.20} step={0.01}
+            min={0.02} max={0.20} step={0.01}
             formatValue={(val) => `${(val * 100).toFixed(0)}%`}
           />
         </div>
