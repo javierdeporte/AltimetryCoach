@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import * as d3 from 'd3';
 
 interface ElevationPoint {
@@ -70,10 +70,10 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
 
   // Default options
   const defaultOptions = {
-    width: 600,
     height: 300,
     marginTop: 20,
     marginRight: 20,
@@ -91,6 +91,29 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   };
 
   const opts = { ...defaultOptions, ...options };
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver(entries => {
+      if (entries[0]) {
+        const width = entries[0].contentRect.width;
+        setContainerWidth(width > MIN_CHART_WIDTH ? width : MIN_CHART_WIDTH);
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    const width = container.getBoundingClientRect().width;
+    setContainerWidth(width > MIN_CHART_WIDTH ? width : MIN_CHART_WIDTH);
+
+    return () => {
+      if (container) {
+        resizeObserver.unobserve(container);
+      }
+    };
+  }, []);
 
   // Calculate inclines for elevation data
   const processedData = React.useMemo(() => {
@@ -128,12 +151,13 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   }, [processedData, showGradientVisualization]);
 
   useEffect(() => {
-    if (!svgRef.current || !containerRef.current || processedData.length === 0) return;
+    if (!svgRef.current || !containerRef.current || processedData.length === 0 || containerWidth === 0) return;
 
     console.log('Drawing chart with advanced segments:', advancedSegments.length);
+    const width = containerWidth;
 
     const svg = d3.select(svgRef.current)
-      .attr("viewBox", `0 0 ${opts.width} ${opts.height}`)
+      .attr("viewBox", `0 0 ${width} ${opts.height}`)
       .style("background-color", opts.backgroundColor)
       .style("overflow", "visible");
 
@@ -159,7 +183,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
     // Scales
     const xScale = d3.scaleLinear()
       .domain([0, d3.max(processedData, d => d.displayDistance) || 1])
-      .range([opts.marginLeft, opts.width - opts.marginRight]);
+      .range([opts.marginLeft, width - opts.marginRight]);
 
     const yScale = d3.scaleLinear()
       .domain(yDomain)
@@ -324,7 +348,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
     }
 
     // X-axis
-    const numXTicks = opts.xAxisTicks || Math.max(2, Math.floor(opts.width / 80));
+    const numXTicks = opts.xAxisTicks || Math.max(2, Math.floor(width / 80));
     chartContent.append("g")
       .attr("transform", `translate(0,${opts.height - opts.marginBottom})`)
       .call(d3.axisBottom(xScale).ticks(numXTicks).tickSizeOuter(0))
@@ -334,7 +358,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       .call(g => g.select(".domain").style("stroke", opts.axisColor))
       .append("text")
         .attr("class", "axis-label")
-        .attr("x", opts.width - opts.marginRight)
+        .attr("x", width - opts.marginRight)
         .attr("y", opts.marginBottom - 10)
         .attr("fill", opts.textColor)
         .attr("text-anchor", "end")
@@ -380,7 +404,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
     // Event rectangle for mouse interactions
     svg.append("rect")
       .attr("class", "event-rect")
-      .attr("width", opts.width - opts.marginLeft - opts.marginRight)
+      .attr("width", width - opts.marginLeft - opts.marginRight)
       .attr("height", opts.height - opts.marginTop - opts.marginBottom)
       .attr("transform", `translate(${opts.marginLeft},${opts.marginTop})`)
       .attr("fill", "none")
@@ -443,17 +467,15 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         }
       });
 
-  }, [processedData, opts, intelligentSegments, advancedSegments, onPointHover, showGradientVisualization, gradientColorScale, macroBoundaries]);
+  }, [processedData, opts, intelligentSegments, advancedSegments, onPointHover, showGradientVisualization, gradientColorScale, macroBoundaries, containerWidth]);
 
   return (
     <div 
       ref={containerRef} 
-      className="relative chart-container bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 p-6" 
+      className="relative chart-container bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 p-6 w-full" 
       style={{ 
-        width: `${opts.width}px`, 
         height: `${opts.height + 100}px`, 
         backgroundColor: opts.backgroundColor === 'transparent' ? undefined : opts.backgroundColor,
-        overflow: 'hidden' 
       }} 
       aria-label="Elevation profile chart" 
       role="img"
