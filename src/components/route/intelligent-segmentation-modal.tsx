@@ -1,6 +1,5 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import React, { useState, useMemo } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import { ElevationChartD3 } from './elevation-chart-d3';
@@ -10,14 +9,7 @@ import {
   getAdvancedSegmentTypeLabel 
 } from '../../utils/advancedSegmentation';
 import { Settings, Save, RotateCcw, TrendingUp } from 'lucide-react';
-
-interface ElevationPoint {
-  distance: number;
-  elevation: number;
-  displayDistance: number;
-  displayElevation: number;
-  segmentIndex?: number;
-}
+import { AdvancedSegment, AdvancedSegmentationParams, ElevationPoint } from '@/utils/types';
 
 interface IntelligentSegmentationModalProps {
   isOpen: boolean;
@@ -32,22 +24,14 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
   elevationData,
   onSaveSegments
 }) => {
-  const [params, setParams] = useState(DEFAULT_ADVANCED_SEGMENTATION_PARAMS);
-
-  // Process elevation data to ensure it has the required displayDistance and displayElevation properties
-  const processedElevationData = useMemo(() => {
-    return elevationData.map(point => ({
-      ...point,
-      displayDistance: point.displayDistance || point.distance,
-      displayElevation: point.displayElevation || point.elevation
-    }));
-  }, [elevationData]);
+  const [params, setParams] = useState<AdvancedSegmentationParams>(DEFAULT_ADVANCED_SEGMENTATION_PARAMS);
 
   // Calculate advanced segments in real-time
   const advancedSegments = useMemo(() => {
-    if (!processedElevationData || processedElevationData.length === 0) return [];
-    return segmentProfileAdvanced(processedElevationData, params);
-  }, [processedElevationData, params]);
+    if (!elevationData || elevationData.length === 0) return [];
+    console.log("Recalculating segments with params:", params);
+    return segmentProfileAdvanced(elevationData, params);
+  }, [elevationData, params]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -107,85 +91,114 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
     onClose();
   };
 
+  const ParamSlider = ({ label, description, value, onValueChange, min, max, step, formatValue }: {
+    label: string;
+    description: string;
+    value: number;
+    onValueChange: (val: number) => void;
+    min: number;
+    max: number;
+    step: number;
+    formatValue: (val: number) => string;
+  }) => (
+    <div className="space-y-2">
+      <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+        {label}: {formatValue(value)}
+      </label>
+      <Slider
+        value={[value]}
+        onValueChange={(v) => onValueChange(v[0])}
+        min={min}
+        max={max}
+        step={step}
+        className="w-full"
+      />
+      <p className="text-xs text-mountain-600 dark:text-mountain-400">
+        {description}
+      </p>
+    </div>
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
-            Análisis Avanzado de Segmentos con Regresión Lineal
+            Análisis Híbrido de Segmentos
           </DialogTitle>
-          <p className="text-sm text-mountain-600 dark:text-mountain-400">
-            Algoritmo de ventana creciente con control de calidad R²
-          </p>
+          <DialogDescription>
+            Ajusta los parámetros para optimizar la detección de segmentos según tu estrategia deportiva.
+          </DialogDescription>
         </DialogHeader>
         
         <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
           {/* Controls Panel */}
-          <div className="lg:w-80 flex-shrink-0 space-y-6 overflow-y-auto">
-            <div className="space-y-4">
+          <div className="lg:w-96 flex-shrink-0 space-y-6 overflow-y-auto p-2">
+            <div className="space-y-4 p-4 rounded-lg border">
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-                Parámetros de Segmentación Avanzada
+                Parámetros de Segmentación
               </h3>
               
-              {/* R² Threshold */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Umbral de Calidad R²: {params.rSquaredThreshold.toFixed(3)}
-                </label>
-                <Slider
-                  value={[params.rSquaredThreshold]}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, rSquaredThreshold: value[0] }))}
-                  min={0.80}
-                  max={0.98}
-                  step={0.01}
-                  className="w-full"
+              <div className="space-y-4">
+                <h4 className="font-medium text-primary-600">Macro-Segmentación (Picos y Valles)</h4>
+                <ParamSlider 
+                  label="Prominencia Mínima"
+                  description="Altura mínima que debe tener un pico o valle para ser considerado un punto de división principal."
+                  value={params.macroProminence}
+                  onValueChange={(val) => setParams(p => ({...p, macroProminence: val}))}
+                  min={10} max={100} step={5}
+                  formatValue={(val) => `${val} m`}
                 />
-                <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Coeficiente de determinación mínimo para mantener un segmento
-                </p>
+                <ParamSlider 
+                  label="Distancia Mínima (Macro)"
+                  description="Distancia mínima entre picos/valles principales para evitar divisiones muy seguidas."
+                  value={params.macroMinDistance}
+                  onValueChange={(val) => setParams(p => ({...p, macroMinDistance: val}))}
+                  min={0.2} max={2.0} step={0.1}
+                  formatValue={(val) => `${val.toFixed(1)} km`}
+                />
               </div>
 
-              {/* Minimum Points */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Puntos Mínimos por Segmento: {params.minSegmentPoints}
-                </label>
-                <Slider
-                  value={[params.minSegmentPoints]}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, minSegmentPoints: value[0] }))}
-                  min={10}
-                  max={50}
-                  step={5}
-                  className="w-full"
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium text-primary-600">Micro-Segmentación (Regresión Lineal)</h4>
+                <ParamSlider 
+                  label="Calidad de Ajuste (R²)"
+                  description="Qué tan recta debe ser una sección para ser un segmento. Más alto = más estricto."
+                  value={params.rSquaredThreshold}
+                  onValueChange={(val) => setParams(p => ({...p, rSquaredThreshold: val}))}
+                  min={0.80} max={0.99} step={0.01}
+                  formatValue={(val) => val.toFixed(2)}
                 />
-                <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Número mínimo de puntos para formar un segmento válido
-                </p>
+                 <ParamSlider 
+                  label="Distancia Mínima (Micro)"
+                  description="Distancia mínima para un micro-segmento. Absorbe variaciones cortas como las que mencionaste."
+                  value={params.microMinDistance}
+                  onValueChange={(val) => setParams(p => ({...p, microMinDistance: val}))}
+                  min={0.1} max={1.0} step={0.1}
+                  formatValue={(val) => `${val.toFixed(1)} km`}
+                />
+                <ParamSlider 
+                  label="Puntos Mínimos"
+                  description="Número de puntos de datos necesarios. Aumentar si el GPS es ruidoso."
+                  value={params.minSegmentPoints}
+                  onValueChange={(val) => setParams(p => ({...p, minSegmentPoints: val}))}
+                  min={10} max={50} step={1}
+                  formatValue={(val) => `${val}`}
+                />
               </div>
 
-              {/* Minimum Distance */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Distancia Mínima: {params.minSegmentDistance.toFixed(1)} km
-                </label>
-                <Slider
-                  value={[params.minSegmentDistance]}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, minSegmentDistance: value[0] }))}
-                  min={0.1}
-                  max={1.0}
-                  step={0.1}
-                  className="w-full"
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium text-primary-600">Post-Procesamiento</h4>
+                 <ParamSlider 
+                  label="Umbral de Fusión de Pendiente"
+                  description="Si dos segmentos seguidos tienen pendientes muy parecidas, se unen. Más alto = menos fusiones."
+                  value={params.slopeChangeThreshold}
+                  onValueChange={(val) => setParams(p => ({...p, slopeChangeThreshold: val}))}
+                  min={0.05} max={0.20} step={0.01}
+                  formatValue={(val) => `${(val * 100).toFixed(0)}%`}
                 />
-                <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Distancia mínima para considerar un segmento
-                </p>
               </div>
-
-              <Button onClick={handleResetParams} variant="outline" className="w-full">
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Restaurar Valores por Defecto
-              </Button>
             </div>
 
             {/* Enhanced Statistics */}
@@ -321,16 +334,19 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex justify-between pt-4 border-t border-primary-200 dark:border-mountain-700">
-          <Button onClick={onClose} variant="outline">
-            Cancelar
+        <DialogFooter className="pt-4 border-t">
+          <Button onClick={handleResetParams} variant="outline">
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Restaurar
+          </Button>
+          <Button onClick={onClose} variant="secondary">
+            Cerrar
           </Button>
           <Button onClick={handleSaveSegments} disabled={advancedSegments.length === 0}>
             <Save className="w-4 h-4 mr-2" />
-            Aplicar Segmentos Avanzados ({advancedSegments.length})
+            Aplicar y Guardar ({advancedSegments.length})
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

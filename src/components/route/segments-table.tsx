@@ -1,6 +1,6 @@
-
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { AdvancedSegment } from '@/utils/types';
 
 interface Segment {
   id: string;
@@ -43,11 +43,11 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
   const displaySegments = React.useMemo(() => {
     if (isAdvancedMode && advancedSegments.length > 0) {
       return advancedSegments.map((advSeg, index) => {
-        const distance = advSeg.endPoint.displayDistance - advSeg.startPoint.displayDistance;
-        const elevationGain = Math.max(0, advSeg.endPoint.displayElevation - advSeg.startPoint.displayElevation);
-        const elevationLoss = Math.max(0, advSeg.startPoint.displayElevation - advSeg.endPoint.displayElevation);
+        const distance = advSeg.distance;
+        const elevationGain = advSeg.elevationGain;
+        const elevationLoss = advSeg.elevationLoss;
         
-        // Calculate grade from slope (slope is already in percentage terms)
+        // Calculate grade from slope 
         const gradePercent = advSeg.slope * 100;
         
         return {

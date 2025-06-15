@@ -12,6 +12,7 @@ import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
 import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS } from '../../utils/advancedSegmentation';
+import { IntelligentSegmentationModal } from '../../components/route/intelligent-segmentation-modal';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -23,6 +24,7 @@ const RouteDetail = () => {
   const [advancedAnalysisMode, setAdvancedAnalysisMode] = useState(false);
   const [advancedParams, setAdvancedParams] = useState(DEFAULT_ADVANCED_SEGMENTATION_PARAMS);
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -100,6 +102,15 @@ const RouteDetail = () => {
     } else {
       setShowAdvancedControls(false);
     }
+  };
+
+  const handleSaveAdvancedSegments = (newSegments: any) => {
+    // Here you would typically save the new segments to your backend
+    console.log("Saving new advanced segments:", newSegments);
+    // For now, we just apply them to the view
+    // In a real app, this would trigger a mutation and refetch route data
+    // setAdvancedSegments(newSegments); // This is derived, so we can't set it directly.
+    // Instead, we might want to update params and let it recalculate
   };
 
   if (isLoading) {
@@ -243,13 +254,12 @@ const RouteDetail = () => {
               {/* Advanced Controls Toggle */}
               {advancedAnalysisMode && (
                 <Button 
-                  onClick={() => setShowAdvancedControls(!showAdvancedControls)}
+                  onClick={() => setIsModalOpen(true)}
                   variant="outline" 
                   className="border-primary-300 text-primary-600 hover:bg-primary-50"
                 >
                   <Sliders className="w-4 h-4 mr-2" />
-                  Controles
-                  {showAdvancedControls ? <ChevronRight className="w-4 h-4 ml-2" /> : <ChevronLeft className="w-4 h-4 ml-2" />}
+                  Ajustar Parámetros
                 </Button>
               )}
               
@@ -348,140 +358,14 @@ const RouteDetail = () => {
         </div>
       </div>
 
-      {/* Advanced Controls Sidebar */}
-      {showAdvancedControls && advancedAnalysisMode && (
-        <div className="fixed right-0 top-0 h-full w-80 bg-white dark:bg-mountain-800 border-l border-primary-200 dark:border-mountain-700 shadow-lg z-50">
-          <div className="p-6 h-full overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-                Controles Avanzados
-              </h3>
-              <Button 
-                onClick={() => setShowAdvancedControls(false)}
-                variant="ghost"
-                size="sm"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-            
-            <div className="space-y-6">
-              {/* Real-time Statistics */}
-              <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-4">
-                <h4 className="font-semibold text-primary-800 dark:text-primary-200 mb-3">
-                  Estadísticas en Tiempo Real
-                </h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-mountain-600 dark:text-mountain-400">Segmentos:</span>
-                    <div className="font-bold text-primary-600">{advancedStats.totalSegments}</div>
-                  </div>
-                  <div>
-                    <span className="text-mountain-600 dark:text-mountain-400">R² Promedio:</span>
-                    <div className="font-bold text-primary-600">{advancedStats.avgRSquared.toFixed(3)}</div>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-mountain-600 dark:text-mountain-400">Calidad Global:</span>
-                    <div className="font-bold text-lg text-primary-600">{advancedStats.qualityScore}%</div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                      <div 
-                        className="bg-primary-600 h-2 rounded-full transition-all duration-300" 
-                        style={{ width: `${advancedStats.qualityScore}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Parameter Controls */}
-              <div className="space-y-6">
-                <div>
-                  <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
-                    R² Threshold: {advancedParams.rSquaredThreshold.toFixed(3)}
-                  </label>
-                  <p className="text-xs text-mountain-500 mb-3">
-                    Calidad mínima de cada segmento (mayor = más preciso)
-                  </p>
-                  <Slider
-                    value={[advancedParams.rSquaredThreshold]}
-                    onValueChange={(value) => setAdvancedParams(prev => ({
-                      ...prev,
-                      rSquaredThreshold: value[0]
-                    }))}
-                    min={0.7}
-                    max={0.99}
-                    step={0.01}
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
-                    Puntos Mínimos: {advancedParams.minSegmentPoints}
-                  </label>
-                  <p className="text-xs text-mountain-500 mb-3">
-                    Número mínimo de puntos por segmento
-                  </p>
-                  <Slider
-                    value={[advancedParams.minSegmentPoints]}
-                    onValueChange={(value) => setAdvancedParams(prev => ({
-                      ...prev,
-                      minSegmentPoints: value[0]
-                    }))}
-                    min={10}
-                    max={50}
-                    step={1}
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
-                    Distancia Mínima: {advancedParams.minSegmentDistance.toFixed(1)} km
-                  </label>
-                  <p className="text-xs text-mountain-500 mb-3">
-                    Longitud mínima de cada segmento
-                  </p>
-                  <Slider
-                    value={[advancedParams.minSegmentDistance]}
-                    onValueChange={(value) => setAdvancedParams(prev => ({
-                      ...prev,
-                      minSegmentDistance: value[0]
-                    }))}
-                    min={0.1}
-                    max={2.0}
-                    step={0.1}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-
-              {/* Reset Button */}
-              <Button 
-                onClick={resetAdvancedParams}
-                variant="outline" 
-                className="w-full"
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Restaurar Defaults
-              </Button>
-
-              {/* Quality Interpretation Guide */}
-              <div className="bg-gray-50 dark:bg-mountain-700 rounded-lg p-4">
-                <h5 className="font-medium text-mountain-700 dark:text-mountain-300 mb-2">
-                  Guía de Interpretación
-                </h5>
-                <div className="text-xs text-mountain-600 dark:text-mountain-400 space-y-1">
-                  <div>• R² &gt; 0.95: Excelente ajuste</div>
-                  <div>• R² &gt; 0.90: Muy buen ajuste</div>
-                  <div>• R² &gt; 0.85: Buen ajuste</div>
-                  <div>• R² &lt; 0.85: Posible sobreajuste</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* DEPRECATED: Advanced Controls Sidebar is now replaced by the modal */}
+      {/* We keep the logic for the modal itself */}
+      <IntelligentSegmentationModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        elevationData={processedElevationData}
+        onSaveSegments={handleSaveAdvancedSegments}
+      />
     </div>
   );
 };
