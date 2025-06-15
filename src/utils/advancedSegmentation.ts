@@ -114,7 +114,6 @@ export function segmentProfileAdvanced(
   for (let i = 2; i < elevationData.length; i++) {
     const segmentPoints = elevationData.slice(currentSegmentStartIndex, i + 1);
     
-    // Prepare points for regression (filter out invalid elevations)
     const regressionPoints = segmentPoints
       .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
       .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
@@ -122,40 +121,85 @@ export function segmentProfileAdvanced(
     if (regressionPoints.length < 2) continue;
 
     const regression = calculateLinearRegression(regressionPoints);
-    const segmentDistance = elevationData[i].displayDistance - elevationData[currentSegmentStartIndex].displayDistance;
+    const isQualityPoor = regression.rSquared < params.rSquaredThreshold;
 
-    // Conditions to finalize current segment
-    const shouldFinalizeSegment = (
-      regression.rSquared < params.rSquaredThreshold && 
-      segmentPoints.length >= params.minSegmentPoints && 
-      segmentDistance >= params.minSegmentDistance
-    );
-
-    if (shouldFinalizeSegment) {
-      // Finalize current segment (excluding the point that broke the quality)
+    // A segment cut is considered if the regression quality drops.
+    if (isQualityPoor) {
+      // The segment to finalize is the one *before* the current point `i`.
       const finalSegmentPoints = elevationData.slice(currentSegmentStartIndex, i);
-      const finalRegressionPoints = finalSegmentPoints
+      const finalSegmentDistance = elevationData[i - 1].displayDistance - elevationData[currentSegmentStartIndex].displayDistance;
+
+      // Per user feedback, we prioritize distance to define a meaningful segment.
+      if (finalSegmentDistance >= params.minSegmentDistance) {
+        
+        const finalRegressionPoints = finalSegmentPoints
+          .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
+          .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+        
+        // A final quality gate ensures the segment has enough points for a reliable calculation.
+        if (finalRegressionPoints.length >= params.minSegmentPoints) {
+          const finalRegression = calculateLinearRegression(finalRegressionPoints);
+          const segmentType = getSegmentType(finalRegression.slope);
+          
+          const startElevation = finalSegmentPoints[0].displayElevation;
+          const endElevation = finalSegmentPoints[finalSegmentPoints.length - 1].displayElevation;
+          const elevationChange = endElevation - startElevation;
+          
+          const segment: AdvancedSegment = {
+            startIndex: currentSegmentStartIndex,
+            endIndex: i - 1,
+            startPoint: elevationData[currentSegmentStartIndex],
+            endPoint: elevationData[i - 1],
+            slope: finalRegression.slope,
+            intercept: finalRegression.intercept,
+            rSquared: finalRegression.rSquared,
+            distance: finalSegmentDistance,
+            elevationGain: elevationChange > 0 ? elevationChange : 0,
+            elevationLoss: elevationChange < 0 ? Math.abs(elevationChange) : 0,
+            type: segmentType,
+            color: SEGMENT_COLORS[segmentType]
+          };
+          
+          finalSegments.push(segment);
+          
+          // Start the new segment from the point that broke the old trend.
+          // This creates an overlap, ensuring continuous segmentation.
+          currentSegmentStartIndex = i - 1;
+        }
+        // If not enough points, we don't cut and let the window grow.
+      }
+      // If not enough distance, we don't cut and let the window grow.
+    }
+  }
+
+  // Handle the last segment
+  if (currentSegmentStartIndex < elevationData.length - 1) {
+    const lastSegmentPoints = elevationData.slice(currentSegmentStartIndex);
+    const lastSegmentDistance = lastSegmentPoints[lastSegmentPoints.length - 1].displayDistance - lastSegmentPoints[0].displayDistance;
+
+    // The last segment must also meet the minimum criteria to be considered valid.
+    if (lastSegmentPoints.length >= params.minSegmentPoints && lastSegmentDistance >= params.minSegmentDistance) {
+      const lastRegressionPoints = lastSegmentPoints
         .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
         .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+
+      if (lastRegressionPoints.length >= params.minSegmentPoints) {
+        const lastRegression = calculateLinearRegression(lastRegressionPoints);
+        const segmentType = getSegmentType(lastRegression.slope);
         
-      if (finalRegressionPoints.length >= params.minSegmentPoints) {
-        const finalRegression = calculateLinearRegression(finalRegressionPoints);
-        const segmentType = getSegmentType(finalRegression.slope);
-        
-        // Calculate elevation statistics
-        const startElevation = finalSegmentPoints[0].displayElevation;
-        const endElevation = finalSegmentPoints[finalSegmentPoints.length - 1].displayElevation;
+        const startElevation = lastSegmentPoints[0].displayElevation;
+        const endElevation = lastSegmentPoints[lastSegmentPoints.length - 1].displayElevation;
         const elevationChange = endElevation - startElevation;
         
         const segment: AdvancedSegment = {
           startIndex: currentSegmentStartIndex,
-          endIndex: i - 1,
+          endIndex: elevationData.length - 1,
           startPoint: elevationData[currentSegmentStartIndex],
-          endPoint: elevationData[i - 1],
-          slope: finalRegression.slope,
-          intercept: finalRegression.intercept,
-          rSquared: finalRegression.rSquared,
-          distance: elevationData[i - 1].displayDistance - elevationData[currentSegmentStartIndex].displayDistance,
+          endPoint: elevationData[elevationData.length - 1],
+          slope: lastRegression.slope,
+          intercept: lastRegression.intercept,
+          rSquared: lastRegression.rSquared,
+          distance: elevationData[elevationData.length - 1].displayDistance - elevationData[currentSegmentStartIndex].displayDistance,
           elevationGain: elevationChange > 0 ? elevationChange : 0,
           elevationLoss: elevationChange < 0 ? Math.abs(elevationChange) : 0,
           type: segmentType,
@@ -164,48 +208,16 @@ export function segmentProfileAdvanced(
         
         finalSegments.push(segment);
       }
-      
-      // Start new segment
-      currentSegmentStartIndex = i;
-    }
-  }
-
-  // Handle the last segment
-  if (currentSegmentStartIndex < elevationData.length - 1) {
-    const lastSegmentPoints = elevationData.slice(currentSegmentStartIndex);
-    const lastRegressionPoints = lastSegmentPoints
-      .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
-      .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-
-    if (lastRegressionPoints.length >= params.minSegmentPoints) {
-      const lastRegression = calculateLinearRegression(lastRegressionPoints);
-      const segmentType = getSegmentType(lastRegression.slope);
-      
-      const startElevation = lastSegmentPoints[0].displayElevation;
-      const endElevation = lastSegmentPoints[lastSegmentPoints.length - 1].displayElevation;
-      const elevationChange = endElevation - startElevation;
-      
-      const segment: AdvancedSegment = {
-        startIndex: currentSegmentStartIndex,
-        endIndex: elevationData.length - 1,
-        startPoint: elevationData[currentSegmentStartIndex],
-        endPoint: elevationData[elevationData.length - 1],
-        slope: lastRegression.slope,
-        intercept: lastRegression.intercept,
-        rSquared: lastRegression.rSquared,
-        distance: elevationData[elevationData.length - 1].displayDistance - elevationData[currentSegmentStartIndex].displayDistance,
-        elevationGain: elevationChange > 0 ? elevationChange : 0,
-        elevationLoss: elevationChange < 0 ? Math.abs(elevationChange) : 0,
-        type: segmentType,
-        color: SEGMENT_COLORS[segmentType]
-      };
-      
-      finalSegments.push(segment);
     }
   }
 
   console.log('Generated', finalSegments.length, 'advanced segments');
-  console.log('Average R²:', finalSegments.reduce((acc, s) => acc + s.rSquared, 0) / finalSegments.length);
+  if (finalSegments.length > 0) {
+    const avgR = finalSegments.reduce((acc, s) => acc + s.rSquared, 0) / finalSegments.length;
+    if (!isNaN(avgR)) {
+      console.log('Average R²:', avgR);
+    }
+  }
   
   return finalSegments;
 }
