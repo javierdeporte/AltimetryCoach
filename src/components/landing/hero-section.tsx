@@ -1,12 +1,11 @@
 
 import React from 'react';
 import { Button } from '../ui/button';
-import { Logo } from '../ui/logo';
 import { ArrowUp, Map } from 'lucide-react';
 
 export const HeroSection: React.FC = () => {
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-primary-50 via-earth-50 to-primary-100 dark:from-mountain-900 dark:via-mountain-800 dark:to-primary-900 overflow-hidden">
+    <div className="relative min-h-[calc(100vh-160px)] bg-gradient-to-br from-primary-50 via-earth-50 to-primary-100 dark:from-mountain-900 dark:via-mountain-800 dark:to-primary-900 overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <svg width="100%" height="100%" viewBox="0 0 100 100" className="absolute inset-0">
@@ -18,34 +17,21 @@ export const HeroSection: React.FC = () => {
       </div>
 
       <div className="relative z-10 container mx-auto px-4 pt-20 pb-16">
-        {/* Header */}
-        <header className="flex items-center justify-between mb-16">
-          <Logo size="lg" />
-          <div className="flex gap-4">
-            <Button variant="ghost" className="text-primary-700 hover:text-primary-800">
-              Log In
-            </Button>
-            <Button className="bg-primary-600 hover:bg-primary-700 text-white">
-              Get Started
-            </Button>
-          </div>
-        </header>
-
         {/* Hero Content */}
         <div className="max-w-4xl mx-auto text-center">
           <div className="animate-fade-in">
             <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
               <span className="bg-gradient-to-r from-primary-600 to-earth-600 bg-clip-text text-transparent">
-                Elevate Your
+                Eleva Tu
               </span>
               <br />
               <span className="text-mountain-800 dark:text-mountain-200">
-                Trail Running
+                Carrera de Montaña
               </span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-mountain-600 dark:text-mountain-300 mb-8 max-w-2xl mx-auto leading-relaxed">
-              Analyze your GPX routes, visualize elevation profiles, and optimize your mountain adventures with professional insights.
+            <p className="text-xl md:text-2xl text-mountain-600 dark:text-mountain-300 mb-8 max-w-3xl mx-auto leading-relaxed">
+              Analiza tus rutas GPX, visualiza perfiles de elevación y optimiza tus aventuras en la montaña con información profesional.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
@@ -53,7 +39,7 @@ export const HeroSection: React.FC = () => {
                 size="lg" 
                 className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-4 text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
               >
-                Start Your Journey
+                Comienza Tu Aventura
                 <ArrowUp className="ml-2 h-5 w-5" />
               </Button>
               <Button 
@@ -61,7 +47,7 @@ export const HeroSection: React.FC = () => {
                 size="lg"
                 className="border-2 border-primary-600 text-primary-700 hover:bg-primary-50 px-8 py-4 text-lg rounded-xl"
               >
-                View Demo
+                Ver Demostración
                 <Map className="ml-2 h-5 w-5" />
               </Button>
             </div>
@@ -76,10 +62,10 @@ export const HeroSection: React.FC = () => {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-                Elevation Analysis
+                Análisis de Elevación
               </h3>
               <p className="text-mountain-600 dark:text-mountain-400 text-sm">
-                Detailed elevation profiles with gradient analysis and segment breakdown.
+                Perfiles de elevación detallados con análisis de pendiente y desglose por segmentos.
               </p>
             </div>
 
@@ -88,10 +74,10 @@ export const HeroSection: React.FC = () => {
                 <Map className="w-6 h-6 text-earth-600" />
               </div>
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-                Interactive Maps
+                Mapas Interactivos
               </h3>
               <p className="text-mountain-600 dark:text-mountain-400 text-sm">
-                Explore your routes with synchronized map and elevation visualization.
+                Explora tus rutas con visualización sincronizada de mapa y elevación.
               </p>
             </div>
 
@@ -102,10 +88,10 @@ export const HeroSection: React.FC = () => {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-                Performance Metrics
+                Métricas de Rendimiento
               </h3>
               <p className="text-mountain-600 dark:text-mountain-400 text-sm">
-                Get insights on pace, effort, and optimal nutrition strategies.
+                Obtén información sobre ritmo, esfuerzo y estrategias óptimas de nutrición.
               </p>
             </div>
           </div>
