@@ -40,6 +40,15 @@ const RouteDetail = () => {
   
   const { route, segments, elevationData, isLoading, error } = useRouteData(routeId);
 
+  // Transform elevation data to the format expected by D3 chart and advanced segmentation
+  const processedElevationData = React.useMemo(() => {
+    return elevationData.map(point => ({
+      ...point,
+      displayDistance: point.distance,
+      displayElevation: point.elevation
+    }));
+  }, [elevationData]);
+
   const handleBackToRoutes = () => {
     navigate('/dashboard/routes');
   };
@@ -248,7 +257,7 @@ const RouteDetail = () => {
       {/* Advanced Elevation Chart */}
       <div className="w-full">
         <ElevationChartD3
-          elevationData={elevationData}
+          elevationData={processedElevationData}
           onPointHover={setHoveredSegment}
           hoveredSegment={hoveredSegment}
           options={{
@@ -286,7 +295,7 @@ const RouteDetail = () => {
       <IntelligentSegmentationModal
         isOpen={showIntelligentSegmentation}
         onClose={() => setShowIntelligentSegmentation(false)}
-        elevationData={elevationData}
+        elevationData={processedElevationData}
         onSaveSegments={handleSaveIntelligentSegments}
       />
     </div>
