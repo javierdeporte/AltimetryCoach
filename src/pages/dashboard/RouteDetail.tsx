@@ -11,7 +11,7 @@ import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Slide
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
-import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS } from '../../utils/advancedSegmentation';
+import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS, detectExtremeSlopePoints } from '../../utils/advancedSegmentation';
 import { AdvancedControlsPanel } from '../../components/route/advanced-controls-panel';
 
 const RouteDetail = () => {
@@ -64,6 +64,14 @@ const RouteDetail = () => {
     console.log('Calculating advanced segments with params:', advancedParams);
     return segmentProfileAdvanced(processedElevationData, advancedParams);
   }, [advancedAnalysisMode, processedElevationData, advancedParams]);
+
+  // Calculate extreme slope points for highlighting
+  const extremeSlopePoints = useMemo(() => {
+    if (!advancedAnalysisMode || !advancedParams.enableExtremeHighlighting || processedElevationData.length === 0) {
+      return [];
+    }
+    return detectExtremeSlopePoints(processedElevationData, advancedParams.extremeSlopeThreshold);
+  }, [advancedAnalysisMode, processedElevationData, advancedParams.enableExtremeHighlighting, advancedParams.extremeSlopeThreshold]);
 
   // Calculate advanced segments statistics
   const advancedStats = useMemo(() => {
@@ -211,7 +219,7 @@ const RouteDetail = () => {
               <div className="flex flex-wrap gap-6 text-sm text-mountain-600 dark:text-mountain-400">
                 <span className="flex items-center gap-1">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 012-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                   {route.distance_km.toFixed(1)} km
                 </span>
@@ -316,6 +324,7 @@ const RouteDetail = () => {
               }}
               advancedSegments={advancedSegments}
               macroBoundaries={macroBoundaries}
+              extremeSlopePoints={extremeSlopePoints}
             />
           </div>
 

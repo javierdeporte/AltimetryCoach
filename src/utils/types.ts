@@ -33,9 +33,12 @@ export interface AdvancedSegmentationResult {
 }
 
 export interface AdvancedSegmentationParams {
-  rSquaredThreshold: number;
   minSegmentPoints: number;
   microMinDistance: number; // in km
   macroProminence: number; // in meters
   slopeChangeThreshold: number; // as a slope value (e.g., 0.1 for 10%)
+  
+  // Parámetros para el resaltado de pendientes extremas
+  enableExtremeHighlighting: boolean;
+  extremeSlopeThreshold: number; // en porcentaje (e.g., 15 for 15%)
 }
