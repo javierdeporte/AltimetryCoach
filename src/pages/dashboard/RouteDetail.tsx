@@ -61,25 +61,23 @@ const RouteDetail = () => {
       return [];
     }
     
-    console.log('Calculating advanced segments with new params:', advancedParams);
+    console.log('Calculating advanced segments with params:', advancedParams);
     return segmentProfileAdvanced(processedElevationData, advancedParams);
   }, [advancedAnalysisMode, processedElevationData, advancedParams]);
 
   // Calculate advanced segments statistics
   const advancedStats = useMemo(() => {
     if (advancedSegments.length === 0) {
-      return { totalSegments: 0, totalDistance: 0, totalGain: 0, totalLoss: 0 };
+      return { avgRSquared: 0, totalSegments: 0, qualityScore: 0 };
     }
     
-    const totalDistance = advancedSegments.reduce((acc, seg) => acc + seg.distance, 0);
-    const totalGain = advancedSegments.reduce((acc, seg) => acc + seg.elevationGain, 0);
-    const totalLoss = advancedSegments.reduce((acc, seg) => acc + seg.elevationLoss, 0);
+    const avgRSquared = advancedSegments.reduce((acc, seg) => acc + seg.rSquared, 0) / advancedSegments.length;
+    const qualityScore = Math.min(100, Math.round(avgRSquared * 100));
     
     return {
+      avgRSquared,
       totalSegments: advancedSegments.length,
-      totalDistance,
-      totalGain,
-      totalLoss,
+      qualityScore
     };
   }, [advancedSegments]);
 
@@ -371,7 +369,7 @@ const RouteDetail = () => {
               {/* Real-time Statistics */}
               <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-4">
                 <h4 className="font-semibold text-primary-800 dark:text-primary-200 mb-3">
-                  Estadísticas Topográficas
+                  Estadísticas en Tiempo Real
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
@@ -379,16 +377,18 @@ const RouteDetail = () => {
                     <div className="font-bold text-primary-600">{advancedStats.totalSegments}</div>
                   </div>
                   <div>
-                    <span className="text-mountain-600 dark:text-mountain-400">Distancia:</span>
-                    <div className="font-bold text-primary-600">{advancedStats.totalDistance.toFixed(1)} km</div>
+                    <span className="text-mountain-600 dark:text-mountain-400">R² Promedio:</span>
+                    <div className="font-bold text-primary-600">{advancedStats.avgRSquared.toFixed(3)}</div>
                   </div>
-                  <div>
-                    <span className="text-mountain-600 dark:text-mountain-400">Ganancia:</span>
-                    <div className="font-bold text-green-600">+{Math.round(advancedStats.totalGain)} m</div>
-                  </div>
-                  <div>
-                    <span className="text-mountain-600 dark:text-mountain-400">Pérdida:</span>
-                    <div className="font-bold text-blue-600">-{Math.round(advancedStats.totalLoss)} m</div>
+                  <div className="col-span-2">
+                    <span className="text-mountain-600 dark:text-mountain-400">Calidad Global:</span>
+                    <div className="font-bold text-lg text-primary-600">{advancedStats.qualityScore}%</div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                      <div 
+                        className="bg-primary-600 h-2 rounded-full transition-all duration-300" 
+                        style={{ width: `${advancedStats.qualityScore}%` }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -397,20 +397,40 @@ const RouteDetail = () => {
               <div className="space-y-6">
                 <div>
                   <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
-                    Prominencia Mínima: {advancedParams.minProminence} m
+                    R² Threshold: {advancedParams.rSquaredThreshold.toFixed(3)}
                   </label>
                   <p className="text-xs text-mountain-500 mb-3">
-                    Desnivel mínimo para detectar un pico o valle relevante.
+                    Calidad mínima de cada segmento (mayor = más preciso)
                   </p>
                   <Slider
-                    value={[advancedParams.minProminence]}
+                    value={[advancedParams.rSquaredThreshold]}
                     onValueChange={(value) => setAdvancedParams(prev => ({
                       ...prev,
-                      minProminence: value[0]
+                      rSquaredThreshold: value[0]
+                    }))}
+                    min={0.7}
+                    max={0.99}
+                    step={0.01}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
+                    Puntos Mínimos: {advancedParams.minSegmentPoints}
+                  </label>
+                  <p className="text-xs text-mountain-500 mb-3">
+                    Número mínimo de puntos por segmento
+                  </p>
+                  <Slider
+                    value={[advancedParams.minSegmentPoints]}
+                    onValueChange={(value) => setAdvancedParams(prev => ({
+                      ...prev,
+                      minSegmentPoints: value[0]
                     }))}
                     min={10}
-                    max={100}
-                    step={5}
+                    max={50}
+                    step={1}
                     className="w-full"
                   />
                 </div>
@@ -420,7 +440,7 @@ const RouteDetail = () => {
                     Distancia Mínima: {advancedParams.minSegmentDistance.toFixed(1)} km
                   </label>
                   <p className="text-xs text-mountain-500 mb-3">
-                    Longitud mínima de cada segmento topográfico.
+                    Longitud mínima de cada segmento
                   </p>
                   <Slider
                     value={[advancedParams.minSegmentDistance]}
@@ -428,8 +448,8 @@ const RouteDetail = () => {
                       ...prev,
                       minSegmentDistance: value[0]
                     }))}
-                    min={0.2}
-                    max={3.0}
+                    min={0.1}
+                    max={2.0}
                     step={0.1}
                     className="w-full"
                   />
@@ -452,8 +472,10 @@ const RouteDetail = () => {
                   Guía de Interpretación
                 </h5>
                 <div className="text-xs text-mountain-600 dark:text-mountain-400 space-y-1">
-                  <div>• <strong>Prominencia:</strong> Aumentar para ignorar pequeños baches y obtener segmentos más largos y generales.</div>
-                  <div>• <strong>Distancia:</strong> Aumentar para forzar segmentos más largos, ideal para maratones o ultras.</div>
+                  <div>• R² &gt; 0.95: Excelente ajuste</div>
+                  <div>• R² &gt; 0.90: Muy buen ajuste</div>
+                  <div>• R² &gt; 0.85: Buen ajuste</div>
+                  <div>• R² &lt; 0.85: Posible sobreajuste</div>
                 </div>
               </div>
             </div>
