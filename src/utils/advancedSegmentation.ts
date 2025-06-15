@@ -32,6 +32,7 @@ interface AccumulatedSlopeEvaluation {
   slopeInconsistency: number; // Percentage of inconsistency
   segmentSlope: number; // Overall segment slope
   localSlope: number; // Recent local slope
+  hasEarlyWarning: boolean; // Whether slope change triggered this evaluation
 }
 
 interface AdvancedSegment {
@@ -53,7 +54,7 @@ interface AdvancedSegment {
 interface AdvancedSegmentationParams {
   rSquaredThreshold: number;
   minSegmentDistance: number; // in km - minimum distance for a change to be considered sustained
-  slopeChangeThreshold: number; // percentage change that triggers a cut
+  slopeChangeThreshold: number; // percentage change that triggers early warning (not direct cut)
   inflectionSensitivity: number; // multiplier for inflection point detection
   detectInflectionPoints: boolean; // toggle for inflection point detection
 }
@@ -117,13 +118,51 @@ function calculateSlopeBetweenPoints(point1: ElevationPoint, point2: ElevationPo
 }
 
 /**
- * NEW: Evaluates accumulated slope consistency for the entire segment
+ * NEW: Detects if there's a recent slope change that warrants deeper analysis
+ */
+function hasRecentSlopeWarning(
+  elevationData: ElevationPoint[],
+  currentIndex: number,
+  threshold: number,
+  windowSize: number = 10
+): boolean {
+  if (currentIndex < windowSize * 2) return false;
+  
+  // Look back a few points to see if there was a significant slope change
+  const lookBackRange = Math.min(15, currentIndex - windowSize);
+  
+  for (let i = currentIndex - lookBackRange; i < currentIndex - 5; i++) {
+    if (i < windowSize || i >= elevationData.length - windowSize) continue;
+    
+    const beforeSlope = calculateSlopeBetweenPoints(
+      elevationData[Math.max(0, i - windowSize)], 
+      elevationData[i]
+    );
+    
+    const afterSlope = calculateSlopeBetweenPoints(
+      elevationData[i], 
+      elevationData[Math.min(elevationData.length - 1, i + windowSize)]
+    );
+    
+    const slopeChange = Math.abs(afterSlope - beforeSlope);
+    
+    if (slopeChange >= threshold) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * ENHANCED: Evaluates accumulated slope consistency with early warning context
  */
 function evaluateAccumulatedSlope(
   elevationData: ElevationPoint[],
   segmentStartIndex: number,
   currentIndex: number,
-  params: AdvancedSegmentationParams
+  params: AdvancedSegmentationParams,
+  hasEarlyWarning: boolean = false
 ): AccumulatedSlopeEvaluation {
   
   const segmentPoints = elevationData.slice(segmentStartIndex, currentIndex + 1);
@@ -134,7 +173,8 @@ function evaluateAccumulatedSlope(
       reason: 'Segment too short',
       slopeInconsistency: 0,
       segmentSlope: 0,
-      localSlope: 0
+      localSlope: 0,
+      hasEarlyWarning
     };
   }
   
@@ -154,30 +194,44 @@ function evaluateAccumulatedSlope(
   // Calculate slope inconsistency
   const slopeInconsistency = Math.abs(localSlope - segmentSlope);
   
-  // Determine if we should cut based on accumulated slope analysis
-  const shouldCut = slopeInconsistency >= params.slopeChangeThreshold;
+  // ENHANCED LOGIC: Slope change threshold is dynamic based on early warning
+  let effectiveThreshold = params.slopeChangeThreshold;
+  
+  // If we have an early warning, be more sensitive to inconsistency
+  if (hasEarlyWarning) {
+    effectiveThreshold *= 0.7; // 30% more sensitive when warned
+  }
+  
+  // But also require minimum segment distance for cuts
+  const segmentDistance = elevationData[currentIndex].displayDistance - elevationData[segmentStartIndex].displayDistance;
+  const meetsMinDistance = segmentDistance >= params.minSegmentDistance;
+  
+  // Determine if we should cut
+  const shouldCut = slopeInconsistency >= effectiveThreshold && meetsMinDistance;
   
   const reason = shouldCut 
-    ? `Inconsistencia pendiente acumulada: ${slopeInconsistency.toFixed(1)}% (segmento: ${segmentSlope.toFixed(1)}%, local: ${localSlope.toFixed(1)}%)`
-    : 'Pendiente consistente';
+    ? `Inconsistencia pendiente: ${slopeInconsistency.toFixed(1)}% (umbral: ${effectiveThreshold.toFixed(1)}%${hasEarlyWarning ? ', alerta previa' : ''})`
+    : hasEarlyWarning 
+      ? `Alerta pendiente, pero consistente (${slopeInconsistency.toFixed(1)}% < ${effectiveThreshold.toFixed(1)}%)`
+      : 'Pendiente consistente';
     
   return {
     shouldCut,
     reason,
     slopeInconsistency,
     segmentSlope,
-    localSlope
+    localSlope,
+    hasEarlyWarning
   };
 }
 
 /**
- * Detects significant slope changes that are sustained over minimum distance
- * Now mainly used for visualization/debugging, not primary cutting logic
+ * Detects significant slope changes for early warning (not direct cutting)
  */
 function detectSlopeChanges(
   elevationData: ElevationPoint[], 
   windowSize: number = 10,
-  threshold: number, // Now uses the actual threshold parameter instead of hardcoded 3
+  threshold: number,
   minSustainedDistance: number = 0.2 // km
 ): SlopeChange[] {
   const slopeChanges: SlopeChange[] = [];
@@ -204,7 +258,6 @@ function detectSlopeChanges(
     // Calculate change in slope
     const slopeChange = Math.abs(afterSlope - beforeSlope);
     
-    // Use the actual threshold parameter instead of hardcoded value
     if (slopeChange >= threshold) {
       // Calculate how long this change is sustained
       let sustainedEndIndex = afterEnd;
@@ -343,10 +396,11 @@ function getSegmentType(slope: number): 'asc' | 'desc' | 'hor' {
 }
 
 /**
- * IMPROVED: Cut decision with prioritized logic
- * 1. Inflection points (highest priority)
- * 2. Accumulated slope consistency 
- * 3. R² quality as fallback
+ * ENHANCED: Cut decision with slope change as early warning system
+ * Priority Logic:
+ * 1. Inflection points (highest priority for sports relevance)
+ * 2. Accumulated slope consistency (enhanced by early warnings)
+ * 3. R² quality as ultimate fallback
  */
 function shouldCutSegment(
   currentIndex: number,
@@ -357,7 +411,14 @@ function shouldCutSegment(
   inflectionPoints: InflectionPoint[]
 ): { shouldCut: boolean; reason: string } {
   
-  // PRIORITY 1: Check for sustained inflection points (highest priority for sports relevance)
+  // Check for early warning from slope changes
+  const hasEarlyWarning = hasRecentSlopeWarning(
+    elevationData, 
+    currentIndex, 
+    params.slopeChangeThreshold
+  );
+  
+  // PRIORITY 1: Check for sustained inflection points (highest priority)
   if (params.detectInflectionPoints) {
     const recentInflection = inflectionPoints.find(ip => 
       ip.index >= segmentStartIndex && 
@@ -378,10 +439,16 @@ function shouldCutSegment(
     }
   }
   
-  // PRIORITY 2: Check accumulated slope consistency (new approach)
+  // PRIORITY 2: Check accumulated slope consistency (enhanced by early warnings)
   const segmentDistance = elevationData[currentIndex].displayDistance - elevationData[segmentStartIndex].displayDistance;
   if (segmentDistance >= params.minSegmentDistance) {
-    const slopeEval = evaluateAccumulatedSlope(elevationData, segmentStartIndex, currentIndex, params);
+    const slopeEval = evaluateAccumulatedSlope(
+      elevationData, 
+      segmentStartIndex, 
+      currentIndex, 
+      params, 
+      hasEarlyWarning
+    );
     
     if (slopeEval.shouldCut) {
       return { 
@@ -391,8 +458,8 @@ function shouldCutSegment(
     }
   }
   
-  // PRIORITY 3: Check R-squared quality as fallback (only after minimum practical segment length)
-  if (segmentDistance >= 0.1) { // 100m minimum for R² check
+  // PRIORITY 3: Check R-squared quality as fallback (only after practical minimum)
+  if (segmentDistance >= 0.15) { // 150m minimum for R² check
     const segmentPoints = elevationData.slice(segmentStartIndex, currentIndex + 1);
     const regressionPoints = segmentPoints
       .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
@@ -400,8 +467,17 @@ function shouldCutSegment(
       
     if (regressionPoints.length >= 2) {
       const regression = calculateLinearRegression(regressionPoints);
-      if (regression.rSquared < params.rSquaredThreshold) {
-        return { shouldCut: true, reason: `Calidad baja (R²=${regression.rSquared.toFixed(3)})` };
+      
+      // Stricter R² requirement if we have early warning
+      const effectiveThreshold = hasEarlyWarning 
+        ? params.rSquaredThreshold + 0.02 // More demanding when warned
+        : params.rSquaredThreshold;
+        
+      if (regression.rSquared < effectiveThreshold) {
+        return { 
+          shouldCut: true, 
+          reason: `Calidad baja (R²=${regression.rSquared.toFixed(3)}${hasEarlyWarning ? ', alerta confirmada' : ''})` 
+        };
       }
     }
   }
@@ -410,7 +486,7 @@ function shouldCutSegment(
 }
 
 /**
- * Enhanced segmentation using accumulated slope analysis and prioritized cutting logic
+ * Enhanced segmentation using slope changes as early warning system
  */
 export function segmentProfileAdvanced(
   elevationData: ElevationPoint[], 
@@ -422,7 +498,7 @@ export function segmentProfileAdvanced(
     return [];
   }
 
-  console.log('Starting enhanced accumulated-slope segmentation with params:', params);
+  console.log('Starting enhanced slope-warning segmentation with params:', params);
   console.log('Input data points:', elevationData.length);
 
   // Pre-calculate sustained inflection points (priority 1)
@@ -435,7 +511,7 @@ export function segmentProfileAdvanced(
       ) 
     : [];
     
-  // Keep slope changes for visualization/debugging (not used in cutting logic anymore)
+  // Calculate slope changes for early warning system (not direct cutting)
   const slopeChanges = detectSlopeChanges(
     elevationData, 
     10, 
@@ -444,12 +520,12 @@ export function segmentProfileAdvanced(
   );
     
   console.log('Detected sustained inflection points:', inflectionPoints.length);
-  console.log('Detected slope changes (for viz):', slopeChanges.length);
+  console.log('Detected slope changes for early warning:', slopeChanges.length);
 
   const finalSegments: AdvancedSegment[] = [];
   let currentSegmentStartIndex = 0;
 
-  for (let i = 5; i < elevationData.length; i++) {
+  for (let i = 10; i < elevationData.length; i++) {
     const cutDecision = shouldCutSegment(
       i, 
       currentSegmentStartIndex, 
@@ -534,7 +610,7 @@ export function segmentProfileAdvanced(
     }
   }
 
-  console.log('Generated', finalSegments.length, 'enhanced segments with accumulated slope analysis');
+  console.log('Generated', finalSegments.length, 'enhanced segments with slope early warning');
   console.log('Average R²:', finalSegments.reduce((acc, s) => acc + s.rSquared, 0) / finalSegments.length);
   console.log('Cut reasons:', finalSegments.map(s => s.cutReason));
   
@@ -542,13 +618,13 @@ export function segmentProfileAdvanced(
 }
 
 /**
- * Updated default parameters with 200m minimum distance for sustained changes
+ * Updated default parameters optimized for early warning system
  */
 export const DEFAULT_ADVANCED_SEGMENTATION_PARAMS: AdvancedSegmentationParams = {
-  rSquaredThreshold: 0.92,
-  minSegmentDistance: 0.2, // 200m - minimum distance for sustained changes (sports relevance)
-  slopeChangeThreshold: 4.0, // percentage change that triggers a cut
-  inflectionSensitivity: 2.0, // meters of elevation difference
+  rSquaredThreshold: 0.88, // Slightly more lenient since slope warning helps
+  minSegmentDistance: 0.3, // 300m - more practical minimum for sports relevance
+  slopeChangeThreshold: 8.0, // Higher threshold since it's now early warning, not direct cut
+  inflectionSensitivity: 2.5, // Balanced inflection detection
   detectInflectionPoints: true // enable inflection point detection
 };
 
@@ -564,6 +640,6 @@ export function getAdvancedSegmentTypeLabel(type: 'asc' | 'desc' | 'hor'): strin
 }
 
 /**
- * Export sustained change detection for debugging/visualization
+ * Export detection functions for debugging/visualization
  */
 export { detectSlopeChanges, detectInflectionPoints };
