@@ -2,8 +2,10 @@
 import React from 'react';
 import { Button } from '../ui/button';
 import { ArrowUp, Map } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const HeroSection: React.FC = () => {
+  const { t } = useTranslation();
   return (
     <div className="relative min-h-[calc(100vh-160px)] bg-gradient-to-br from-primary-50 via-earth-50 to-primary-100 dark:from-mountain-900 dark:via-mountain-800 dark:to-primary-900 overflow-hidden">
       {/* Background Pattern */}
@@ -22,16 +24,16 @@ export const HeroSection: React.FC = () => {
           <div className="animate-fade-in">
             <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
               <span className="bg-gradient-to-r from-primary-600 to-earth-600 bg-clip-text text-transparent">
-                Eleva Tu
+                {t('hero.title1')}
               </span>
               <br />
               <span className="text-mountain-800 dark:text-mountain-200">
-                Carrera de Montaña
+                {t('hero.title2')}
               </span>
             </h1>
             
             <p className="text-xl md:text-2xl text-mountain-600 dark:text-mountain-300 mb-8 max-w-3xl mx-auto leading-relaxed">
-              Analiza tus rutas GPX, visualiza perfiles de elevación y optimiza tus aventuras en la montaña con información profesional.
+              {t('hero.subtitle')}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
@@ -39,7 +41,7 @@ export const HeroSection: React.FC = () => {
                 size="lg" 
                 className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-4 text-lg rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
               >
-                Comienza Tu Aventura
+                {t('hero.cta_main')}
                 <ArrowUp className="ml-2 h-5 w-5" />
               </Button>
               <Button 
@@ -47,7 +49,7 @@ export const HeroSection: React.FC = () => {
                 size="lg"
                 className="border-2 border-primary-600 text-primary-700 hover:bg-primary-50 px-8 py-4 text-lg rounded-xl"
               >
-                Ver Demostración
+                {t('hero.cta_demo')}
                 <Map className="ml-2 h-5 w-5" />
               </Button>
             </div>
@@ -62,10 +64,10 @@ export const HeroSection: React.FC = () => {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-                Análisis de Elevación
+                {t('features.elevation_analysis_title')}
               </h3>
               <p className="text-mountain-600 dark:text-mountain-400 text-sm">
-                Perfiles de elevación detallados con análisis de pendiente y desglose por segmentos.
+                {t('features.elevation_analysis_desc')}
               </p>
             </div>
 
@@ -74,10 +76,10 @@ export const HeroSection: React.FC = () => {
                 <Map className="w-6 h-6 text-earth-600" />
               </div>
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-                Mapas Interactivos
+                {t('features.interactive_maps_title')}
               </h3>
               <p className="text-mountain-600 dark:text-mountain-400 text-sm">
-                Explora tus rutas con visualización sincronizada de mapa y elevación.
+                {t('features.interactive_maps_desc')}
               </p>
             </div>
 
@@ -88,10 +90,10 @@ export const HeroSection: React.FC = () => {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-                Métricas de Rendimiento
+                {t('features.performance_metrics_title')}
               </h3>
               <p className="text-mountain-600 dark:text-mountain-400 text-sm">
-                Obtén información sobre ritmo, esfuerzo y estrategias óptimas de nutrición.
+                {t('features.performance_metrics_desc')}
               </p>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -15,6 +16,7 @@ const LoginPage = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +26,7 @@ const LoginPage = () => {
     
     if (error) {
       toast({
-        title: "Error al iniciar sesión",
+        title: t('login_page.error_title'),
         description: error.message,
         variant: "destructive"
       });
@@ -37,16 +39,16 @@ const LoginPage = () => {
 
   return (
     <AuthLayout
-      title="Bienvenido de vuelta"
-      subtitle="Inicia sesión en tu cuenta de AltimetryCoach"
+      title={t('login_page.title')}
+      subtitle={t('login_page.subtitle')}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t('login_page.email_label')}</Label>
           <Input
             id="email"
             type="email"
-            placeholder="tu@email.com"
+            placeholder={t('login_page.email_placeholder')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -55,7 +57,7 @@ const LoginPage = () => {
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="password">Contraseña</Label>
+          <Label htmlFor="password">{t('login_page.password_label')}</Label>
           <Input
             id="password"
             type="password"
@@ -72,19 +74,19 @@ const LoginPage = () => {
           className="w-full bg-primary-600 hover:bg-primary-700 text-white" 
           disabled={loading}
         >
-          {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+          {loading ? t('login_page.loading_button') : t('login_page.submit_button')}
         </Button>
         
         <div className="text-center">
           <Button variant="link" className="text-primary-600 hover:text-primary-700">
-            ¿Olvidaste tu contraseña?
+            {t('login_page.forgot_password')}
           </Button>
         </div>
         
         <div className="text-center text-sm text-mountain-600 dark:text-mountain-400">
-          ¿No tienes cuenta?{' '}
-          <Link to="/auth/sign-up" className="text-primary-600 hover:text-primary-700 underline">
-            Crear cuenta
+          {t('login_page.no_account')}{' '}
+          <Link to="/signup" className="text-primary-600 hover:text-primary-700 underline">
+            {t('login_page.create_account')}
           </Link>
         </div>
       </form>

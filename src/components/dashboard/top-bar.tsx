@@ -12,6 +12,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { User, LogOut } from 'lucide-react';
+import { LanguageToggle } from '../ui/language-toggle';
 
 export const TopBar: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -39,6 +40,7 @@ export const TopBar: React.FC = () => {
         
         <div className="flex items-center gap-4">
           <ThemeToggle />
+          <LanguageToggle />
           
           {user && (
             <DropdownMenu>

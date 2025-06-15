@@ -1,0 +1,44 @@
+
+{
+  "nav": {
+    "login": "Login",
+    "start": "Get Started"
+  },
+  "hero": {
+    "title1": "Elevate Your",
+    "title2": "Mountain Running",
+    "subtitle": "Analyze your GPX routes, visualize elevation profiles, and optimize your mountain adventures with professional insights.",
+    "cta_main": "Start Your Adventure",
+    "cta_demo": "View Demo"
+  },
+  "features": {
+    "elevation_analysis_title": "Elevation Analysis",
+    "elevation_analysis_desc": "Detailed elevation profiles with slope analysis and segment breakdown.",
+    "interactive_maps_title": "Interactive Maps",
+    "interactive_maps_desc": "Explore your routes with synchronized map and elevation visualization.",
+    "performance_metrics_title": "Performance Metrics",
+    "performance_metrics_desc": "Get insights on pace, effort, and optimal nutrition strategies."
+  },
+  "footer": {
+    "copyright": "© 2025 AltimetryCoach. All rights reserved."
+  },
+  "language_switcher": {
+    "change_language": "Change language"
+  },
+  "auth_layout": {
+    "back_to_home": "Back to home"
+  },
+  "login_page": {
+    "title": "Welcome back",
+    "subtitle": "Log in to your AltimetryCoach account",
+    "email_label": "Email",
+    "email_placeholder": "you@email.com",
+    "password_label": "Password",
+    "submit_button": "Login",
+    "loading_button": "Logging in...",
+    "forgot_password": "Forgot your password?",
+    "no_account": "Don't have an account?",
+    "create_account": "Create account",
+    "error_title": "Login Error"
+  }
+}

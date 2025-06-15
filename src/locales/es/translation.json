@@ -1,0 +1,44 @@
+
+{
+  "nav": {
+    "login": "Iniciar sesión",
+    "start": "Comenzar"
+  },
+  "hero": {
+    "title1": "Eleva Tu",
+    "title2": "Carrera de Montaña",
+    "subtitle": "Analiza tus rutas GPX, visualiza perfiles de elevación y optimiza tus aventuras en la montaña con información profesional.",
+    "cta_main": "Comienza Tu Aventura",
+    "cta_demo": "Ver Demostración"
+  },
+  "features": {
+    "elevation_analysis_title": "Análisis de Elevación",
+    "elevation_analysis_desc": "Perfiles de elevación detallados con análisis de pendiente y desglose por segmentos.",
+    "interactive_maps_title": "Mapas Interactivos",
+    "interactive_maps_desc": "Explora tus rutas con visualización sincronizada de mapa y elevación.",
+    "performance_metrics_title": "Métricas de Rendimiento",
+    "performance_metrics_desc": "Obtén información sobre ritmo, esfuerzo y estrategias óptimas de nutrición."
+  },
+  "footer": {
+    "copyright": "© 2025 AltimetryCoach. Todos los derechos reservados."
+  },
+  "language_switcher": {
+    "change_language": "Cambiar idioma"
+  },
+  "auth_layout": {
+    "back_to_home": "Volver al inicio"
+  },
+  "login_page": {
+    "title": "Bienvenido de vuelta",
+    "subtitle": "Inicia sesión en tu cuenta de AltimetryCoach",
+    "email_label": "Email",
+    "email_placeholder": "tu@email.com",
+    "password_label": "Contraseña",
+    "submit_button": "Iniciar sesión",
+    "loading_button": "Iniciando sesión...",
+    "forgot_password": "¿Olvidaste tu contraseña?",
+    "no_account": "¿No tienes cuenta?",
+    "create_account": "Crear cuenta",
+    "error_title": "Error al iniciar sesión"
+  }
+}
