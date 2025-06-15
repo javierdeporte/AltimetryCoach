@@ -12,30 +12,6 @@ interface RegressionResult {
   rSquared: number;
 }
 
-interface SlopeChange {
-  index: number;
-  previousSlope: number;
-  currentSlope: number;
-  changePercent: number;
-  sustainedDistance: number; // Distance over which this change is sustained
-}
-
-interface InflectionPoint {
-  index: number;
-  type: 'peak' | 'valley' | 'direction_change';
-  significance: number;
-  newTrendDistance: number; // Distance over which the NEW trend after inflection is sustained
-}
-
-interface AccumulatedSlopeEvaluation {
-  shouldCut: boolean;
-  reason: string;
-  slopeInconsistency: number; // Percentage of inconsistency
-  segmentSlope: number; // Overall segment slope
-  localSlope: number; // Recent local slope
-  hasEarlyWarning: boolean; // Whether slope change triggered this evaluation
-}
-
 interface AdvancedSegment {
   startIndex: number;
   endIndex: number;
@@ -49,17 +25,29 @@ interface AdvancedSegment {
   elevationLoss: number;
   type: 'asc' | 'desc' | 'hor';
   color: string;
-  cutReason?: string;
+  cutReason?: string; // New field to track why the segment was cut
 }
 
 interface AdvancedSegmentationParams {
   rSquaredThreshold: number;
-  minSegmentDistance: number; // in km - minimum distance for a change to be considered sustained
-  slopeChangeThreshold: number; // percentage change that triggers early warning (not direct cut)
-  inflectionSensitivity: number; // elevation difference in meters for detecting peaks/valleys
-  slopeThreshold: number; // percentage threshold for slope-based direction changes
-  windowDistance: number; // distance window in km for inflection analysis
+  minSegmentPoints: number;
+  minSegmentDistance: number; // in km
+  slopeChangeThreshold: number; // percentage change that triggers a cut
+  inflectionSensitivity: number; // multiplier for inflection point detection
   detectInflectionPoints: boolean; // toggle for inflection point detection
+}
+
+interface SlopeChange {
+  index: number;
+  previousSlope: number;
+  currentSlope: number;
+  changePercent: number;
+}
+
+interface InflectionPoint {
+  index: number;
+  type: 'peak' | 'valley' | 'direction_change';
+  significance: number;
 }
 
 const SEGMENT_COLORS = {
@@ -110,41 +98,6 @@ function calculateLinearRegression(points: Array<{x: number, y: number}>): Regre
 }
 
 /**
- * IMPROVED: Helper function to get points within a distance window around a center point
- */
-function getPointsInDistanceWindow(
-  elevationData: ElevationPoint[],
-  centerIndex: number,
-  windowDistance: number
-): { leftPoints: ElevationPoint[], rightPoints: ElevationPoint[], centerPoint: ElevationPoint } {
-  const centerPoint = elevationData[centerIndex];
-  const leftPoints: ElevationPoint[] = [];
-  const rightPoints: ElevationPoint[] = [];
-  
-  // Get points to the left within windowDistance
-  for (let i = centerIndex - 1; i >= 0; i--) {
-    const distance = centerPoint.displayDistance - elevationData[i].displayDistance;
-    if (distance <= windowDistance) {
-      leftPoints.unshift(elevationData[i]); // Add to beginning to maintain order
-    } else {
-      break;
-    }
-  }
-  
-  // Get points to the right within windowDistance
-  for (let i = centerIndex + 1; i < elevationData.length; i++) {
-    const distance = elevationData[i].displayDistance - centerPoint.displayDistance;
-    if (distance <= windowDistance) {
-      rightPoints.push(elevationData[i]);
-    } else {
-      break;
-    }
-  }
-  
-  return { leftPoints, rightPoints, centerPoint };
-}
-
-/**
  * Calculates slope between two points as percentage grade
  */
 function calculateSlopeBetweenPoints(point1: ElevationPoint, point2: ElevationPoint): number {
@@ -156,121 +109,12 @@ function calculateSlopeBetweenPoints(point1: ElevationPoint, point2: ElevationPo
 }
 
 /**
- * NEW: Detects if there's a recent slope change that warrants deeper analysis
- */
-function hasRecentSlopeWarning(
-  elevationData: ElevationPoint[],
-  currentIndex: number,
-  threshold: number,
-  windowSize: number = 10
-): boolean {
-  if (currentIndex < windowSize * 2) return false;
-  
-  // Look back a few points to see if there was a significant slope change
-  const lookBackRange = Math.min(15, currentIndex - windowSize);
-  
-  for (let i = currentIndex - lookBackRange; i < currentIndex - 5; i++) {
-    if (i < windowSize || i >= elevationData.length - windowSize) continue;
-    
-    const beforeSlope = calculateSlopeBetweenPoints(
-      elevationData[Math.max(0, i - windowSize)], 
-      elevationData[i]
-    );
-    
-    const afterSlope = calculateSlopeBetweenPoints(
-      elevationData[i], 
-      elevationData[Math.min(elevationData.length - 1, i + windowSize)]
-    );
-    
-    const slopeChange = Math.abs(afterSlope - beforeSlope);
-    
-    if (slopeChange >= threshold) {
-      return true;
-    }
-  }
-  
-  return false;
-}
-
-/**
- * ENHANCED: Evaluates accumulated slope consistency with early warning context
- */
-function evaluateAccumulatedSlope(
-  elevationData: ElevationPoint[],
-  segmentStartIndex: number,
-  currentIndex: number,
-  params: AdvancedSegmentationParams,
-  hasEarlyWarning: boolean = false
-): AccumulatedSlopeEvaluation {
-  
-  const segmentPoints = elevationData.slice(segmentStartIndex, currentIndex + 1);
-  
-  if (segmentPoints.length < 10) {
-    return {
-      shouldCut: false,
-      reason: 'Segment too short',
-      slopeInconsistency: 0,
-      segmentSlope: 0,
-      localSlope: 0,
-      hasEarlyWarning
-    };
-  }
-  
-  // Calculate overall segment slope
-  const segmentSlope = calculateSlopeBetweenPoints(
-    segmentPoints[0], 
-    segmentPoints[segmentPoints.length - 1]
-  );
-  
-  // Calculate local slope for recent section (last 25% of segment)
-  const localSectionStart = Math.floor(segmentPoints.length * 0.75);
-  const localSlope = calculateSlopeBetweenPoints(
-    segmentPoints[localSectionStart],
-    segmentPoints[segmentPoints.length - 1]
-  );
-  
-  // Calculate slope inconsistency
-  const slopeInconsistency = Math.abs(localSlope - segmentSlope);
-  
-  // ENHANCED LOGIC: Slope change threshold is dynamic based on early warning
-  let effectiveThreshold = params.slopeChangeThreshold;
-  
-  // If we have an early warning, be more sensitive to inconsistency
-  if (hasEarlyWarning) {
-    effectiveThreshold *= 0.7; // 30% more sensitive when warned
-  }
-  
-  // But also require minimum segment distance for cuts
-  const segmentDistance = elevationData[currentIndex].displayDistance - elevationData[segmentStartIndex].displayDistance;
-  const meetsMinDistance = segmentDistance >= params.minSegmentDistance;
-  
-  // Determine if we should cut
-  const shouldCut = slopeInconsistency >= effectiveThreshold && meetsMinDistance;
-  
-  const reason = shouldCut 
-    ? `Inconsistencia pendiente: ${slopeInconsistency.toFixed(1)}% (umbral: ${effectiveThreshold.toFixed(1)}%${hasEarlyWarning ? ', alerta previa' : ''})`
-    : hasEarlyWarning 
-      ? `Alerta pendiente, pero consistente (${slopeInconsistency.toFixed(1)}% < ${effectiveThreshold.toFixed(1)}%)`
-      : 'Pendiente consistente';
-    
-  return {
-    shouldCut,
-    reason,
-    slopeInconsistency,
-    segmentSlope,
-    localSlope,
-    hasEarlyWarning
-  };
-}
-
-/**
- * Detects significant slope changes for early warning (not direct cutting)
+ * Detects significant slope changes in the elevation data
  */
 function detectSlopeChanges(
   elevationData: ElevationPoint[], 
   windowSize: number = 10,
-  threshold: number,
-  minSustainedDistance: number = 0.2 // km
+  threshold: number = 3
 ): SlopeChange[] {
   const slopeChanges: SlopeChange[] = [];
   
@@ -297,33 +141,12 @@ function detectSlopeChanges(
     const slopeChange = Math.abs(afterSlope - beforeSlope);
     
     if (slopeChange >= threshold) {
-      // Calculate how long this change is sustained
-      let sustainedEndIndex = afterEnd;
-      for (let j = afterEnd + 1; j < elevationData.length - windowSize; j++) {
-        const futureSlope = calculateSlopeBetweenPoints(
-          elevationData[j], 
-          elevationData[Math.min(elevationData.length - 1, j + windowSize)]
-        );
-        
-        // If slope changes significantly again, stop measuring sustenance
-        if (Math.abs(futureSlope - afterSlope) >= threshold) {
-          break;
-        }
-        sustainedEndIndex = j;
-      }
-      
-      const sustainedDistance = elevationData[sustainedEndIndex].displayDistance - elevationData[afterStart].displayDistance;
-      
-      // Only include changes that are sustained for at least the minimum distance
-      if (sustainedDistance >= minSustainedDistance) {
-        slopeChanges.push({
-          index: i,
-          previousSlope: beforeSlope,
-          currentSlope: afterSlope,
-          changePercent: slopeChange,
-          sustainedDistance: sustainedDistance
-        });
-      }
+      slopeChanges.push({
+        index: i,
+        previousSlope: beforeSlope,
+        currentSlope: afterSlope,
+        changePercent: slopeChange
+      });
     }
   }
   
@@ -331,146 +154,61 @@ function detectSlopeChanges(
 }
 
 /**
- * COMPLETELY REDESIGNED: Detects inflection points with coherent logic
- * Now focuses on detecting the inflection and validating the NEW trend
+ * Detects inflection points (peaks, valleys, direction changes)
  */
 function detectInflectionPoints(
   elevationData: ElevationPoint[], 
-  params: AdvancedSegmentationParams
+  sensitivity: number = 1.0,
+  windowSize: number = 5
 ): InflectionPoint[] {
   const inflectionPoints: InflectionPoint[] = [];
   
-  if (elevationData.length < 10) return inflectionPoints;
+  if (elevationData.length < windowSize * 2 + 1) return inflectionPoints;
   
-  console.log('Detecting inflections with params:', {
-    inflectionSensitivity: params.inflectionSensitivity,
-    slopeThreshold: params.slopeThreshold,
-    windowDistance: params.windowDistance,
-    minSegmentDistance: params.minSegmentDistance
-  });
-  
-  // Start from a reasonable index to ensure we have enough data
-  const startIndex = Math.max(5, Math.floor(elevationData.length * 0.05));
-  const endIndex = Math.min(elevationData.length - 5, Math.floor(elevationData.length * 0.95));
-  
-  for (let i = startIndex; i < endIndex; i++) {
-    const { leftPoints, rightPoints, centerPoint } = getPointsInDistanceWindow(
-      elevationData, 
-      i, 
-      params.windowDistance
-    );
-    
-    // Ensure we have enough points for meaningful analysis
-    if (leftPoints.length < 3 || rightPoints.length < 3) continue;
+  for (let i = windowSize; i < elevationData.length - windowSize; i++) {
+    const leftWindow = elevationData.slice(i - windowSize, i);
+    const rightWindow = elevationData.slice(i + 1, i + windowSize + 1);
+    const currentPoint = elevationData[i];
     
     // Calculate average elevations in windows
-    const leftAvg = leftPoints.reduce((sum, p) => sum + p.displayElevation, 0) / leftPoints.length;
-    const rightAvg = rightPoints.reduce((sum, p) => sum + p.displayElevation, 0) / rightPoints.length;
-    const currentElev = centerPoint.displayElevation;
-    
-    let detectedType: 'peak' | 'valley' | 'direction_change' | null = null;
-    let significance = 0;
-    
-    // IMPROVED: Use inflectionSensitivity ONLY for elevation differences (meters)
-    const elevationSensitivity = params.inflectionSensitivity;
+    const leftAvg = leftWindow.reduce((sum, p) => sum + p.displayElevation, 0) / leftWindow.length;
+    const rightAvg = rightWindow.reduce((sum, p) => sum + p.displayElevation, 0) / rightWindow.length;
+    const currentElev = currentPoint.displayElevation;
     
     // Detect peaks (current point higher than both sides)
-    if (currentElev > leftAvg + elevationSensitivity && currentElev > rightAvg + elevationSensitivity) {
-      detectedType = 'peak';
-      significance = Math.min(currentElev - leftAvg, currentElev - rightAvg);
+    if (currentElev > leftAvg + sensitivity && currentElev > rightAvg + sensitivity) {
+      const significance = Math.min(currentElev - leftAvg, currentElev - rightAvg);
+      inflectionPoints.push({
+        index: i,
+        type: 'peak',
+        significance: significance
+      });
     }
     
     // Detect valleys (current point lower than both sides)
-    else if (currentElev < leftAvg - elevationSensitivity && currentElev < rightAvg - elevationSensitivity) {
-      detectedType = 'valley';
-      significance = Math.min(leftAvg - currentElev, rightAvg - currentElev);
+    if (currentElev < leftAvg - sensitivity && currentElev < rightAvg - sensitivity) {
+      const significance = Math.min(leftAvg - currentElev, rightAvg - currentElev);
+      inflectionPoints.push({
+        index: i,
+        type: 'valley',
+        significance: significance
+      });
     }
     
-    // IMPROVED: Detect direction changes using separate slopeThreshold
-    else {
-      const leftSlope = leftPoints.length > 0 
-        ? calculateSlopeBetweenPoints(leftPoints[0], centerPoint)
-        : 0;
-      const rightSlope = rightPoints.length > 0 
-        ? calculateSlopeBetweenPoints(centerPoint, rightPoints[rightPoints.length - 1])
-        : 0;
-      
-      // Use slopeThreshold for slope-based detection (percentage)
-      if (Math.sign(leftSlope) !== Math.sign(rightSlope) && 
-          Math.abs(leftSlope) > params.slopeThreshold && Math.abs(rightSlope) > params.slopeThreshold) {
-        detectedType = 'direction_change';
-        significance = Math.abs(leftSlope) + Math.abs(rightSlope);
-      }
-    }
+    // Detect direction changes
+    const leftSlope = calculateSlopeBetweenPoints(leftWindow[0], currentPoint);
+    const rightSlope = calculateSlopeBetweenPoints(currentPoint, rightWindow[rightWindow.length - 1]);
     
-    if (detectedType) {
-      // CRITICAL CHANGE: Validate that the NEW trend is sustained for minSegmentDistance
-      // Not the inflection itself, but the trend AFTER the inflection
-      let newTrendDistance = 0;
-      let trendIsValid = false;
-      
-      // Look forward to see if the new trend continues
-      const maxLookAhead = Math.min(200, elevationData.length - i - 1);
-      
-      for (let j = 1; j <= maxLookAhead; j++) {
-        const futureIndex = i + j;
-        if (futureIndex >= elevationData.length) break;
-        
-        newTrendDistance = elevationData[futureIndex].displayDistance - centerPoint.displayDistance;
-        
-        // Check if we've reached the minimum required distance for the new trend
-        if (newTrendDistance >= params.minSegmentDistance) {
-          // Validate that the trend is still consistent at this distance
-          const trendEndPoint = elevationData[futureIndex];
-          
-          if (detectedType === 'peak') {
-            // After a peak, we expect descent or at least not continued ascent
-            const postPeakSlope = calculateSlopeBetweenPoints(centerPoint, trendEndPoint);
-            trendIsValid = postPeakSlope <= params.slopeThreshold; // Not ascending significantly
-          } else if (detectedType === 'valley') {
-            // After a valley, we expect ascent or at least not continued descent
-            const postValleySlope = calculateSlopeBetweenPoints(centerPoint, trendEndPoint);
-            trendIsValid = postValleySlope >= -params.slopeThreshold; // Not descending significantly
-          } else if (detectedType === 'direction_change') {
-            // For direction changes, check that the new direction is maintained
-            const { rightPoints: futureRightPoints } = getPointsInDistanceWindow(
-              elevationData, 
-              futureIndex, 
-              params.windowDistance
-            );
-            
-            if (futureRightPoints.length > 2) {
-              const continuedSlope = calculateSlopeBetweenPoints(
-                trendEndPoint, 
-                futureRightPoints[futureRightPoints.length - 1]
-              );
-              
-              // Check if the direction change is still valid
-              const initialNewSlope = calculateSlopeBetweenPoints(centerPoint, trendEndPoint);
-              trendIsValid = Math.sign(continuedSlope) === Math.sign(initialNewSlope) &&
-                            Math.abs(continuedSlope) > params.slopeThreshold * 0.5; // Allow some variation
-            }
-          }
-          
-          break; // We've checked at the required distance
-        }
-      }
-      
-      // Only include inflections where the new trend is validated
-      if (trendIsValid && newTrendDistance >= params.minSegmentDistance) {
-        inflectionPoints.push({
-          index: i,
-          type: detectedType,
-          significance: significance,
-          newTrendDistance: newTrendDistance
-        });
-        
-        console.log(`Valid ${detectedType} inflection at index ${i}, new trend sustained for ${newTrendDistance.toFixed(2)}km`);
-      }
+    if (Math.sign(leftSlope) !== Math.sign(rightSlope) && 
+        Math.abs(leftSlope) > sensitivity && Math.abs(rightSlope) > sensitivity) {
+      inflectionPoints.push({
+        index: i,
+        type: 'direction_change',
+        significance: Math.abs(leftSlope) + Math.abs(rightSlope)
+      });
     }
   }
   
-  console.log(`Detected ${inflectionPoints.length} valid inflection points`);
   return inflectionPoints;
 }
 
@@ -487,11 +225,7 @@ function getSegmentType(slope: number): 'asc' | 'desc' | 'hor' {
 }
 
 /**
- * ENHANCED: Cut decision with R² restored as Priority 3 safety net
- * Priority Logic:
- * 1. Inflection points with validated new trends (highest priority)
- * 2. Accumulated slope consistency (enhanced by early warnings)
- * 3. R² quality as safety net (lowest priority, but essential)
+ * Determines why a segment should be cut based on multiple criteria
  */
 function shouldCutSegment(
   currentIndex: number,
@@ -501,15 +235,26 @@ function shouldCutSegment(
   slopeChanges: SlopeChange[],
   inflectionPoints: InflectionPoint[]
 ): { shouldCut: boolean; reason: string } {
+  const segmentLength = currentIndex - segmentStartIndex + 1;
+  const segmentDistance = elevationData[currentIndex].displayDistance - elevationData[segmentStartIndex].displayDistance;
   
-  // Check for early warning from slope changes
-  const hasEarlyWarning = hasRecentSlopeWarning(
-    elevationData, 
-    currentIndex, 
-    params.slopeChangeThreshold
+  // Always respect minimum distance and points requirements for sports relevance
+  if (segmentLength < params.minSegmentPoints || segmentDistance < params.minSegmentDistance) {
+    return { shouldCut: false, reason: 'Insufficient distance/points' };
+  }
+  
+  // Check for significant slope changes
+  const recentSlopeChange = slopeChanges.find(sc => 
+    sc.index >= segmentStartIndex && 
+    sc.index <= currentIndex && 
+    sc.changePercent >= params.slopeChangeThreshold
   );
   
-  // PRIORITY 1: Check for validated inflection points (highest priority)
+  if (recentSlopeChange) {
+    return { shouldCut: true, reason: `Cambio de pendiente (${recentSlopeChange.changePercent.toFixed(1)}%)` };
+  }
+  
+  // Check for inflection points if enabled
   if (params.detectInflectionPoints) {
     const recentInflection = inflectionPoints.find(ip => 
       ip.index >= segmentStartIndex && 
@@ -519,99 +264,59 @@ function shouldCutSegment(
     
     if (recentInflection) {
       const typeLabels = {
-        'peak': 'Pico con tendencia validada',
-        'valley': 'Valle con tendencia validada',
-        'direction_change': 'Cambio dirección validado'
+        'peak': 'Pico detectado',
+        'valley': 'Valle detectado',
+        'direction_change': 'Cambio de dirección'
       };
-      return { 
-        shouldCut: true, 
-        reason: `${typeLabels[recentInflection.type]} (${recentInflection.newTrendDistance.toFixed(1)}km)` 
-      };
+      return { shouldCut: true, reason: typeLabels[recentInflection.type] };
     }
   }
   
-  // PRIORITY 2: Check accumulated slope consistency (enhanced by early warnings)
-  const segmentDistance = elevationData[currentIndex].displayDistance - elevationData[segmentStartIndex].displayDistance;
-  if (segmentDistance >= params.minSegmentDistance) {
-    const slopeEval = evaluateAccumulatedSlope(
-      elevationData, 
-      segmentStartIndex, 
-      currentIndex, 
-      params, 
-      hasEarlyWarning
-    );
+  // Check R-squared quality as fallback
+  const segmentPoints = elevationData.slice(segmentStartIndex, currentIndex + 1);
+  const regressionPoints = segmentPoints
+    .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
+    .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
     
-    if (slopeEval.shouldCut) {
-      return { 
-        shouldCut: true, 
-        reason: slopeEval.reason 
-      };
+  if (regressionPoints.length >= 2) {
+    const regression = calculateLinearRegression(regressionPoints);
+    if (regression.rSquared < params.rSquaredThreshold) {
+      return { shouldCut: true, reason: `Calidad baja (R²=${regression.rSquared.toFixed(3)})` };
     }
   }
   
-  // PRIORITY 3: R² quality check as safety net (restored)
-  if (segmentDistance >= params.minSegmentDistance) {
-    const segmentPoints = elevationData.slice(segmentStartIndex, currentIndex + 1);
-    const regressionPoints = segmentPoints
-      .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
-      .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-      
-    if (regressionPoints.length >= 10) {
-      const regression = calculateLinearRegression(regressionPoints);
-      
-      if (regression.rSquared < params.rSquaredThreshold) {
-        return { 
-          shouldCut: true, 
-          reason: `Calidad R² insuficiente: ${regression.rSquared.toFixed(3)} < ${params.rSquaredThreshold.toFixed(3)}` 
-        };
-      }
-    }
-  }
-  
-  return { shouldCut: false, reason: 'Todos los criterios cumplidos' };
+  return { shouldCut: false, reason: 'Criteria not met' };
 }
 
 /**
- * Enhanced segmentation with corrected inflection logic and restored R² safety net
+ * Enhanced segmentation using multiple criteria for sports relevance
  */
 export function segmentProfileAdvanced(
   elevationData: ElevationPoint[], 
   params: AdvancedSegmentationParams
 ): AdvancedSegment[] {
   
-  if (!elevationData || elevationData.length < 5) {
+  if (!elevationData || elevationData.length < params.minSegmentPoints) {
     console.log('Not enough data points for segmentation');
     return [];
   }
 
-  console.log('Starting corrected inflection segmentation with params:', params);
+  console.log('Starting enhanced multi-criteria segmentation with params:', params);
   console.log('Input data points:', elevationData.length);
 
-  // Pre-calculate validated inflection points
+  // Pre-calculate slope changes and inflection points
+  const slopeChanges = detectSlopeChanges(elevationData, 10, params.slopeChangeThreshold);
   const inflectionPoints = params.detectInflectionPoints 
-    ? detectInflectionPoints(elevationData, params) 
+    ? detectInflectionPoints(elevationData, params.inflectionSensitivity) 
     : [];
     
-  // Calculate slope changes for early warning system (not direct cutting)
-  const slopeChanges = detectSlopeChanges(
-    elevationData, 
-    10, 
-    params.slopeChangeThreshold, 
-    params.minSegmentDistance
-  );
-    
-  console.log('Detected validated inflection points:', inflectionPoints.length);
-  console.log('Detected slope changes for early warning:', slopeChanges.length);
-  if (inflectionPoints.length > 0) {
-    console.log('Inflection details:', inflectionPoints.map(ip => 
-      `${ip.type} at ${ip.index} (${ip.newTrendDistance.toFixed(2)}km trend validated)`
-    ));
-  }
+  console.log('Detected slope changes:', slopeChanges.length);
+  console.log('Detected inflection points:', inflectionPoints.length);
 
   const finalSegments: AdvancedSegment[] = [];
   let currentSegmentStartIndex = 0;
 
-  for (let i = 10; i < elevationData.length; i++) {
+  for (let i = params.minSegmentPoints; i < elevationData.length; i++) {
     const cutDecision = shouldCutSegment(
       i, 
       currentSegmentStartIndex, 
@@ -628,7 +333,7 @@ export function segmentProfileAdvanced(
         .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
         .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
         
-      if (regressionPoints.length >= 2) {
+      if (regressionPoints.length >= params.minSegmentPoints) {
         const regression = calculateLinearRegression(regressionPoints);
         const segmentType = getSegmentType(regression.slope);
         
@@ -668,7 +373,7 @@ export function segmentProfileAdvanced(
       .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
       .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
 
-    if (lastRegressionPoints.length >= 2) {
+    if (lastRegressionPoints.length >= params.minSegmentPoints) {
       const lastRegression = calculateLinearRegression(lastRegressionPoints);
       const segmentType = getSegmentType(lastRegression.slope);
       
@@ -696,7 +401,7 @@ export function segmentProfileAdvanced(
     }
   }
 
-  console.log('Generated', finalSegments.length, 'segments with corrected logic');
+  console.log('Generated', finalSegments.length, 'enhanced segments');
   console.log('Average R²:', finalSegments.reduce((acc, s) => acc + s.rSquared, 0) / finalSegments.length);
   console.log('Cut reasons:', finalSegments.map(s => s.cutReason));
   
@@ -704,16 +409,15 @@ export function segmentProfileAdvanced(
 }
 
 /**
- * Updated default parameters with corrected logic
+ * Enhanced default parameters with new criteria
  */
 export const DEFAULT_ADVANCED_SEGMENTATION_PARAMS: AdvancedSegmentationParams = {
-  rSquaredThreshold: 0.80, // Restored as safety net, made more conservative
-  minSegmentDistance: 0.3, // 300m - practical minimum for sports relevance
-  slopeChangeThreshold: 6.0, // Early warning threshold
-  inflectionSensitivity: 2.5, // Elevation difference in meters for peaks/valleys
-  slopeThreshold: 3.0, // NEW: Separate threshold for slope-based direction changes (percentage)
-  windowDistance: 0.15, // NEW: Configurable window distance in km (150m)
-  detectInflectionPoints: true // Enable inflection point detection
+  rSquaredThreshold: 0.92,
+  minSegmentPoints: 20,
+  minSegmentDistance: 0.3, // km - sports relevance filter
+  slopeChangeThreshold: 4.0, // percentage change that triggers a cut
+  inflectionSensitivity: 2.0, // meters of elevation difference
+  detectInflectionPoints: true // enable inflection point detection
 };
 
 /**
@@ -728,6 +432,6 @@ export function getAdvancedSegmentTypeLabel(type: 'asc' | 'desc' | 'hor'): strin
 }
 
 /**
- * Export detection functions for debugging/visualization
+ * Export slope change detection for debugging/visualization
  */
 export { detectSlopeChanges, detectInflectionPoints };
