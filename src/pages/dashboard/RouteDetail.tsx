@@ -12,7 +12,7 @@ import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
 import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS } from '../../utils/advancedSegmentation';
-import { IntelligentSegmentationModal } from '../../components/route/intelligent-segmentation-modal';
+import { AdvancedControlsPanel } from '../../components/route/advanced-controls-panel';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -23,8 +23,6 @@ const RouteDetail = () => {
   // Advanced analysis state
   const [advancedAnalysisMode, setAdvancedAnalysisMode] = useState(false);
   const [advancedParams, setAdvancedParams] = useState(DEFAULT_ADVANCED_SEGMENTATION_PARAMS);
-  const [showAdvancedControls, setShowAdvancedControls] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -69,17 +67,32 @@ const RouteDetail = () => {
 
   // Calculate advanced segments statistics
   const advancedStats = useMemo(() => {
-    if (advancedSegments.length === 0) {
-      return { avgRSquared: 0, totalSegments: 0, qualityScore: 0 };
-    }
+    if (!advancedSegments || advancedSegments.length === 0) return null;
     
-    const avgRSquared = advancedSegments.reduce((acc, seg) => acc + seg.rSquared, 0) / advancedSegments.length;
-    const qualityScore = Math.min(100, Math.round(avgRSquared * 100));
+    const totalAscent = advancedSegments
+      .filter(s => s.type === 'asc')
+      .reduce((sum, s) => sum + s.elevationGain, 0);
+    
+    const totalDescent = advancedSegments
+      .filter(s => s.type === 'desc')
+      .reduce((sum, s) => sum + s.elevationLoss, 0);
+    
+    const totalDistance = advancedSegments.reduce((sum, s) => sum + s.distance, 0);
+    const avgSegmentDistance = totalDistance / advancedSegments.length;
+    
+    const avgRSquared = advancedSegments
+      .reduce((sum, s) => sum + s.rSquared, 0) / advancedSegments.length;
     
     return {
-      avgRSquared,
       totalSegments: advancedSegments.length,
-      qualityScore
+      ascentSegments: advancedSegments.filter(s => s.type === 'asc').length,
+      descentSegments: advancedSegments.filter(s => s.type === 'desc').length,
+      horizontalSegments: advancedSegments.filter(s => s.type === 'hor').length,
+      totalAscent: Math.round(totalAscent),
+      totalDescent: Math.round(totalDescent),
+      avgSegmentDistance: isNaN(avgSegmentDistance) ? '0.0' : avgSegmentDistance.toFixed(1),
+      avgRSquared: isNaN(avgRSquared) ? '0.000' : avgRSquared.toFixed(3),
+      qualityRating: avgRSquared >= 0.95 ? 'Excelente' : avgRSquared >= 0.90 ? 'Bueno' : avgRSquared >= 0.85 ? 'Regular' : 'Bajo'
     };
   }, [advancedSegments]);
 
@@ -97,20 +110,6 @@ const RouteDetail = () => {
 
   const handleAdvancedModeToggle = (enabled: boolean) => {
     setAdvancedAnalysisMode(enabled);
-    if (enabled) {
-      setShowAdvancedControls(true);
-    } else {
-      setShowAdvancedControls(false);
-    }
-  };
-
-  const handleSaveAdvancedSegments = (newSegments: any) => {
-    // Here you would typically save the new segments to your backend
-    console.log("Saving new advanced segments:", newSegments);
-    // For now, we just apply them to the view
-    // In a real app, this would trigger a mutation and refetch route data
-    // setAdvancedSegments(newSegments); // This is derived, so we can't set it directly.
-    // Instead, we might want to update params and let it recalculate
   };
 
   if (isLoading) {
@@ -172,7 +171,7 @@ const RouteDetail = () => {
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-mountain-900">
       {/* Main Content */}
-      <div className={`flex-1 transition-all duration-300 ${showAdvancedControls ? 'mr-80' : ''} overflow-y-auto`}>
+      <div className="flex-1 overflow-y-auto">
         <div className="p-6 space-y-6">
           {/* Enhanced Header */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -250,18 +249,6 @@ const RouteDetail = () => {
                   onCheckedChange={handleAdvancedModeToggle}
                 />
               </div>
-              
-              {/* Advanced Controls Toggle */}
-              {advancedAnalysisMode && (
-                <Button 
-                  onClick={() => setIsModalOpen(true)}
-                  variant="outline" 
-                  className="border-primary-300 text-primary-600 hover:bg-primary-50"
-                >
-                  <Sliders className="w-4 h-4 mr-2" />
-                  Ajustar Parámetros
-                </Button>
-              )}
               
               <Button 
                 onClick={() => setShowMap(!showMap)}
@@ -358,14 +345,16 @@ const RouteDetail = () => {
         </div>
       </div>
 
-      {/* DEPRECATED: Advanced Controls Sidebar is now replaced by the modal */}
-      {/* We keep the logic for the modal itself */}
-      <IntelligentSegmentationModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        elevationData={processedElevationData}
-        onSaveSegments={handleSaveAdvancedSegments}
-      />
+      {/* Advanced Controls Panel */}
+      {advancedAnalysisMode && (
+        <AdvancedControlsPanel
+          params={advancedParams}
+          setParams={setAdvancedParams}
+          stats={advancedStats}
+          onReset={resetAdvancedParams}
+          onClose={() => setAdvancedAnalysisMode(false)}
+        />
+      )}
     </div>
   );
 };
