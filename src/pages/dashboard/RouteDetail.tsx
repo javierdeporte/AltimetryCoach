@@ -519,26 +519,6 @@ const RouteDetail = () => {
 
                 <div>
                   <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
-                    Puntos Mínimos: {advancedParams.minSegmentPoints}
-                  </label>
-                  <p className="text-xs text-mountain-500 mb-3">
-                    Número mínimo de puntos por segmento
-                  </p>
-                  <Slider
-                    value={[advancedParams.minSegmentPoints]}
-                    onValueChange={(value) => setAdvancedParams(prev => ({
-                      ...prev,
-                      minSegmentPoints: value[0]
-                    }))}
-                    min={5}
-                    max={30}
-                    step={1}
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
                     Distancia Mínima: {advancedParams.minSegmentDistance.toFixed(1)} km
                   </label>
                   <p className="text-xs text-mountain-500 mb-3">

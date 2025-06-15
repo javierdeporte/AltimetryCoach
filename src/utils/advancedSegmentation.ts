@@ -1,4 +1,3 @@
-
 interface ElevationPoint {
   distance: number;
   elevation: number;
@@ -25,29 +24,15 @@ interface AdvancedSegment {
   elevationLoss: number;
   type: 'asc' | 'desc' | 'hor';
   color: string;
-  cutReason?: string; // New field to track why the segment was cut
+  cutReason?: string;
 }
 
 interface AdvancedSegmentationParams {
   rSquaredThreshold: number;
-  minSegmentPoints: number;
   minSegmentDistance: number; // in km
   slopeChangeThreshold: number; // percentage change that triggers a cut
   inflectionSensitivity: number; // multiplier for inflection point detection
   detectInflectionPoints: boolean; // toggle for inflection point detection
-}
-
-interface SlopeChange {
-  index: number;
-  previousSlope: number;
-  currentSlope: number;
-  changePercent: number;
-}
-
-interface InflectionPoint {
-  index: number;
-  type: 'peak' | 'valley' | 'direction_change';
-  significance: number;
 }
 
 const SEGMENT_COLORS = {
@@ -235,12 +220,11 @@ function shouldCutSegment(
   slopeChanges: SlopeChange[],
   inflectionPoints: InflectionPoint[]
 ): { shouldCut: boolean; reason: string } {
-  const segmentLength = currentIndex - segmentStartIndex + 1;
   const segmentDistance = elevationData[currentIndex].displayDistance - elevationData[segmentStartIndex].displayDistance;
   
-  // Always respect minimum distance and points requirements for sports relevance
-  if (segmentLength < params.minSegmentPoints || segmentDistance < params.minSegmentDistance) {
-    return { shouldCut: false, reason: 'Insufficient distance/points' };
+  // Always respect minimum distance requirement for sports relevance
+  if (segmentDistance < params.minSegmentDistance) {
+    return { shouldCut: false, reason: 'Insufficient distance' };
   }
   
   // Check for significant slope changes
@@ -296,7 +280,7 @@ export function segmentProfileAdvanced(
   params: AdvancedSegmentationParams
 ): AdvancedSegment[] {
   
-  if (!elevationData || elevationData.length < params.minSegmentPoints) {
+  if (!elevationData || elevationData.length < 5) { // Minimum practical requirement
     console.log('Not enough data points for segmentation');
     return [];
   }
@@ -316,7 +300,7 @@ export function segmentProfileAdvanced(
   const finalSegments: AdvancedSegment[] = [];
   let currentSegmentStartIndex = 0;
 
-  for (let i = params.minSegmentPoints; i < elevationData.length; i++) {
+  for (let i = 5; i < elevationData.length; i++) { // Start with minimum 5 points
     const cutDecision = shouldCutSegment(
       i, 
       currentSegmentStartIndex, 
@@ -333,7 +317,7 @@ export function segmentProfileAdvanced(
         .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
         .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
         
-      if (regressionPoints.length >= params.minSegmentPoints) {
+      if (regressionPoints.length >= 2) {
         const regression = calculateLinearRegression(regressionPoints);
         const segmentType = getSegmentType(regression.slope);
         
@@ -373,7 +357,7 @@ export function segmentProfileAdvanced(
       .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
       .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
 
-    if (lastRegressionPoints.length >= params.minSegmentPoints) {
+    if (lastRegressionPoints.length >= 2) {
       const lastRegression = calculateLinearRegression(lastRegressionPoints);
       const segmentType = getSegmentType(lastRegression.slope);
       
@@ -409,11 +393,10 @@ export function segmentProfileAdvanced(
 }
 
 /**
- * Enhanced default parameters with new criteria
+ * Enhanced default parameters without minSegmentPoints
  */
 export const DEFAULT_ADVANCED_SEGMENTATION_PARAMS: AdvancedSegmentationParams = {
   rSquaredThreshold: 0.92,
-  minSegmentPoints: 10, // Reduced from 20 to 10 to be less restrictive
   minSegmentDistance: 0.3, // km - sports relevance filter
   slopeChangeThreshold: 4.0, // percentage change that triggers a cut
   inflectionSensitivity: 2.0, // meters of elevation difference
