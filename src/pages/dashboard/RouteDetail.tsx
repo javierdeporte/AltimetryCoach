@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
@@ -20,7 +19,6 @@ const RouteDetail = () => {
   const [showMap, setShowMap] = useState(false);
   
   console.log('RouteDetail mounted with routeId:', routeId);
-  console.log('RouteId type:', typeof routeId, 'value:', routeId);
   
   // Verificar que tenemos un routeId válido antes de proceder
   if (!routeId) {
@@ -192,7 +190,7 @@ const RouteDetail = () => {
             className="border-primary-300 text-primary-600 hover:bg-primary-50"
           >
             <Brain className="w-4 h-4 mr-2" />
-            Segmentos Inteligentes
+            Análisis Avanzado
           </Button>
           <Button 
             onClick={() => setShowMap(!showMap)}
@@ -247,7 +245,7 @@ const RouteDetail = () => {
         </div>
       </div>
 
-      {/* Elevation Chart - Now full width and prominent */}
+      {/* Advanced Elevation Chart */}
       <div className="w-full">
         <ElevationChartD3
           elevationData={elevationData}
@@ -258,7 +256,6 @@ const RouteDetail = () => {
             height: 400,
             backgroundColor: 'transparent'
           }}
-          showGradientVisualization={true}
         />
       </div>
 
@@ -285,7 +282,7 @@ const RouteDetail = () => {
         </div>
       )}
 
-      {/* Intelligent Segmentation Modal */}
+      {/* Advanced Intelligent Segmentation Modal */}
       <IntelligentSegmentationModal
         isOpen={showIntelligentSegmentation}
         onClose={() => setShowIntelligentSegmentation(false)}

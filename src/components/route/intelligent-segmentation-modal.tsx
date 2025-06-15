@@ -5,15 +5,17 @@ import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import { ElevationChartD3 } from './elevation-chart-d3';
 import { 
-  analyzeIntelligentSegments, 
-  DEFAULT_SEGMENTATION_PARAMS,
-  getSegmentTypeLabel 
-} from '../../utils/intelligentSegmentation';
-import { Settings, Save, RotateCcw } from 'lucide-react';
+  segmentProfileAdvanced, 
+  DEFAULT_ADVANCED_SEGMENTATION_PARAMS,
+  getAdvancedSegmentTypeLabel 
+} from '../../utils/advancedSegmentation';
+import { Settings, Save, RotateCcw, TrendingUp } from 'lucide-react';
 
 interface ElevationPoint {
   distance: number;
   elevation: number;
+  displayDistance: number;
+  displayElevation: number;
   segmentIndex?: number;
 }
 
@@ -30,49 +32,62 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
   elevationData,
   onSaveSegments
 }) => {
-  const [params, setParams] = useState(DEFAULT_SEGMENTATION_PARAMS);
-  const [isPreviewMode, setIsPreviewMode] = useState(true);
+  const [params, setParams] = useState(DEFAULT_ADVANCED_SEGMENTATION_PARAMS);
 
-  // Calculate intelligent segments in real-time
-  const intelligentSegments = useMemo(() => {
-    if (!elevationData || elevationData.length === 0) return [];
-    return analyzeIntelligentSegments(elevationData, params);
-  }, [elevationData, params]);
+  // Process elevation data to ensure it has the required displayDistance and displayElevation properties
+  const processedElevationData = useMemo(() => {
+    return elevationData.map(point => ({
+      ...point,
+      displayDistance: point.displayDistance || point.distance,
+      displayElevation: point.displayElevation || point.elevation
+    }));
+  }, [elevationData]);
+
+  // Calculate advanced segments in real-time
+  const advancedSegments = useMemo(() => {
+    if (!processedElevationData || processedElevationData.length === 0) return [];
+    return segmentProfileAdvanced(processedElevationData, params);
+  }, [processedElevationData, params]);
 
   // Calculate statistics
   const stats = useMemo(() => {
-    if (intelligentSegments.length === 0) return null;
+    if (advancedSegments.length === 0) return null;
     
-    const totalAscent = intelligentSegments
+    const totalAscent = advancedSegments
       .filter(s => s.type === 'asc')
       .reduce((sum, s) => sum + s.elevationGain, 0);
     
-    const totalDescent = intelligentSegments
+    const totalDescent = advancedSegments
       .filter(s => s.type === 'desc')
       .reduce((sum, s) => sum + s.elevationLoss, 0);
     
-    const avgSegmentDistance = intelligentSegments
-      .reduce((sum, s) => sum + s.distance, 0) / intelligentSegments.length;
+    const avgSegmentDistance = advancedSegments
+      .reduce((sum, s) => sum + s.distance, 0) / advancedSegments.length;
+    
+    const avgRSquared = advancedSegments
+      .reduce((sum, s) => sum + s.rSquared, 0) / advancedSegments.length;
     
     return {
-      totalSegments: intelligentSegments.length,
-      ascentSegments: intelligentSegments.filter(s => s.type === 'asc').length,
-      descentSegments: intelligentSegments.filter(s => s.type === 'desc').length,
-      horizontalSegments: intelligentSegments.filter(s => s.type === 'hor').length,
+      totalSegments: advancedSegments.length,
+      ascentSegments: advancedSegments.filter(s => s.type === 'asc').length,
+      descentSegments: advancedSegments.filter(s => s.type === 'desc').length,
+      horizontalSegments: advancedSegments.filter(s => s.type === 'hor').length,
       totalAscent: Math.round(totalAscent),
       totalDescent: Math.round(totalDescent),
-      avgSegmentDistance: avgSegmentDistance.toFixed(1)
+      avgSegmentDistance: avgSegmentDistance.toFixed(1),
+      avgRSquared: avgRSquared.toFixed(3),
+      qualityRating: avgRSquared >= 0.95 ? 'Excelente' : avgRSquared >= 0.90 ? 'Bueno' : avgRSquared >= 0.85 ? 'Regular' : 'Bajo'
     };
-  }, [intelligentSegments]);
+  }, [advancedSegments]);
 
   const handleResetParams = () => {
-    setParams(DEFAULT_SEGMENTATION_PARAMS);
+    setParams(DEFAULT_ADVANCED_SEGMENTATION_PARAMS);
   };
 
   const handleSaveSegments = () => {
     if (onSaveSegments) {
-      // Convert intelligent segments to the format expected by the database
-      const segmentsForDB = intelligentSegments.map((segment, index) => ({
+      // Convert advanced segments to the format expected by the database
+      const segmentsForDB = advancedSegments.map((segment, index) => ({
         segment_index: index,
         start_lat: 0, // These would need to be calculated from actual GPX data
         start_lng: 0,
@@ -80,8 +95,11 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
         end_lng: 0,
         distance_km: segment.distance,
         elevation_gain_m: Math.round(segment.elevationGain),
-        avg_grade_percent: segment.avgGrade * (180 / Math.PI), // Convert from degrees to percentage
-        segment_type: segment.type
+        avg_grade_percent: (segment.slope * 100), // Convert slope to percentage
+        segment_type: segment.type,
+        r_squared: segment.rSquared,
+        slope: segment.slope,
+        intercept: segment.intercept
       }));
       
       onSaveSegments(segmentsForDB);
@@ -94,9 +112,12 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
       <DialogContent className="max-w-6xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Análisis de Segmentos Inteligentes
+            <TrendingUp className="w-5 h-5" />
+            Análisis Avanzado de Segmentos con Regresión Lineal
           </DialogTitle>
+          <p className="text-sm text-mountain-600 dark:text-mountain-400">
+            Algoritmo de ventana creciente con control de calidad R²
+          </p>
         </DialogHeader>
         
         <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
@@ -104,60 +125,60 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
           <div className="lg:w-80 flex-shrink-0 space-y-6 overflow-y-auto">
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-                Parámetros de Segmentación
+                Parámetros de Segmentación Avanzada
               </h3>
               
-              {/* Grade Threshold */}
+              {/* R² Threshold */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Umbral de Cambio de Grado: {params.gradeThreshold}°
+                  Umbral de Calidad R²: {params.rSquaredThreshold.toFixed(3)}
                 </label>
                 <Slider
-                  value={[params.gradeThreshold]}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, gradeThreshold: value[0] }))}
-                  min={5}
-                  max={20}
-                  step={1}
+                  value={[params.rSquaredThreshold]}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, rSquaredThreshold: value[0] }))}
+                  min={0.80}
+                  max={0.98}
+                  step={0.01}
                   className="w-full"
                 />
                 <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Cambio mínimo de pendiente para crear un nuevo segmento
+                  Coeficiente de determinación mínimo para mantener un segmento
                 </p>
               </div>
 
-              {/* Minimum Sustained Distance */}
+              {/* Minimum Points */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Distancia Mínima Sostenida: {params.minSustainedDistance}m
+                  Puntos Mínimos por Segmento: {params.minSegmentPoints}
                 </label>
                 <Slider
-                  value={[params.minSustainedDistance]}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, minSustainedDistance: value[0] }))}
-                  min={50}
-                  max={500}
-                  step={25}
+                  value={[params.minSegmentPoints]}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, minSegmentPoints: value[0] }))}
+                  min={10}
+                  max={50}
+                  step={5}
                   className="w-full"
                 />
                 <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Distancia mínima que debe mantenerse una pendiente
+                  Número mínimo de puntos para formar un segmento válido
                 </p>
               </div>
 
-              {/* Smoothing Window */}
+              {/* Minimum Distance */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Suavizado de Datos: {params.smoothingWindow} puntos
+                  Distancia Mínima: {params.minSegmentDistance.toFixed(1)} km
                 </label>
                 <Slider
-                  value={[params.smoothingWindow]}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, smoothingWindow: value[0] }))}
-                  min={3}
-                  max={15}
-                  step={2}
+                  value={[params.minSegmentDistance]}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, minSegmentDistance: value[0] }))}
+                  min={0.1}
+                  max={1.0}
+                  step={0.1}
                   className="w-full"
                 />
                 <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Ventana de suavizado para reducir ruido en los datos
+                  Distancia mínima para considerar un segmento
                 </p>
               </div>
 
@@ -167,12 +188,25 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
               </Button>
             </div>
 
-            {/* Statistics */}
+            {/* Enhanced Statistics */}
             {stats && (
               <div className="space-y-3 border-t border-primary-200 dark:border-mountain-700 pt-4">
                 <h4 className="text-md font-semibold text-mountain-800 dark:text-mountain-200">
-                  Estadísticas de Segmentación
+                  Métricas de Calidad
                 </h4>
+                
+                {/* Quality Rating */}
+                <div className="bg-primary-50 dark:bg-mountain-700 p-3 rounded-lg">
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-primary-600 dark:text-primary-400">
+                      {stats.qualityRating}
+                    </div>
+                    <div className="text-xs text-mountain-600 dark:text-mountain-400">
+                      Calidad del Ajuste (R² = {stats.avgRSquared})
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="bg-primary-50 dark:bg-mountain-700 p-2 rounded">
                     <div className="font-semibold text-primary-600 dark:text-primary-400">
@@ -221,9 +255,9 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
             <div className="h-full flex flex-col">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-                  Vista Previa de Segmentación
+                  Vista Previa con Líneas de Regresión
                 </h3>
-                <div className="flex gap-2 text-sm">
+                <div className="flex gap-4 text-sm">
                   <span className="flex items-center gap-1">
                     <div className="w-3 h-3 bg-green-500 rounded"></div>
                     Ascenso
@@ -236,13 +270,17 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                     <div className="w-3 h-3 bg-gray-500 rounded"></div>
                     Horizontal
                   </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-4 h-0.5 bg-red-600 border-dashed border-t"></div>
+                    Tendencias
+                  </span>
                 </div>
               </div>
               
               <div className="flex-1 overflow-auto">
                 <ElevationChartD3
-                  elevationData={elevationData}
-                  intelligentSegments={intelligentSegments}
+                  elevationData={processedElevationData}
+                  advancedSegments={advancedSegments}
                   options={{
                     width: 800,
                     height: 400,
@@ -251,14 +289,14 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                 />
               </div>
 
-              {/* Segments List */}
-              {intelligentSegments.length > 0 && (
+              {/* Enhanced Segments List */}
+              {advancedSegments.length > 0 && (
                 <div className="mt-4 max-h-40 overflow-y-auto border border-primary-200 dark:border-mountain-700 rounded-lg">
                   <div className="bg-primary-50 dark:bg-mountain-700 px-3 py-2 text-sm font-semibold">
-                    Segmentos Detectados
+                    Segmentos Detectados (con Calidad R²)
                   </div>
                   <div className="divide-y divide-primary-200 dark:divide-mountain-700">
-                    {intelligentSegments.map((segment, index) => (
+                    {advancedSegments.map((segment, index) => (
                       <div key={index} className="px-3 py-2 text-sm flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <div 
@@ -266,11 +304,13 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                             style={{ backgroundColor: segment.color }}
                           ></div>
                           <span className="font-medium">
-                            {getSegmentTypeLabel(segment.type)} #{index + 1}
+                            {getAdvancedSegmentTypeLabel(segment.type)} #{index + 1}
                           </span>
                         </div>
-                        <div className="text-xs text-mountain-600 dark:text-mountain-400">
-                          {segment.distance.toFixed(1)}km • {segment.avgGrade.toFixed(1)}°
+                        <div className="text-xs text-mountain-600 dark:text-mountain-400 flex gap-2">
+                          <span>{segment.distance.toFixed(1)}km</span>
+                          <span>R²={segment.rSquared.toFixed(3)}</span>
+                          <span>{(segment.slope * 100).toFixed(1)}%</span>
                         </div>
                       </div>
                     ))}
@@ -286,9 +326,9 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
           <Button onClick={onClose} variant="outline">
             Cancelar
           </Button>
-          <Button onClick={handleSaveSegments} disabled={intelligentSegments.length === 0}>
+          <Button onClick={handleSaveSegments} disabled={advancedSegments.length === 0}>
             <Save className="w-4 h-4 mr-2" />
-            Aplicar Segmentos ({intelligentSegments.length})
+            Aplicar Segmentos Avanzados ({advancedSegments.length})
           </Button>
         </div>
       </DialogContent>

@@ -7,6 +7,20 @@ interface ElevationPoint {
   elevation: number;
   segmentIndex?: number;
   incline?: number;
+  displayDistance: number;
+  displayElevation: number;
+}
+
+interface AdvancedSegment {
+  startIndex: number;
+  endIndex: number;
+  startPoint: ElevationPoint;
+  endPoint: ElevationPoint;
+  slope: number;
+  intercept: number;
+  rSquared: number;
+  type: 'asc' | 'desc' | 'hor';
+  color: string;
 }
 
 interface ElevationChartD3Props {
@@ -37,6 +51,7 @@ interface ElevationChartD3Props {
     avgGrade: number;
     color: string;
   }>;
+  advancedSegments?: AdvancedSegment[];
   showGradientVisualization?: boolean;
 }
 
@@ -49,6 +64,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   hoveredSegment,
   options = {},
   intelligentSegments = [],
+  advancedSegments = [],
   showGradientVisualization = false
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -192,6 +208,24 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       });
     }
 
+    // Draw advanced segments backgrounds if available
+    if (advancedSegments.length > 0) {
+      advancedSegments.forEach(segment => {
+        const startPoint = processedData[segment.startIndex];
+        const endPoint = processedData[segment.endIndex];
+        
+        if (startPoint && endPoint) {
+          chartContent.append("rect")
+            .attr("x", xScale(startPoint.displayDistance))
+            .attr("y", opts.marginTop)
+            .attr("width", xScale(endPoint.displayDistance) - xScale(startPoint.displayDistance))
+            .attr("height", opts.height - opts.marginTop - opts.marginBottom)
+            .attr("fill", segment.color)
+            .attr("opacity", 0.15);
+        }
+      });
+    }
+
     // Draw elevation line
     chartContent.append("path")
       .datum(processedData)
@@ -202,6 +236,23 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       .attr("stroke-linejoin", "round")
       .attr("stroke-linecap", "round")
       .attr("d", lineGenerator);
+
+    // Draw red regression trend lines for advanced segments
+    if (advancedSegments.length > 0) {
+      chartContent.append("g")
+        .attr("class", "trend-lines")
+        .selectAll("line")
+        .data(advancedSegments)
+        .join("line")
+          .attr("stroke", "#dc2626") // Red color for trend lines
+          .attr("stroke-width", 2)
+          .attr("stroke-dasharray", "4, 4")
+          .attr("x1", d => xScale(d.startPoint.displayDistance))
+          .attr("y1", d => yScale(d.slope * d.startPoint.displayDistance + d.intercept))
+          .attr("x2", d => xScale(d.endPoint.displayDistance))
+          .attr("y2", d => yScale(d.slope * d.endPoint.displayDistance + d.intercept))
+          .attr("opacity", 0.8);
+    }
 
     // Draw segment dividers if available
     if (intelligentSegments.length > 0) {
@@ -343,7 +394,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         }
       });
 
-  }, [processedData, opts, intelligentSegments, onPointHover, showGradientVisualization, gradientColorScale]);
+  }, [processedData, opts, intelligentSegments, advancedSegments, onPointHover, showGradientVisualization, gradientColorScale]);
 
   return (
     <div 
@@ -360,27 +411,31 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
     >
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-          Perfil de Elevación Avanzado
+          Perfil de Elevación con Análisis de Regresión
         </h3>
         <div className="flex gap-4 text-sm text-mountain-600 dark:text-mountain-400">
           <span>📏 Distancia: {processedData.length > 0 ? processedData[processedData.length - 1]?.displayDistance.toFixed(1) : '0'} {opts.useMiles ? 'mi' : 'km'}</span>
-          {intelligentSegments.length > 0 && (
-            <span>🎯 Segmentos: {intelligentSegments.length}</span>
+          {advancedSegments.length > 0 && (
+            <span>🎯 Segmentos: {advancedSegments.length}</span>
           )}
-          {showGradientVisualization && (
-            <span>📈 Pendientes visualizadas</span>
+          {advancedSegments.length > 0 && (
+            <span>📊 R² promedio: {(advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length).toFixed(3)}</span>
           )}
         </div>
       </div>
       
       <svg ref={svgRef} style={{ display: 'block', width: '100%', height: `${opts.height}px` }} />
       
-      {showGradientVisualization && (
+      {advancedSegments.length > 0 && (
         <div className="mt-4 flex items-center gap-4 text-xs text-mountain-600 dark:text-mountain-400">
-          <span>Leyenda de pendientes:</span>
+          <span>Leyenda:</span>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-2 bg-gradient-to-r from-green-500 to-red-500"></div>
-            <span>Suave → Empinado</span>
+            <div className="w-4 h-0.5 bg-red-600 border-dashed border-t-2"></div>
+            <span>Líneas de regresión (tendencia)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-2 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 opacity-50"></div>
+            <span>Tipos de segmento</span>
           </div>
         </div>
       )}
