@@ -88,10 +88,6 @@ const RouteDetail = () => {
     const totalDistance = advancedSegments.reduce((sum, s) => sum + s.distance, 0);
     const avgSegmentDistance = totalDistance / advancedSegments.length;
     
-    // R-squared is no longer available in the simplified model
-    // const avgRSquared = advancedSegments
-    //   .reduce((sum, s) => sum + s.rSquared, 0) / advancedSegments.length;
-    
     return {
       totalSegments: advancedSegments.length,
       ascentSegments: advancedSegments.filter(s => s.type === 'asc').length,
@@ -100,9 +96,6 @@ const RouteDetail = () => {
       totalAscent: Math.round(totalAscent),
       totalDescent: Math.round(totalDescent),
       avgSegmentDistance: isNaN(avgSegmentDistance) ? '0.0' : avgSegmentDistance.toFixed(1),
-      // Remove R-squared based stats
-      avgRSquared: 'N/A', // O simplemente quitarlo
-      qualityRating: 'N/A'
     };
   }, [advancedSegments]);
 

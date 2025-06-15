@@ -44,8 +44,6 @@ interface AdvancedControlsPanelProps {
     totalAscent: number;
     totalDescent: number;
     avgSegmentDistance: string;
-    avgRSquared: string;
-    qualityRating: string;
   } | null;
   onReset: () => void;
   onClose: () => void;
