@@ -110,7 +110,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
               {/* Grade Threshold */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Umbral de Cambio de Grado: {params.gradeThreshol}°
+                  Umbral de Cambio de Grado: {params.gradeThreshold}°
                 </label>
                 <Slider
                   value={[params.gradeThreshold]}
