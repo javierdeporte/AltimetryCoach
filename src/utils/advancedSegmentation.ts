@@ -1,3 +1,4 @@
+
 interface ElevationPoint {
   distance: number;
   elevation: number;
@@ -9,6 +10,19 @@ interface RegressionResult {
   slope: number;
   intercept: number;
   rSquared: number;
+}
+
+interface SlopeChange {
+  index: number;
+  previousSlope: number;
+  currentSlope: number;
+  changePercent: number;
+}
+
+interface InflectionPoint {
+  index: number;
+  type: 'peak' | 'valley' | 'direction_change';
+  significance: number;
 }
 
 interface AdvancedSegment {

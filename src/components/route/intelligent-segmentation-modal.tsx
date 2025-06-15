@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -10,6 +9,7 @@ import {
   getAdvancedSegmentTypeLabel 
 } from '../../utils/advancedSegmentation';
 import { Settings, Save, RotateCcw, TrendingUp } from 'lucide-react';
+import { Switch } from '../ui/switch';
 
 interface ElevationPoint {
   distance: number;
@@ -146,24 +146,6 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                 </p>
               </div>
 
-              {/* Minimum Points */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Puntos Mínimos por Segmento: {params.minSegmentPoints}
-                </label>
-                <Slider
-                  value={[params.minSegmentPoints]}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, minSegmentPoints: value[0] }))}
-                  min={10}
-                  max={50}
-                  step={5}
-                  className="w-full"
-                />
-                <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Número mínimo de puntos para formar un segmento válido
-                </p>
-              </div>
-
               {/* Minimum Distance */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
@@ -180,6 +162,58 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                 <p className="text-xs text-mountain-600 dark:text-mountain-400">
                   Distancia mínima para considerar un segmento
                 </p>
+              </div>
+
+              {/* Slope Change Threshold */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                  Sensibilidad a Cambios: {params.slopeChangeThreshold.toFixed(1)}%
+                </label>
+                <Slider
+                  value={[params.slopeChangeThreshold]}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, slopeChangeThreshold: value[0] }))}
+                  min={1.0}
+                  max={15.0}
+                  step={0.5}
+                  className="w-full"
+                />
+                <p className="text-xs text-mountain-600 dark:text-mountain-400">
+                  Cambio de pendiente que dispara un corte
+                </p>
+              </div>
+
+              {/* Inflection Sensitivity */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                  Sensibilidad Inflexión: {params.inflectionSensitivity.toFixed(1)}m
+                </label>
+                <Slider
+                  value={[params.inflectionSensitivity]}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, inflectionSensitivity: value[0] }))}
+                  min={0.5}
+                  max={5.0}
+                  step={0.1}
+                  className="w-full"
+                />
+                <p className="text-xs text-mountain-600 dark:text-mountain-400">
+                  Diferencia de elevación para detectar picos/valles
+                </p>
+              </div>
+
+              {/* Inflection Points Toggle */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-mountain-700 rounded-lg">
+                <div>
+                  <span className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                    Detectar Puntos de Inflexión
+                  </span>
+                  <p className="text-xs text-mountain-500">
+                    Identifica picos, valles y cambios de dirección
+                  </p>
+                </div>
+                <Switch
+                  checked={params.detectInflectionPoints}
+                  onCheckedChange={(checked) => setParams(prev => ({ ...prev, detectInflectionPoints: checked }))}
+                />
               </div>
 
               <Button onClick={handleResetParams} variant="outline" className="w-full">
