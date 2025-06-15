@@ -107,6 +107,41 @@ function calculateLinearRegression(points: Array<{x: number, y: number}>): Regre
 }
 
 /**
+ * NEW: Helper function to get points within a distance window around a center point
+ */
+function getPointsInDistanceWindow(
+  elevationData: ElevationPoint[],
+  centerIndex: number,
+  windowDistance: number
+): { leftPoints: ElevationPoint[], rightPoints: ElevationPoint[], centerPoint: ElevationPoint } {
+  const centerPoint = elevationData[centerIndex];
+  const leftPoints: ElevationPoint[] = [];
+  const rightPoints: ElevationPoint[] = [];
+  
+  // Get points to the left within windowDistance
+  for (let i = centerIndex - 1; i >= 0; i--) {
+    const distance = centerPoint.displayDistance - elevationData[i].displayDistance;
+    if (distance <= windowDistance) {
+      leftPoints.unshift(elevationData[i]); // Add to beginning to maintain order
+    } else {
+      break;
+    }
+  }
+  
+  // Get points to the right within windowDistance
+  for (let i = centerIndex + 1; i < elevationData.length; i++) {
+    const distance = elevationData[i].displayDistance - centerPoint.displayDistance;
+    if (distance <= windowDistance) {
+      rightPoints.push(elevationData[i]);
+    } else {
+      break;
+    }
+  }
+  
+  return { leftPoints, rightPoints, centerPoint };
+}
+
+/**
  * Calculates slope between two points as percentage grade
  */
 function calculateSlopeBetweenPoints(point1: ElevationPoint, point2: ElevationPoint): number {
@@ -293,27 +328,36 @@ function detectSlopeChanges(
 }
 
 /**
- * Detects inflection points that are sustained over minimum distance
+ * ENHANCED: Detects inflection points using distance-based windows instead of point count
  */
 function detectInflectionPoints(
   elevationData: ElevationPoint[], 
   sensitivity: number = 1.0,
-  windowSize: number = 5,
-  minSustainedDistance: number = 0.2 // km
+  windowDistance: number = 0.15, // 150m window distance (instead of windowSize)
+  minSustainedDistance: number = 0.3 // km - minimum distance for sustained inflection
 ): InflectionPoint[] {
   const inflectionPoints: InflectionPoint[] = [];
   
-  if (elevationData.length < windowSize * 2 + 1) return inflectionPoints;
+  if (elevationData.length < 10) return inflectionPoints;
   
-  for (let i = windowSize; i < elevationData.length - windowSize; i++) {
-    const leftWindow = elevationData.slice(i - windowSize, i);
-    const rightWindow = elevationData.slice(i + 1, i + windowSize + 1);
-    const currentPoint = elevationData[i];
+  // Start from a reasonable index to ensure we have enough data
+  const startIndex = Math.max(5, Math.floor(elevationData.length * 0.05));
+  const endIndex = Math.min(elevationData.length - 5, Math.floor(elevationData.length * 0.95));
+  
+  for (let i = startIndex; i < endIndex; i++) {
+    const { leftPoints, rightPoints, centerPoint } = getPointsInDistanceWindow(
+      elevationData, 
+      i, 
+      windowDistance
+    );
+    
+    // Ensure we have enough points for meaningful analysis
+    if (leftPoints.length < 3 || rightPoints.length < 3) continue;
     
     // Calculate average elevations in windows
-    const leftAvg = leftWindow.reduce((sum, p) => sum + p.displayElevation, 0) / leftWindow.length;
-    const rightAvg = rightWindow.reduce((sum, p) => sum + p.displayElevation, 0) / rightWindow.length;
-    const currentElev = currentPoint.displayElevation;
+    const leftAvg = leftPoints.reduce((sum, p) => sum + p.displayElevation, 0) / leftPoints.length;
+    const rightAvg = rightPoints.reduce((sum, p) => sum + p.displayElevation, 0) / rightPoints.length;
+    const currentElev = centerPoint.displayElevation;
     
     let detectedType: 'peak' | 'valley' | 'direction_change' | null = null;
     let significance = 0;
@@ -325,16 +369,22 @@ function detectInflectionPoints(
     }
     
     // Detect valleys (current point lower than both sides)
-    if (currentElev < leftAvg - sensitivity && currentElev < rightAvg - sensitivity) {
+    else if (currentElev < leftAvg - sensitivity && currentElev < rightAvg - sensitivity) {
       detectedType = 'valley';
       significance = Math.min(leftAvg - currentElev, rightAvg - currentElev);
     }
     
-    // Detect direction changes
-    if (!detectedType) {
-      const leftSlope = calculateSlopeBetweenPoints(leftWindow[0], currentPoint);
-      const rightSlope = calculateSlopeBetweenPoints(currentPoint, rightWindow[rightWindow.length - 1]);
+    // Detect direction changes using slope analysis
+    else {
+      // Calculate slopes using distance-based windows
+      const leftSlope = leftPoints.length > 0 
+        ? calculateSlopeBetweenPoints(leftPoints[0], centerPoint)
+        : 0;
+      const rightSlope = rightPoints.length > 0 
+        ? calculateSlopeBetweenPoints(centerPoint, rightPoints[rightPoints.length - 1])
+        : 0;
       
+      // Significant direction change: opposite signs and both slopes are meaningful
       if (Math.sign(leftSlope) !== Math.sign(rightSlope) && 
           Math.abs(leftSlope) > sensitivity && Math.abs(rightSlope) > sensitivity) {
         detectedType = 'direction_change';
@@ -343,38 +393,76 @@ function detectInflectionPoints(
     }
     
     if (detectedType) {
-      // Calculate sustained distance for this inflection
-      let sustainedEndIndex = i + windowSize;
-      for (let j = i + windowSize + 1; j < elevationData.length - windowSize; j++) {
-        const futureWindow = elevationData.slice(j, j + windowSize);
-        const futureAvg = futureWindow.reduce((sum, p) => sum + p.displayElevation, 0) / futureWindow.length;
+      // CRITICAL: Calculate sustained distance to validate the inflection
+      let sustainedEndIndex = i;
+      let maxLookAhead = Math.min(100, elevationData.length - i - 1); // Reasonable limit
+      
+      for (let j = 1; j <= maxLookAhead; j++) {
+        const futureIndex = i + j;
+        if (futureIndex >= elevationData.length) break;
+        
+        const sustainedDistance = elevationData[futureIndex].displayDistance - centerPoint.displayDistance;
+        
+        // Stop if we've reached the minimum sustained distance
+        if (sustainedDistance >= minSustainedDistance) {
+          sustainedEndIndex = futureIndex;
+          break;
+        }
+        
+        // Check if the pattern continues at this future point
+        const { leftPoints: futureLeft, rightPoints: futureRight } = getPointsInDistanceWindow(
+          elevationData, 
+          futureIndex, 
+          windowDistance
+        );
+        
+        if (futureLeft.length < 2 || futureRight.length < 2) continue;
+        
+        const futureLeftAvg = futureLeft.reduce((sum, p) => sum + p.displayElevation, 0) / futureLeft.length;
+        const futureRightAvg = futureRight.reduce((sum, p) => sum + p.displayElevation, 0) / futureRight.length;
+        const futureElev = elevationData[futureIndex].displayElevation;
         
         // Check if the pattern continues
         let patternContinues = false;
-        if (detectedType === 'peak' && futureAvg < currentElev - sensitivity) {
+        if (detectedType === 'peak' && futureElev > futureLeftAvg + sensitivity && futureElev > futureRightAvg + sensitivity) {
           patternContinues = true;
-        } else if (detectedType === 'valley' && futureAvg > currentElev + sensitivity) {
+        } else if (detectedType === 'valley' && futureElev < futureLeftAvg - sensitivity && futureElev < futureRightAvg - sensitivity) {
           patternContinues = true;
         } else if (detectedType === 'direction_change') {
-          const futureSlope = calculateSlopeBetweenPoints(currentPoint, elevationData[j]);
-          if (Math.sign(futureSlope) === Math.sign(calculateSlopeBetweenPoints(currentPoint, rightWindow[rightWindow.length - 1]))) {
+          const futureLeftSlope = futureLeft.length > 0 
+            ? calculateSlopeBetweenPoints(futureLeft[0], elevationData[futureIndex])
+            : 0;
+          const futureRightSlope = futureRight.length > 0 
+            ? calculateSlopeBetweenPoints(elevationData[futureIndex], futureRight[futureRight.length - 1])
+            : 0;
+          
+          if (Math.sign(futureLeftSlope) !== Math.sign(futureRightSlope) && 
+              Math.abs(futureLeftSlope) > sensitivity && Math.abs(futureRightSlope) > sensitivity) {
             patternContinues = true;
           }
         }
         
-        if (!patternContinues) break;
-        sustainedEndIndex = j;
+        if (!patternContinues) {
+          // Pattern broke, check if we've sustained long enough
+          const currentSustainedDistance = elevationData[futureIndex - 1].displayDistance - centerPoint.displayDistance;
+          if (currentSustainedDistance >= minSustainedDistance) {
+            sustainedEndIndex = futureIndex - 1;
+          }
+          break;
+        }
+        
+        sustainedEndIndex = futureIndex;
       }
       
-      const sustainedDistance = elevationData[sustainedEndIndex].displayDistance - currentPoint.displayDistance;
+      const finalSustainedDistance = elevationData[sustainedEndIndex].displayDistance - centerPoint.displayDistance;
       
       // Only include inflections that are sustained for at least the minimum distance
-      if (sustainedDistance >= minSustainedDistance) {
+      if (finalSustainedDistance >= minSustainedDistance) {
         inflectionPoints.push({
           index: i,
           type: detectedType,
           significance: significance,
-          sustainedDistance: sustainedDistance
+          sustainedDistance: finalSustainedDistance
         });
       }
     }
@@ -475,16 +563,16 @@ export function segmentProfileAdvanced(
     return [];
   }
 
-  console.log('Starting enhanced slope-warning segmentation with params:', params);
+  console.log('Starting enhanced distance-based inflection segmentation with params:', params);
   console.log('Input data points:', elevationData.length);
 
-  // Pre-calculate sustained inflection points (priority 1)
+  // Pre-calculate sustained inflection points using distance-based windows
   const inflectionPoints = params.detectInflectionPoints 
     ? detectInflectionPoints(
         elevationData, 
         params.inflectionSensitivity, 
-        5, 
-        params.minSegmentDistance
+        0.15, // 150m window distance for inflection detection
+        params.minSegmentDistance // Minimum sustained distance for cuts
       ) 
     : [];
     
@@ -496,8 +584,13 @@ export function segmentProfileAdvanced(
     params.minSegmentDistance
   );
     
-  console.log('Detected sustained inflection points:', inflectionPoints.length);
+  console.log('Detected sustained inflection points (distance-based):', inflectionPoints.length);
   console.log('Detected slope changes for early warning:', slopeChanges.length);
+  if (inflectionPoints.length > 0) {
+    console.log('Inflection details:', inflectionPoints.map(ip => 
+      `${ip.type} at ${ip.index} (${ip.sustainedDistance.toFixed(2)}km sustained)`
+    ));
+  }
 
   const finalSegments: AdvancedSegment[] = [];
   let currentSegmentStartIndex = 0;
@@ -587,7 +680,7 @@ export function segmentProfileAdvanced(
     }
   }
 
-  console.log('Generated', finalSegments.length, 'enhanced segments with slope early warning');
+  console.log('Generated', finalSegments.length, 'enhanced segments with distance-based inflections');
   console.log('Average R²:', finalSegments.reduce((acc, s) => acc + s.rSquared, 0) / finalSegments.length);
   console.log('Cut reasons:', finalSegments.map(s => s.cutReason));
   
