@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useCallback } from 'react';
 import * as d3 from 'd3';
 
@@ -210,22 +209,23 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       });
     }
 
-    // Draw advanced segments backgrounds if available
+    // FIXED: Draw advanced segments backgrounds using correct distance values
     if (advancedSegments.length > 0) {
       console.log('Drawing advanced segment backgrounds:', advancedSegments.length);
-      advancedSegments.forEach(segment => {
-        const startPoint = processedData[segment.startIndex];
-        const endPoint = processedData[segment.endIndex];
+      advancedSegments.forEach((segment, segmentIndex) => {
+        // Use the actual distance values from the segment points instead of indices
+        const startDistance = segment.startPoint.displayDistance;
+        const endDistance = segment.endPoint.displayDistance;
         
-        if (startPoint && endPoint) {
-          chartContent.append("rect")
-            .attr("x", xScale(startPoint.displayDistance))
-            .attr("y", opts.marginTop)
-            .attr("width", xScale(endPoint.displayDistance) - xScale(startPoint.displayDistance))
-            .attr("height", opts.height - opts.marginTop - opts.marginBottom)
-            .attr("fill", segment.color)
-            .attr("opacity", 0.15);
-        }
+        console.log(`Segment ${segmentIndex}: start=${startDistance}km, end=${endDistance}km, type=${segment.type}`);
+        
+        chartContent.append("rect")
+          .attr("x", xScale(startDistance))
+          .attr("y", opts.marginTop)
+          .attr("width", xScale(endDistance) - xScale(startDistance))
+          .attr("height", opts.height - opts.marginTop - opts.marginBottom)
+          .attr("fill", segment.color)
+          .attr("opacity", 0.15);
       });
     }
 
@@ -240,61 +240,59 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       .attr("stroke-linecap", "round")
       .attr("d", lineGenerator);
 
-    // Draw red regression trend lines for advanced segments - THIS IS THE KEY FIX
+    // FIXED: Draw red regression trend lines using correct distance values
     if (advancedSegments.length > 0) {
       console.log('Drawing regression trend lines for', advancedSegments.length, 'segments');
       
       const trendLinesGroup = chartContent.append("g").attr("class", "trend-lines");
       
       advancedSegments.forEach((segment, index) => {
-        console.log(`Drawing trend line ${index + 1}:`, {
-          startDistance: segment.startPoint.displayDistance,
-          endDistance: segment.endPoint.displayDistance,
-          slope: segment.slope,
-          intercept: segment.intercept,
-          rSquared: segment.rSquared
-        });
-
+        // Use actual distance values from segment points
+        const startDistance = segment.startPoint.displayDistance;
+        const endDistance = segment.endPoint.displayDistance;
+        
         // Calculate Y values using the regression equation: y = slope * x + intercept
-        const startY = segment.slope * segment.startPoint.displayDistance + segment.intercept;
-        const endY = segment.slope * segment.endPoint.displayDistance + segment.intercept;
+        const startY = segment.slope * startDistance + segment.intercept;
+        const endY = segment.slope * endDistance + segment.intercept;
+
+        console.log(`Drawing trend line ${index + 1}:`, {
+          startDistance,
+          endDistance,
+          startY,
+          endY,
+          slope: segment.slope,
+          intercept: segment.intercept
+        });
 
         const trendLine = trendLinesGroup.append("line")
           .attr("class", `trend-line-${index}`)
           .attr("stroke", "#dc2626") // Red color for trend lines
           .attr("stroke-width", 2.5)
           .attr("stroke-dasharray", "6, 3")
-          .attr("x1", xScale(segment.startPoint.displayDistance))
+          .attr("x1", xScale(startDistance))
           .attr("y1", yScale(startY))
-          .attr("x2", xScale(segment.endPoint.displayDistance))
+          .attr("x2", xScale(endDistance))
           .attr("y2", yScale(endY))
           .attr("opacity", 0.9);
-
-        console.log(`Trend line ${index + 1} coordinates:`, {
-          x1: xScale(segment.startPoint.displayDistance),
-          y1: yScale(startY),
-          x2: xScale(segment.endPoint.displayDistance),
-          y2: yScale(endY)
-        });
       });
     }
 
-    // Draw segment dividers if available
-    if (intelligentSegments.length > 0) {
-      intelligentSegments.forEach((segment, index) => {
-        if (index < intelligentSegments.length - 1) {
-          const endPoint = processedData[segment.endIndex];
-          if (endPoint) {
-            chartContent.append("line")
-              .attr("x1", xScale(endPoint.displayDistance))
-              .attr("x2", xScale(endPoint.displayDistance))
-              .attr("y1", opts.marginTop)
-              .attr("y2", opts.height - opts.marginBottom)
-              .attr("stroke", "#dc2626")
-              .attr("stroke-width", 2)
-              .attr("stroke-dasharray", "5,5")
-              .attr("opacity", 0.7);
-          }
+    // Draw segment dividers for advanced segments
+    if (advancedSegments.length > 0) {
+      advancedSegments.forEach((segment, index) => {
+        if (index < advancedSegments.length - 1) {
+          // Use actual distance value from segment endpoint
+          const endDistance = segment.endPoint.displayDistance;
+          
+          chartContent.append("line")
+            .attr("x1", xScale(endDistance))
+            .attr("x2", xScale(endDistance))
+            .attr("y1", opts.marginTop)
+            .attr("y2", opts.height - opts.marginBottom)
+            .attr("stroke", "#dc2626")
+            .attr("stroke-width", 2)
+            .attr("stroke-dasharray", "5,5")
+            .attr("opacity", 0.7);
         }
       });
     }
