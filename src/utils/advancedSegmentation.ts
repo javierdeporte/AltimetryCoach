@@ -247,7 +247,8 @@ export function segmentProfileAdvanced(
   params: AdvancedSegmentationParams
 ): AdvancedSegmentationResult {
   
-  if (!elevationData || elevationData.length < params.minSegmentPoints) {
+  // Use a hardcoded minimum of points to avoid processing empty/too small data
+  if (!elevationData || elevationData.length < 10) {
     return { segments: [], macroBoundaries: [] };
   }
 
@@ -280,7 +281,6 @@ export function segmentProfileAdvanced(
  * Default advanced segmentation parameters
  */
 export const DEFAULT_ADVANCED_SEGMENTATION_PARAMS: AdvancedSegmentationParams = {
-  minSegmentPoints: 10,
   microMinDistance: 0.1, // km
   macroProminence: 40, // meters
   slopeChangeThreshold: 0.08, // 8% grade difference
