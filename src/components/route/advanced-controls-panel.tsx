@@ -83,22 +83,18 @@ export const AdvancedControlsPanel: React.FC<AdvancedControlsPanelProps> = ({
         </div>
 
         <div className="space-y-4 p-4 rounded-lg border border-primary-200 dark:border-mountain-700">
-          <h4 className="font-medium text-primary-600">Micro-Segmentación (Basada en Distancia)</h4>
+          <h4 className="font-medium text-primary-600">Parámetros de Segmentación</h4>
           <ParamSlider 
-            label="Distancia Mínima (Micro)"
-            description="Distancia base para los segmentos iniciales. Pequeños valores generan más segmentos para fusionar."
+            label="Distancia Mínima de Segmento"
+            description="Longitud mínima para cualquier segmento final. Controla el nivel de detalle general."
             value={params.microMinDistance}
             onValueChange={(val) => setParams(p => ({...p, microMinDistance: val}))}
             min={0.05} max={0.5} step={0.05}
             formatValue={(val) => `${val.toFixed(2)} km`}
           />
-        </div>
-
-        <div className="space-y-4 p-4 rounded-lg border border-primary-200 dark:border-mountain-700">
-          <h4 className="font-medium text-primary-600">Post-Procesamiento (Fusión)</h4>
-            <ParamSlider 
-            label="Umbral de Fusión de Pendiente"
-            description="Diferencia de pendiente para unir segmentos. Más bajo = más fusiones."
+          <ParamSlider 
+            label="Sensibilidad al Cambio de Pendiente"
+            description="Define la diferencia de pendiente para crear un nuevo segmento. Un valor más bajo genera más segmentos."
             value={params.slopeChangeThreshold}
             onValueChange={(val) => setParams(p => ({...p, slopeChangeThreshold: val}))}
             min={0.02} max={0.20} step={0.01}
