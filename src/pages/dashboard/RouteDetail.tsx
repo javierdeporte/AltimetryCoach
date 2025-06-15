@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
@@ -6,7 +7,7 @@ import { IntelligentSegmentationModal } from '../../components/route/intelligent
 import { SegmentsTable } from '../../components/route/segments-table';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain } from 'lucide-react';
+import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
@@ -16,7 +17,7 @@ const RouteDetail = () => {
   const navigate = useNavigate();
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   const [showIntelligentSegmentation, setShowIntelligentSegmentation] = useState(false);
-  const [useD3Chart, setUseD3Chart] = useState(true);
+  const [showMap, setShowMap] = useState(false);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   console.log('RouteId type:', typeof routeId, 'value:', routeId);
@@ -193,6 +194,14 @@ const RouteDetail = () => {
             <Brain className="w-4 h-4 mr-2" />
             Segmentos Inteligentes
           </Button>
+          <Button 
+            onClick={() => setShowMap(!showMap)}
+            variant="outline" 
+            className="border-primary-300 text-primary-600 hover:bg-primary-50"
+          >
+            {showMap ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+            {showMap ? 'Ocultar' : 'Ver'} Mapa
+          </Button>
           <Button variant="outline" className="border-primary-300 text-primary-600 hover:bg-primary-50">
             <Settings className="w-4 h-4 mr-2" />
             Export Data
@@ -238,45 +247,19 @@ const RouteDetail = () => {
         </div>
       </div>
 
-      {/* Map and Chart */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <InteractiveMap routeData={route} />
-        
-        {/* Toggle between old and new chart for comparison */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-              Perfil de Elevación
-            </h3>
-            <Button
-              onClick={() => setUseD3Chart(!useD3Chart)}
-              variant="outline"
-              size="sm"
-            >
-              {useD3Chart ? 'Vista Clásica' : 'Vista D3'}
-            </Button>
-          </div>
-          
-          {useD3Chart ? (
-            <ElevationChartD3
-              elevationData={elevationData}
-              onPointHover={setHoveredSegment}
-              hoveredSegment={hoveredSegment}
-              options={{
-                width: 600,
-                height: 300,
-                backgroundColor: 'transparent'
-              }}
-            />
-          ) : (
-            // Keep the old chart for comparison during development
-            <div className="h-80 bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 p-6">
-              <p className="text-center text-mountain-600 dark:text-mountain-400 mt-20">
-                Vista clásica (mantenida para comparación)
-              </p>
-            </div>
-          )}
-        </div>
+      {/* Elevation Chart - Now full width and prominent */}
+      <div className="w-full">
+        <ElevationChartD3
+          elevationData={elevationData}
+          onPointHover={setHoveredSegment}
+          hoveredSegment={hoveredSegment}
+          options={{
+            width: 1000,
+            height: 400,
+            backgroundColor: 'transparent'
+          }}
+          showGradientVisualization={true}
+        />
       </div>
 
       {/* Segments Table */}
@@ -285,6 +268,22 @@ const RouteDetail = () => {
         onSegmentHover={setHoveredSegment}
         hoveredSegment={hoveredSegment}
       />
+
+      {/* Conditional Map */}
+      {showMap && (
+        <div className="w-full">
+          <div className="bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 overflow-hidden">
+            <div className="p-6 border-b border-primary-200 dark:border-mountain-700">
+              <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
+                Mapa Interactivo
+              </h3>
+            </div>
+            <div className="p-6">
+              <InteractiveMap routeData={route} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Intelligent Segmentation Modal */}
       <IntelligentSegmentationModal

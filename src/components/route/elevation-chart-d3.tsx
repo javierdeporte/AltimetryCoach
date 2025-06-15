@@ -37,6 +37,7 @@ interface ElevationChartD3Props {
     avgGrade: number;
     color: string;
   }>;
+  showGradientVisualization?: boolean;
 }
 
 const MIN_CHART_WIDTH = 200;
@@ -47,7 +48,8 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   onPointHover,
   hoveredSegment,
   options = {},
-  intelligentSegments = []
+  intelligentSegments = [],
+  showGradientVisualization = false
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -96,6 +98,18 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
     });
   }, [elevationData, opts.useMiles, opts.useFeet]);
 
+  // Calculate gradient color scale
+  const gradientColorScale = React.useMemo(() => {
+    if (!showGradientVisualization || processedData.length === 0) return null;
+    
+    const inclines = processedData.map(p => Math.abs(p.incline));
+    const maxIncline = Math.max(...inclines, 15); // Minimum scale of 15%
+    
+    return d3.scaleSequential()
+      .domain([0, maxIncline])
+      .interpolator(d3.interpolateRdYlGn);
+  }, [processedData, showGradientVisualization]);
+
   useEffect(() => {
     if (!svgRef.current || !containerRef.current || processedData.length === 0) return;
 
@@ -140,6 +154,26 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
 
     const chartContent = svg.append("g").attr("class", "chart-content");
 
+    // Draw gradient visualization if enabled
+    if (showGradientVisualization && gradientColorScale) {
+      processedData.forEach((point, index) => {
+        if (index === 0) return;
+        
+        const prevPoint = processedData[index - 1];
+        const gradientIntensity = Math.abs(point.incline);
+        const color = gradientColorScale(gradientIntensity);
+        
+        chartContent.append("line")
+          .attr("x1", xScale(prevPoint.displayDistance))
+          .attr("y1", yScale(prevPoint.displayElevation))
+          .attr("x2", xScale(point.displayDistance))
+          .attr("y2", yScale(point.displayElevation))
+          .attr("stroke", color)
+          .attr("stroke-width", 4)
+          .attr("opacity", 0.7);
+      });
+    }
+
     // Draw intelligent segments backgrounds if available
     if (intelligentSegments.length > 0) {
       intelligentSegments.forEach(segment => {
@@ -163,8 +197,8 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       .datum(processedData)
       .attr("class", "elevation-line")
       .attr("fill", "none")
-      .attr("stroke", opts.lineColor)
-      .attr("stroke-width", 2.5)
+      .attr("stroke", showGradientVisualization ? "none" : opts.lineColor)
+      .attr("stroke-width", showGradientVisualization ? 0 : 2.5)
       .attr("stroke-linejoin", "round")
       .attr("stroke-linecap", "round")
       .attr("d", lineGenerator);
@@ -309,7 +343,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         }
       });
 
-  }, [processedData, opts, intelligentSegments, onPointHover]);
+  }, [processedData, opts, intelligentSegments, onPointHover, showGradientVisualization, gradientColorScale]);
 
   return (
     <div 
@@ -333,10 +367,23 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
           {intelligentSegments.length > 0 && (
             <span>🎯 Segmentos: {intelligentSegments.length}</span>
           )}
+          {showGradientVisualization && (
+            <span>📈 Pendientes visualizadas</span>
+          )}
         </div>
       </div>
       
       <svg ref={svgRef} style={{ display: 'block', width: '100%', height: `${opts.height}px` }} />
+      
+      {showGradientVisualization && (
+        <div className="mt-4 flex items-center gap-4 text-xs text-mountain-600 dark:text-mountain-400">
+          <span>Leyenda de pendientes:</span>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-2 bg-gradient-to-r from-green-500 to-red-500"></div>
+            <span>Suave → Empinado</span>
+          </div>
+        </div>
+      )}
       
       {processedData.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center">
