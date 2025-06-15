@@ -129,6 +129,8 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   useEffect(() => {
     if (!svgRef.current || !containerRef.current || processedData.length === 0) return;
 
+    console.log('Drawing chart with advanced segments:', advancedSegments.length);
+
     const svg = d3.select(svgRef.current)
       .attr("viewBox", `0 0 ${opts.width} ${opts.height}`)
       .style("background-color", opts.backgroundColor)
@@ -210,6 +212,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
 
     // Draw advanced segments backgrounds if available
     if (advancedSegments.length > 0) {
+      console.log('Drawing advanced segment backgrounds:', advancedSegments.length);
       advancedSegments.forEach(segment => {
         const startPoint = processedData[segment.startIndex];
         const endPoint = processedData[segment.endIndex];
@@ -237,21 +240,43 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       .attr("stroke-linecap", "round")
       .attr("d", lineGenerator);
 
-    // Draw red regression trend lines for advanced segments
+    // Draw red regression trend lines for advanced segments - THIS IS THE KEY FIX
     if (advancedSegments.length > 0) {
-      chartContent.append("g")
-        .attr("class", "trend-lines")
-        .selectAll("line")
-        .data(advancedSegments)
-        .join("line")
+      console.log('Drawing regression trend lines for', advancedSegments.length, 'segments');
+      
+      const trendLinesGroup = chartContent.append("g").attr("class", "trend-lines");
+      
+      advancedSegments.forEach((segment, index) => {
+        console.log(`Drawing trend line ${index + 1}:`, {
+          startDistance: segment.startPoint.displayDistance,
+          endDistance: segment.endPoint.displayDistance,
+          slope: segment.slope,
+          intercept: segment.intercept,
+          rSquared: segment.rSquared
+        });
+
+        // Calculate Y values using the regression equation: y = slope * x + intercept
+        const startY = segment.slope * segment.startPoint.displayDistance + segment.intercept;
+        const endY = segment.slope * segment.endPoint.displayDistance + segment.intercept;
+
+        const trendLine = trendLinesGroup.append("line")
+          .attr("class", `trend-line-${index}`)
           .attr("stroke", "#dc2626") // Red color for trend lines
-          .attr("stroke-width", 2)
-          .attr("stroke-dasharray", "4, 4")
-          .attr("x1", d => xScale(d.startPoint.displayDistance))
-          .attr("y1", d => yScale(d.slope * d.startPoint.displayDistance + d.intercept))
-          .attr("x2", d => xScale(d.endPoint.displayDistance))
-          .attr("y2", d => yScale(d.slope * d.endPoint.displayDistance + d.intercept))
-          .attr("opacity", 0.8);
+          .attr("stroke-width", 2.5)
+          .attr("stroke-dasharray", "6, 3")
+          .attr("x1", xScale(segment.startPoint.displayDistance))
+          .attr("y1", yScale(startY))
+          .attr("x2", xScale(segment.endPoint.displayDistance))
+          .attr("y2", yScale(endY))
+          .attr("opacity", 0.9);
+
+        console.log(`Trend line ${index + 1} coordinates:`, {
+          x1: xScale(segment.startPoint.displayDistance),
+          y1: yScale(startY),
+          x2: xScale(segment.endPoint.displayDistance),
+          y2: yScale(endY)
+        });
+      });
     }
 
     // Draw segment dividers if available
