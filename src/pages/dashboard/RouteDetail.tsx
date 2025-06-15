@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
-import { ElevationChart } from '../../components/route/elevation-chart';
+import { ElevationChartD3 } from '../../components/route/elevation-chart-d3';
+import { IntelligentSegmentationModal } from '../../components/route/intelligent-segmentation-modal';
 import { SegmentsTable } from '../../components/route/segments-table';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft } from 'lucide-react';
+import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
@@ -14,6 +15,8 @@ const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
   const navigate = useNavigate();
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
+  const [showIntelligentSegmentation, setShowIntelligentSegmentation] = useState(false);
+  const [useD3Chart, setUseD3Chart] = useState(true);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   console.log('RouteId type:', typeof routeId, 'value:', routeId);
@@ -51,6 +54,12 @@ const RouteDetail = () => {
       return `GPX: ${formatDate(route.gpx_capture_date)}`;
     }
     return `Subida: ${formatDate(route.created_at)}`;
+  };
+
+  const handleSaveIntelligentSegments = (intelligentSegments: any[]) => {
+    console.log('Saving intelligent segments:', intelligentSegments);
+    // TODO: Implement saving to database
+    // This would typically involve creating a new table or updating the existing segments
   };
 
   if (isLoading) {
@@ -176,6 +185,14 @@ const RouteDetail = () => {
         </div>
         
         <div className="flex gap-3">
+          <Button 
+            onClick={() => setShowIntelligentSegmentation(true)}
+            variant="outline" 
+            className="border-primary-300 text-primary-600 hover:bg-primary-50"
+          >
+            <Brain className="w-4 h-4 mr-2" />
+            Segmentos Inteligentes
+          </Button>
           <Button variant="outline" className="border-primary-300 text-primary-600 hover:bg-primary-50">
             <Settings className="w-4 h-4 mr-2" />
             Export Data
@@ -224,11 +241,42 @@ const RouteDetail = () => {
       {/* Map and Chart */}
       <div className="grid lg:grid-cols-2 gap-6">
         <InteractiveMap routeData={route} />
-        <ElevationChart 
-          elevationData={elevationData}
-          onPointHover={setHoveredSegment}
-          hoveredSegment={hoveredSegment}
-        />
+        
+        {/* Toggle between old and new chart for comparison */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
+              Perfil de Elevación
+            </h3>
+            <Button
+              onClick={() => setUseD3Chart(!useD3Chart)}
+              variant="outline"
+              size="sm"
+            >
+              {useD3Chart ? 'Vista Clásica' : 'Vista D3'}
+            </Button>
+          </div>
+          
+          {useD3Chart ? (
+            <ElevationChartD3
+              elevationData={elevationData}
+              onPointHover={setHoveredSegment}
+              hoveredSegment={hoveredSegment}
+              options={{
+                width: 600,
+                height: 300,
+                backgroundColor: 'transparent'
+              }}
+            />
+          ) : (
+            // Keep the old chart for comparison during development
+            <div className="h-80 bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 p-6">
+              <p className="text-center text-mountain-600 dark:text-mountain-400 mt-20">
+                Vista clásica (mantenida para comparación)
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Segments Table */}
@@ -236,6 +284,14 @@ const RouteDetail = () => {
         segments={segments}
         onSegmentHover={setHoveredSegment}
         hoveredSegment={hoveredSegment}
+      />
+
+      {/* Intelligent Segmentation Modal */}
+      <IntelligentSegmentationModal
+        isOpen={showIntelligentSegmentation}
+        onClose={() => setShowIntelligentSegmentation(false)}
+        elevationData={elevationData}
+        onSaveSegments={handleSaveIntelligentSegments}
       />
     </div>
   );
