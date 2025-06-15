@@ -53,7 +53,6 @@ interface ElevationChartD3Props {
   advancedSegments?: AdvancedSegment[];
   macroBoundaries?: number[];
   showGradientVisualization?: boolean;
-  extremeSlopePoints?: ElevationPoint[];
 }
 
 const MIN_CHART_WIDTH = 200;
@@ -67,8 +66,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   intelligentSegments = [],
   advancedSegments = [],
   macroBoundaries = [],
-  showGradientVisualization = false,
-  extremeSlopePoints = [],
+  showGradientVisualization = false
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -285,24 +283,6 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       });
     }
 
-    // Draw extreme slope points before dividers
-    if (extremeSlopePoints.length > 0) {
-        chartContent.append("g")
-            .attr("class", "extreme-slope-points")
-            .selectAll("circle")
-            .data(extremeSlopePoints)
-            .join("circle")
-            .attr("cx", d => xScale(d.displayDistance))
-            .attr("cy", d => yScale(d.displayElevation))
-            .attr("r", 3.5)
-            .attr("fill", "#e11d48") // rose-600
-            .attr("stroke", "white")
-            .attr("stroke-width", 1)
-            .attr("opacity", 0.9)
-            .append("title")
-              .text(d => `Pendiente extrema`);
-    }
-
     // Draw micro and macro segment dividers
     if (advancedSegments.length > 0) {
       // Draw micro-segment dividers (dashed) - from elevation line to bottom
@@ -463,7 +443,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         }
       });
 
-  }, [processedData, opts, intelligentSegments, advancedSegments, onPointHover, showGradientVisualization, gradientColorScale, macroBoundaries, extremeSlopePoints]);
+  }, [processedData, opts, intelligentSegments, advancedSegments, onPointHover, showGradientVisualization, gradientColorScale, macroBoundaries]);
 
   return (
     <div 
@@ -517,12 +497,6 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
             <div className="w-px h-4 border-l border-gray-500 border-dashed"></div>
             <span>Divisor Micro</span>
           </div>
-          {extremeSlopePoints.length > 0 && (
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-rose-600 border border-white opacity-90"></div>
-              <span>Pendiente Extrema</span>
-            </div>
-          )}
         </div>
       )}
       
