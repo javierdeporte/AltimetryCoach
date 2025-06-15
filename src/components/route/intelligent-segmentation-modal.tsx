@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -64,9 +63,6 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
     const avgSegmentDistance = advancedSegments
       .reduce((sum, s) => sum + s.distance, 0) / advancedSegments.length;
     
-    const avgRSquared = advancedSegments
-      .reduce((sum, s) => sum + s.rSquared, 0) / advancedSegments.length;
-    
     return {
       totalSegments: advancedSegments.length,
       ascentSegments: advancedSegments.filter(s => s.type === 'asc').length,
@@ -75,8 +71,6 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
       totalAscent: Math.round(totalAscent),
       totalDescent: Math.round(totalDescent),
       avgSegmentDistance: avgSegmentDistance.toFixed(1),
-      avgRSquared: avgRSquared.toFixed(3),
-      qualityRating: avgRSquared >= 0.95 ? 'Excelente' : avgRSquared >= 0.90 ? 'Bueno' : avgRSquared >= 0.85 ? 'Regular' : 'Bajo'
     };
   }, [advancedSegments]);
 
@@ -89,17 +83,14 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
       // Convert advanced segments to the format expected by the database
       const segmentsForDB = advancedSegments.map((segment, index) => ({
         segment_index: index,
-        start_lat: 0, // These would need to be calculated from actual GPX data
+        start_lat: 0, 
         start_lng: 0,
         end_lat: 0,
         end_lng: 0,
         distance_km: segment.distance,
         elevation_gain_m: Math.round(segment.elevationGain),
-        avg_grade_percent: (segment.slope * 100), // Convert slope to percentage
+        avg_grade_percent: segment.avgGrade,
         segment_type: segment.type,
-        r_squared: segment.rSquared,
-        slope: segment.slope,
-        intercept: segment.intercept
       }));
       
       onSaveSegments(segmentsForDB);
@@ -113,10 +104,10 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
-            Análisis Avanzado de Segmentos con Regresión Lineal
+            Análisis Topográfico de Segmentos
           </DialogTitle>
           <p className="text-sm text-mountain-600 dark:text-mountain-400">
-            Algoritmo de ventana creciente con control de calidad R²
+            Algoritmo basado en la detección de picos y valles significativos.
           </p>
         </DialogHeader>
         
@@ -125,42 +116,24 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
           <div className="lg:w-80 flex-shrink-0 space-y-6 overflow-y-auto">
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-                Parámetros de Segmentación Avanzada
+                Parámetros de Segmentación
               </h3>
               
-              {/* R² Threshold */}
+              {/* Min Prominence */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Umbral de Calidad R²: {params.rSquaredThreshold.toFixed(3)}
+                  Prominencia Mínima: {params.minProminence} m
                 </label>
                 <Slider
-                  value={[params.rSquaredThreshold]}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, rSquaredThreshold: value[0] }))}
-                  min={0.80}
-                  max={0.98}
-                  step={0.01}
-                  className="w-full"
-                />
-                <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Coeficiente de determinación mínimo para mantener un segmento
-                </p>
-              </div>
-
-              {/* Minimum Points */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Puntos Mínimos por Segmento: {params.minSegmentPoints}
-                </label>
-                <Slider
-                  value={[params.minSegmentPoints]}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, minSegmentPoints: value[0] }))}
+                  value={[params.minProminence]}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, minProminence: value[0] }))}
                   min={10}
-                  max={50}
+                  max={100}
                   step={5}
                   className="w-full"
                 />
                 <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Número mínimo de puntos para formar un segmento válido
+                  Desnivel mínimo para considerar un pico/valle.
                 </p>
               </div>
 
@@ -172,13 +145,13 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                 <Slider
                   value={[params.minSegmentDistance]}
                   onValueChange={(value) => setParams(prev => ({ ...prev, minSegmentDistance: value[0] }))}
-                  min={0.1}
-                  max={1.0}
+                  min={0.2}
+                  max={3.0}
                   step={0.1}
                   className="w-full"
                 />
                 <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Distancia mínima para considerar un segmento
+                  Distancia mínima para formar un segmento.
                 </p>
               </div>
 
@@ -192,20 +165,8 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
             {stats && (
               <div className="space-y-3 border-t border-primary-200 dark:border-mountain-700 pt-4">
                 <h4 className="text-md font-semibold text-mountain-800 dark:text-mountain-200">
-                  Métricas de Calidad
+                  Métricas de Segmentación
                 </h4>
-                
-                {/* Quality Rating */}
-                <div className="bg-primary-50 dark:bg-mountain-700 p-3 rounded-lg">
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                      {stats.qualityRating}
-                    </div>
-                    <div className="text-xs text-mountain-600 dark:text-mountain-400">
-                      Calidad del Ajuste (R² = {stats.avgRSquared})
-                    </div>
-                  </div>
-                </div>
                 
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="bg-primary-50 dark:bg-mountain-700 p-2 rounded">
@@ -255,7 +216,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
             <div className="h-full flex flex-col">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-                  Vista Previa con Líneas de Regresión
+                  Vista Previa de Segmentos Topográficos
                 </h3>
                 <div className="flex gap-4 text-sm">
                   <span className="flex items-center gap-1">
@@ -269,10 +230,6 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                   <span className="flex items-center gap-1">
                     <div className="w-3 h-3 bg-gray-500 rounded"></div>
                     Horizontal
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <div className="w-4 h-0.5 bg-red-600 border-dashed border-t"></div>
-                    Tendencias
                   </span>
                 </div>
               </div>
@@ -293,7 +250,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
               {advancedSegments.length > 0 && (
                 <div className="mt-4 max-h-40 overflow-y-auto border border-primary-200 dark:border-mountain-700 rounded-lg">
                   <div className="bg-primary-50 dark:bg-mountain-700 px-3 py-2 text-sm font-semibold">
-                    Segmentos Detectados (con Calidad R²)
+                    Segmentos Detectados
                   </div>
                   <div className="divide-y divide-primary-200 dark:divide-mountain-700">
                     {advancedSegments.map((segment, index) => (
@@ -309,8 +266,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                         </div>
                         <div className="text-xs text-mountain-600 dark:text-mountain-400 flex gap-2">
                           <span>{segment.distance.toFixed(1)}km</span>
-                          <span>R²={segment.rSquared.toFixed(3)}</span>
-                          <span>{(segment.slope * 100).toFixed(1)}%</span>
+                          <span>{segment.avgGrade.toFixed(1)}%</span>
                         </div>
                       </div>
                     ))}

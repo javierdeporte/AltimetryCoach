@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useCallback } from 'react';
 import * as d3 from 'd3';
 
@@ -16,9 +15,6 @@ interface AdvancedSegment {
   endIndex: number;
   startPoint: ElevationPoint;
   endPoint: ElevationPoint;
-  slope: number;
-  intercept: number;
-  rSquared: number;
   type: 'asc' | 'desc' | 'hor';
   color: string;
 }
@@ -129,7 +125,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   useEffect(() => {
     if (!svgRef.current || !containerRef.current || processedData.length === 0) return;
 
-    console.log('Drawing chart with advanced segments:', advancedSegments.length);
+    console.log('Drawing chart with new topographical segments:', advancedSegments.length);
 
     const svg = d3.select(svgRef.current)
       .attr("viewBox", `0 0 ${opts.width} ${opts.height}`)
@@ -239,45 +235,6 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       .attr("stroke-linejoin", "round")
       .attr("stroke-linecap", "round")
       .attr("d", lineGenerator);
-
-    // Draw red regression trend lines for advanced segments - THIS IS THE KEY FIX
-    if (advancedSegments.length > 0) {
-      console.log('Drawing regression trend lines for', advancedSegments.length, 'segments');
-      
-      const trendLinesGroup = chartContent.append("g").attr("class", "trend-lines");
-      
-      advancedSegments.forEach((segment, index) => {
-        console.log(`Drawing trend line ${index + 1}:`, {
-          startDistance: segment.startPoint.displayDistance,
-          endDistance: segment.endPoint.displayDistance,
-          slope: segment.slope,
-          intercept: segment.intercept,
-          rSquared: segment.rSquared
-        });
-
-        // Calculate Y values using the regression equation: y = slope * x + intercept
-        const startY = segment.slope * segment.startPoint.displayDistance + segment.intercept;
-        const endY = segment.slope * segment.endPoint.displayDistance + segment.intercept;
-
-        const trendLine = trendLinesGroup.append("line")
-          .attr("class", `trend-line-${index}`)
-          .attr("stroke", "#dc2626") // Red color for trend lines
-          .attr("stroke-width", 2.5)
-          .attr("stroke-dasharray", "6, 3")
-          .attr("x1", xScale(segment.startPoint.displayDistance))
-          .attr("y1", yScale(startY))
-          .attr("x2", xScale(segment.endPoint.displayDistance))
-          .attr("y2", yScale(endY))
-          .attr("opacity", 0.9);
-
-        console.log(`Trend line ${index + 1} coordinates:`, {
-          x1: xScale(segment.startPoint.displayDistance),
-          y1: yScale(startY),
-          x2: xScale(segment.endPoint.displayDistance),
-          y2: yScale(endY)
-        });
-      });
-    }
 
     // Draw segment dividers if available
     if (intelligentSegments.length > 0) {
@@ -436,15 +393,12 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
     >
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-          Perfil de Elevación con Análisis de Regresión
+          Perfil de Elevación Topográfico
         </h3>
         <div className="flex gap-4 text-sm text-mountain-600 dark:text-mountain-400">
           <span>📏 Distancia: {processedData.length > 0 ? processedData[processedData.length - 1]?.displayDistance.toFixed(1) : '0'} {opts.useMiles ? 'mi' : 'km'}</span>
           {advancedSegments.length > 0 && (
             <span>🎯 Segmentos: {advancedSegments.length}</span>
-          )}
-          {advancedSegments.length > 0 && (
-            <span>📊 R² promedio: {(advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length).toFixed(3)}</span>
           )}
         </div>
       </div>
@@ -455,12 +409,8 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         <div className="mt-4 flex items-center gap-4 text-xs text-mountain-600 dark:text-mountain-400">
           <span>Leyenda:</span>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-0.5 bg-red-600 border-dashed border-t-2"></div>
-            <span>Líneas de regresión (tendencia)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-2 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 opacity-50"></div>
-            <span>Tipos de segmento</span>
+            <div className="w-4 h-2 bg-gradient-to-r from-green-100 via-blue-100 to-gray-100 opacity-80 border border-gray-300"></div>
+            <span>Segmentos Topográficos</span>
           </div>
         </div>
       )}

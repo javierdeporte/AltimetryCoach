@@ -1,4 +1,3 @@
-
 interface ElevationPoint {
   distance: number;
   elevation: number;
@@ -17,19 +16,16 @@ interface AdvancedSegment {
   endIndex: number;
   startPoint: ElevationPoint;
   endPoint: ElevationPoint;
-  slope: number;
-  intercept: number;
-  rSquared: number;
   distance: number;
   elevationGain: number;
   elevationLoss: number;
+  avgGrade: number;
   type: 'asc' | 'desc' | 'hor';
   color: string;
 }
 
 interface AdvancedSegmentationParams {
-  rSquaredThreshold: number;
-  minSegmentPoints: number;
+  minProminence: number; // in meters
   minSegmentDistance: number; // in km
 }
 
@@ -81,154 +77,136 @@ function calculateLinearRegression(points: Array<{x: number, y: number}>): Regre
 }
 
 /**
- * Determines segment type based on slope
+ * Determines segment type based on average grade percentage
  */
-function getSegmentType(slope: number): 'asc' | 'desc' | 'hor' {
-  // Convert slope to percentage for easier interpretation
-  const slopePercent = slope * 100;
-  
-  if (slopePercent > 2) return 'asc';
-  if (slopePercent < -2) return 'desc';
+function getSegmentType(avgGrade: number): 'asc' | 'desc' | 'hor' {
+  if (avgGrade > 2) return 'asc';
+  if (avgGrade < -2) return 'desc';
   return 'hor';
 }
 
 /**
- * Advanced segmentation using growing window algorithm with R² quality control
+ * Finds significant local extrema (peaks and valleys) in the elevation profile.
+ * An extremum is considered significant if it has enough prominence and is far enough
+ * from the last significant one.
+ */
+function findSignificantExtrema(
+  elevationData: ElevationPoint[],
+  params: { minProminence: number; minDistance: number }
+): number[] {
+  if (elevationData.length < 3) {
+    const indices = [0, elevationData.length - 1];
+    return [...new Set(indices)].filter(i => i < elevationData.length).sort((a, b) => a - b);
+  }
+
+  const localExtremaIndices: number[] = [];
+  // Find all local maxima and minima
+  for (let i = 1; i < elevationData.length - 1; i++) {
+    const prev = elevationData[i - 1].displayElevation;
+    const curr = elevationData[i].displayElevation;
+    const next = elevationData[i + 1].displayElevation;
+    if ((curr > prev && curr >= next) || (curr < prev && curr <= next)) {
+      if (localExtremaIndices.length === 0 || elevationData[localExtremaIndices[localExtremaIndices.length - 1]].displayElevation !== curr) {
+        localExtremaIndices.push(i);
+      }
+    }
+  }
+
+  if (localExtremaIndices.length === 0) {
+    const indices = [0, elevationData.length - 1];
+    return [...new Set(indices)].filter(i => i < elevationData.length).sort((a, b) => a - b);
+  }
+
+  const significantExtremaIndices: number[] = [0];
+  let lastSignificantIndex = 0;
+
+  for (const currentIndex of localExtremaIndices) {
+    const lastSignificantPoint = elevationData[lastSignificantIndex];
+    const currentPoint = elevationData[currentIndex];
+    
+    const elevationDiff = Math.abs(currentPoint.displayElevation - lastSignificantPoint.displayElevation);
+    const distanceDiff = currentPoint.displayDistance - lastSignificantPoint.displayDistance;
+
+    if (elevationDiff >= params.minProminence && distanceDiff >= params.minDistance) {
+      significantExtremaIndices.push(currentIndex);
+      lastSignificantIndex = currentIndex;
+    }
+  }
+
+  // Ensure the last point of the route is always included as the end of the last segment.
+  if (lastSignificantIndex !== elevationData.length - 1) {
+    significantExtremaIndices.push(elevationData.length - 1);
+  }
+
+  // Remove duplicates and sort
+  return [...new Set(significantExtremaIndices)].sort((a, b) => a - b);
+}
+
+/**
+ * Advanced segmentation based on finding significant topological features (peaks/valleys).
  */
 export function segmentProfileAdvanced(
   elevationData: ElevationPoint[], 
   params: AdvancedSegmentationParams
 ): AdvancedSegment[] {
   
-  if (!elevationData || elevationData.length < params.minSegmentPoints) {
-    console.log('Not enough data points for segmentation');
+  if (!elevationData || elevationData.length < 2) {
     return [];
   }
 
-  console.log('Starting advanced segmentation with params:', params);
-  console.log('Input data points:', elevationData.length);
+  console.log('Starting TOPOGRAPHICAL advanced segmentation with params:', params);
 
+  const keyPointsIndices = findSignificantExtrema(elevationData, {
+    minProminence: params.minProminence,
+    minDistance: params.minSegmentDistance,
+  });
+
+  console.log('Found', keyPointsIndices.length, 'key points for macro-segments:', keyPointsIndices);
+  
   const finalSegments: AdvancedSegment[] = [];
-  let currentSegmentStartIndex = 0;
 
-  for (let i = 2; i < elevationData.length; i++) {
-    const segmentPoints = elevationData.slice(currentSegmentStartIndex, i + 1);
+  for (let i = 0; i < keyPointsIndices.length - 1; i++) {
+    const startIndex = keyPointsIndices[i];
+    const endIndex = keyPointsIndices[i + 1];
+
+    if (startIndex >= endIndex) continue;
+
+    const startPoint = elevationData[startIndex];
+    const endPoint = elevationData[endIndex];
     
-    const regressionPoints = segmentPoints
-      .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
-      .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+    const distance = endPoint.displayDistance - startPoint.displayDistance;
+    if (distance <= 0.01) continue; // Ignore very short/zero-distance segments
 
-    if (regressionPoints.length < 2) continue;
-
-    const regression = calculateLinearRegression(regressionPoints);
-    const isQualityPoor = regression.rSquared < params.rSquaredThreshold;
-
-    // A segment cut is considered if the regression quality drops.
-    if (isQualityPoor) {
-      // The segment to finalize is the one *before* the current point `i`.
-      const finalSegmentPoints = elevationData.slice(currentSegmentStartIndex, i);
-      const finalSegmentDistance = elevationData[i - 1].displayDistance - elevationData[currentSegmentStartIndex].displayDistance;
-
-      // Per user feedback, we prioritize distance to define a meaningful segment.
-      if (finalSegmentDistance >= params.minSegmentDistance) {
-        
-        const finalRegressionPoints = finalSegmentPoints
-          .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
-          .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-        
-        // A final quality gate ensures the segment has enough points for a reliable calculation.
-        if (finalRegressionPoints.length >= params.minSegmentPoints) {
-          const finalRegression = calculateLinearRegression(finalRegressionPoints);
-          const segmentType = getSegmentType(finalRegression.slope);
-          
-          const startElevation = finalSegmentPoints[0].displayElevation;
-          const endElevation = finalSegmentPoints[finalSegmentPoints.length - 1].displayElevation;
-          const elevationChange = endElevation - startElevation;
-          
-          const segment: AdvancedSegment = {
-            startIndex: currentSegmentStartIndex,
-            endIndex: i - 1,
-            startPoint: elevationData[currentSegmentStartIndex],
-            endPoint: elevationData[i - 1],
-            slope: finalRegression.slope,
-            intercept: finalRegression.intercept,
-            rSquared: finalRegression.rSquared,
-            distance: finalSegmentDistance,
-            elevationGain: elevationChange > 0 ? elevationChange : 0,
-            elevationLoss: elevationChange < 0 ? Math.abs(elevationChange) : 0,
-            type: segmentType,
-            color: SEGMENT_COLORS[segmentType]
-          };
-          
-          finalSegments.push(segment);
-          
-          // Start the new segment from the point that broke the old trend.
-          // This creates an overlap, ensuring continuous segmentation.
-          currentSegmentStartIndex = i - 1;
-        }
-        // If not enough points, we don't cut and let the window grow.
-      }
-      // If not enough distance, we don't cut and let the window grow.
-    }
-  }
-
-  // Handle the last segment
-  if (currentSegmentStartIndex < elevationData.length - 1) {
-    const lastSegmentPoints = elevationData.slice(currentSegmentStartIndex);
-    const lastSegmentDistance = lastSegmentPoints[lastSegmentPoints.length - 1].displayDistance - lastSegmentPoints[0].displayDistance;
-
-    // The last segment must also meet the minimum criteria to be considered valid.
-    if (lastSegmentPoints.length >= params.minSegmentPoints && lastSegmentDistance >= params.minSegmentDistance) {
-      const lastRegressionPoints = lastSegmentPoints
-        .filter(p => p.displayElevation !== null && p.displayElevation !== undefined)
-        .map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-
-      if (lastRegressionPoints.length >= params.minSegmentPoints) {
-        const lastRegression = calculateLinearRegression(lastRegressionPoints);
-        const segmentType = getSegmentType(lastRegression.slope);
-        
-        const startElevation = lastSegmentPoints[0].displayElevation;
-        const endElevation = lastSegmentPoints[lastSegmentPoints.length - 1].displayElevation;
-        const elevationChange = endElevation - startElevation;
-        
-        const segment: AdvancedSegment = {
-          startIndex: currentSegmentStartIndex,
-          endIndex: elevationData.length - 1,
-          startPoint: elevationData[currentSegmentStartIndex],
-          endPoint: elevationData[elevationData.length - 1],
-          slope: lastRegression.slope,
-          intercept: lastRegression.intercept,
-          rSquared: lastRegression.rSquared,
-          distance: elevationData[elevationData.length - 1].displayDistance - elevationData[currentSegmentStartIndex].displayDistance,
-          elevationGain: elevationChange > 0 ? elevationChange : 0,
-          elevationLoss: elevationChange < 0 ? Math.abs(elevationChange) : 0,
-          type: segmentType,
-          color: SEGMENT_COLORS[segmentType]
-        };
-        
-        finalSegments.push(segment);
-      }
-    }
+    const elevationChange = endPoint.displayElevation - startPoint.displayElevation;
+    const avgGrade = (elevationChange / (distance * 1000)) * 100;
+    const segmentType = getSegmentType(avgGrade);
+    
+    const segment: AdvancedSegment = {
+      startIndex,
+      endIndex,
+      startPoint,
+      endPoint,
+      distance,
+      elevationGain: elevationChange > 0 ? elevationChange : 0,
+      elevationLoss: elevationChange < 0 ? Math.abs(elevationChange) : 0,
+      avgGrade,
+      type: segmentType,
+      color: SEGMENT_COLORS[segmentType],
+    };
+    
+    finalSegments.push(segment);
   }
 
   console.log('Generated', finalSegments.length, 'advanced segments');
-  if (finalSegments.length > 0) {
-    const avgR = finalSegments.reduce((acc, s) => acc + s.rSquared, 0) / finalSegments.length;
-    if (!isNaN(avgR)) {
-      console.log('Average R²:', avgR);
-    }
-  }
-  
   return finalSegments;
 }
 
 /**
- * Default advanced segmentation parameters
+ * Default advanced segmentation parameters based on topological features.
  */
 export const DEFAULT_ADVANCED_SEGMENTATION_PARAMS: AdvancedSegmentationParams = {
-  rSquaredThreshold: 0.92,
-  minSegmentPoints: 20,
-  minSegmentDistance: 0.3 // km
+  minProminence: 25, // meters
+  minSegmentDistance: 0.5, // km
 };
 
 /**

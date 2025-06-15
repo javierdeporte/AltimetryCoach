@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
@@ -15,9 +14,10 @@ interface AdvancedSegment {
   endIndex: number;
   startPoint: { distance: number; elevation: number; displayDistance: number; displayElevation: number };
   endPoint: { distance: number; elevation: number; displayDistance: number; displayElevation: number };
-  slope: number;
-  intercept: number;
-  rSquared: number;
+  avgGrade: number;
+  distance: number;
+  elevationGain: number;
+  elevationLoss: number;
   type: 'asc' | 'desc' | 'hor';
   color: string;
 }
@@ -43,21 +43,14 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
   const displaySegments = React.useMemo(() => {
     if (isAdvancedMode && advancedSegments.length > 0) {
       return advancedSegments.map((advSeg, index) => {
-        const distance = advSeg.endPoint.displayDistance - advSeg.startPoint.displayDistance;
-        const elevationGain = Math.max(0, advSeg.endPoint.displayElevation - advSeg.startPoint.displayElevation);
-        const elevationLoss = Math.max(0, advSeg.startPoint.displayElevation - advSeg.endPoint.displayElevation);
-        
-        // Calculate grade from slope (slope is already in percentage terms)
-        const gradePercent = advSeg.slope * 100;
-        
         return {
           id: `advanced-${index}`,
           segment_index: index,
-          distance_km: distance,
-          elevation_gain_m: elevationGain,
-          elevation_loss_m: elevationLoss,
-          avg_grade_percent: gradePercent,
-          rSquared: advSeg.rSquared,
+          distance_km: advSeg.distance,
+          elevation_gain_m: advSeg.elevationGain,
+          elevation_loss_m: advSeg.elevationLoss,
+          avg_grade_percent: advSeg.avgGrade,
+          rSquared: null, // rSquared is no longer available
           type: advSeg.type
         };
       });
@@ -108,32 +101,9 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
     return Math.round(segment.distance_km * 5);
   }
 
+  // This function is no longer needed as rSquared is gone.
   const getQualityIndicator = (rSquared: number | null) => {
-    if (rSquared === null) return null;
-    
-    const quality = rSquared * 100;
-    let colorClass = 'text-red-500';
-    let label = 'Baja';
-    
-    if (quality >= 95) {
-      colorClass = 'text-green-600';
-      label = 'Excelente';
-    } else if (quality >= 90) {
-      colorClass = 'text-primary-600';
-      label = 'Muy Buena';
-    } else if (quality >= 85) {
-      colorClass = 'text-yellow-600';
-      label = 'Buena';
-    } else if (quality >= 80) {
-      colorClass = 'text-orange-600';
-      label = 'Regular';
-    }
-    
-    return (
-      <span className={`text-xs ${colorClass} font-medium`} title={`R² = ${rSquared.toFixed(3)}`}>
-        {label}
-      </span>
-    );
+    return null;
   };
 
   return (
@@ -145,23 +115,17 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
               Análisis de Segmentos de Ruta
               {isAdvancedMode && (
                 <span className="ml-2 text-sm bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">
-                  Modo Avanzado
+                  Modo Topográfico
                 </span>
               )}
             </h3>
             <p className="text-sm text-mountain-600 dark:text-mountain-400 mt-1">
               {displaySegments.length > 0 
-                ? `${displaySegments.length} segmentos ${isAdvancedMode ? 'generados por regresión lineal' : 'básicos'}` 
+                ? `${displaySegments.length} segmentos ${isAdvancedMode ? 'generados por topografía' : 'básicos'}` 
                 : 'Los segmentos se generarán automáticamente al procesar el archivo GPX'
               }
             </p>
           </div>
-          {isAdvancedMode && advancedSegments.length > 0 && (
-            <div className="text-right text-sm text-mountain-600 dark:text-mountain-400">
-              <div>R² Promedio: {(advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length).toFixed(3)}</div>
-              <div>Calidad: {Math.round((advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length) * 100)}%</div>
-            </div>
-          )}
         </div>
       </div>
       
@@ -189,9 +153,6 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
                 <TableHead className="text-mountain-700 dark:text-mountain-300">Ganancia</TableHead>
                 <TableHead className="text-mountain-700 dark:text-mountain-300">Pérdida</TableHead>
                 <TableHead className="text-mountain-700 dark:text-mountain-300">Gradiente Promedio</TableHead>
-                {isAdvancedMode && (
-                  <TableHead className="text-mountain-700 dark:text-mountain-300">Calidad</TableHead>
-                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -232,11 +193,6 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
                   <TableCell className={getGradeColor(segment.avg_grade_percent)}>
                     {segment.avg_grade_percent > 0 ? '+' : ''}{segment.avg_grade_percent.toFixed(1)}%
                   </TableCell>
-                  {isAdvancedMode && (
-                    <TableCell>
-                      {getQualityIndicator(segment.rSquared)}
-                    </TableCell>
-                  )}
                 </TableRow>
               ))}
             </TableBody>
