@@ -61,7 +61,7 @@ const RouteDetail = () => {
       return { segments: [], macroBoundaries: [] };
     }
     
-    console.log('Calculating simplified segments with params:', advancedParams);
+    console.log('Calculating advanced segments with params:', advancedParams);
     return segmentProfileAdvanced(processedElevationData, advancedParams);
   }, [advancedAnalysisMode, processedElevationData, advancedParams]);
 
@@ -88,6 +88,9 @@ const RouteDetail = () => {
     const totalDistance = advancedSegments.reduce((sum, s) => sum + s.distance, 0);
     const avgSegmentDistance = totalDistance / advancedSegments.length;
     
+    const avgRSquared = advancedSegments
+      .reduce((sum, s) => sum + s.rSquared, 0) / advancedSegments.length;
+    
     return {
       totalSegments: advancedSegments.length,
       ascentSegments: advancedSegments.filter(s => s.type === 'asc').length,
@@ -96,6 +99,8 @@ const RouteDetail = () => {
       totalAscent: Math.round(totalAscent),
       totalDescent: Math.round(totalDescent),
       avgSegmentDistance: isNaN(avgSegmentDistance) ? '0.0' : avgSegmentDistance.toFixed(1),
+      avgRSquared: isNaN(avgRSquared) ? '0.000' : avgRSquared.toFixed(3),
+      qualityRating: avgRSquared >= 0.95 ? 'Excelente' : avgRSquared >= 0.90 ? 'Bueno' : avgRSquared >= 0.85 ? 'Regular' : 'Bajo'
     };
   }, [advancedSegments]);
 
