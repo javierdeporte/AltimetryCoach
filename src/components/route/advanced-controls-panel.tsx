@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
@@ -91,6 +92,14 @@ export const AdvancedControlsPanel: React.FC<AdvancedControlsPanelProps> = ({
             onValueChange={(val) => setParams(p => ({...p, microMinDistance: val}))}
             min={0.05} max={0.5} step={0.05}
             formatValue={(val) => `${val.toFixed(2)} km`}
+          />
+          <ParamSlider 
+            label="Puntos Mínimos"
+            description="Número mínimo de puntos de datos por segmento. Evita segmentos con datos de GPS escasos."
+            value={params.minSegmentPoints}
+            onValueChange={(val) => setParams(p => ({...p, minSegmentPoints: val}))}
+            min={5} max={50} step={1}
+            formatValue={(val) => `${val}`}
           />
         </div>
 

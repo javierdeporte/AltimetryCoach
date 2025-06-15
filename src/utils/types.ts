@@ -33,6 +33,7 @@ export interface AdvancedSegmentationResult {
 }
 
 export interface AdvancedSegmentationParams {
+  minSegmentPoints: number;
   microMinDistance: number; // in km
   macroProminence: number; // in meters
   slopeChangeThreshold: number; // as a slope value (e.g., 0.1 for 10%)
