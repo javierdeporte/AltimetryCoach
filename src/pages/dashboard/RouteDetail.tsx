@@ -62,14 +62,7 @@ const RouteDetail = () => {
     }
     
     console.log('Calculating enhanced segments with params:', advancedParams);
-    const segments = segmentProfileAdvanced(processedElevationData, advancedParams);
-    console.log('Generated segments:', segments.map(s => ({
-      startDistance: s.startPoint.displayDistance,
-      endDistance: s.endPoint.displayDistance,
-      type: s.type,
-      rSquared: s.rSquared
-    })));
-    return segments;
+    return segmentProfileAdvanced(processedElevationData, advancedParams);
   }, [advancedAnalysisMode, processedElevationData, advancedParams]);
 
   // Calculate slope changes and inflection points for visualization
@@ -530,8 +523,8 @@ const RouteDetail = () => {
                       ...prev,
                       minSegmentPoints: value[0]
                     }))}
-                    min={5}
-                    max={30}
+                    min={10}
+                    max={50}
                     step={1}
                     className="w-full"
                   />

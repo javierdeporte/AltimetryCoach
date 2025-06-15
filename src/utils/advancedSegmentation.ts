@@ -413,7 +413,7 @@ export function segmentProfileAdvanced(
  */
 export const DEFAULT_ADVANCED_SEGMENTATION_PARAMS: AdvancedSegmentationParams = {
   rSquaredThreshold: 0.92,
-  minSegmentPoints: 10, // Reduced from 20 to 10 to be less restrictive
+  minSegmentPoints: 20,
   minSegmentDistance: 0.3, // km - sports relevance filter
   slopeChangeThreshold: 4.0, // percentage change that triggers a cut
   inflectionSensitivity: 2.0, // meters of elevation difference
