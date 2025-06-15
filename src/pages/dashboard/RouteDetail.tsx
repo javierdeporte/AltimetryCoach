@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
 import { ElevationChartD3 } from '../../components/route/elevation-chart-d3';
@@ -6,10 +6,14 @@ import { IntelligentSegmentationModal } from '../../components/route/intelligent
 import { SegmentsTable } from '../../components/route/segments-table';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff } from 'lucide-react';
+import { Slider } from '../../components/ui/slider';
+import { Switch } from '../../components/ui/switch';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '../../components/ui/sheet';
+import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
+import { performAdvancedSegmentation } from '../../utils/advancedSegmentation';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -17,6 +21,15 @@ const RouteDetail = () => {
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   const [showIntelligentSegmentation, setShowIntelligentSegmentation] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  
+  // Advanced analysis state
+  const [advancedAnalysisMode, setAdvancedAnalysisMode] = useState(false);
+  const [advancedParams, setAdvancedParams] = useState({
+    rSquaredThreshold: 0.92,
+    minSegmentPoints: 20,
+    minSegmentDistance: 0.5
+  });
+  const [showAdvancedControls, setShowAdvancedControls] = useState(false);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -49,6 +62,32 @@ const RouteDetail = () => {
     }));
   }, [elevationData]);
 
+  // Calculate advanced segments in real-time when mode is active
+  const advancedSegments = useMemo(() => {
+    if (!advancedAnalysisMode || processedElevationData.length === 0) {
+      return [];
+    }
+    
+    console.log('Calculating advanced segments with params:', advancedParams);
+    return performAdvancedSegmentation(processedElevationData, advancedParams);
+  }, [advancedAnalysisMode, processedElevationData, advancedParams]);
+
+  // Calculate advanced segments statistics
+  const advancedStats = useMemo(() => {
+    if (advancedSegments.length === 0) {
+      return { avgRSquared: 0, totalSegments: 0, qualityScore: 0 };
+    }
+    
+    const avgRSquared = advancedSegments.reduce((acc, seg) => acc + seg.rSquared, 0) / advancedSegments.length;
+    const qualityScore = Math.min(100, Math.round(avgRSquared * 100));
+    
+    return {
+      avgRSquared,
+      totalSegments: advancedSegments.length,
+      qualityScore
+    };
+  }, [advancedSegments]);
+
   const handleBackToRoutes = () => {
     navigate('/dashboard/routes');
   };
@@ -57,17 +96,19 @@ const RouteDetail = () => {
     return new Date(dateString).toLocaleDateString('es-ES');
   };
 
-  const formatGPXCaptureDate = (route: any) => {
-    if (route.gpx_capture_date) {
-      return `GPX: ${formatDate(route.gpx_capture_date)}`;
-    }
-    return `Subida: ${formatDate(route.created_at)}`;
+  const resetAdvancedParams = () => {
+    setAdvancedParams({
+      rSquaredThreshold: 0.92,
+      minSegmentPoints: 20,
+      minSegmentDistance: 0.5
+    });
   };
 
-  const handleSaveIntelligentSegments = (intelligentSegments: any[]) => {
-    console.log('Saving intelligent segments:', intelligentSegments);
-    // TODO: Implement saving to database
-    // This would typically involve creating a new table or updating the existing segments
+  const handleAdvancedModeToggle = (enabled: boolean) => {
+    setAdvancedAnalysisMode(enabled);
+    if (enabled) {
+      setShowAdvancedControls(true);
+    }
   };
 
   if (isLoading) {
@@ -146,6 +187,11 @@ const RouteDetail = () => {
             <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200">
               {route.name}
             </h1>
+            {advancedAnalysisMode && (
+              <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                Análisis Avanzado Activo
+              </Badge>
+            )}
           </div>
           
           {/* Route type and date info */}
@@ -193,14 +239,132 @@ const RouteDetail = () => {
         </div>
         
         <div className="flex gap-3">
-          <Button 
-            onClick={() => setShowIntelligentSegmentation(true)}
-            variant="outline" 
-            className="border-primary-300 text-primary-600 hover:bg-primary-50"
-          >
-            <Brain className="w-4 h-4 mr-2" />
-            Análisis Avanzado
-          </Button>
+          {/* Advanced Analysis Toggle */}
+          <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg px-3 py-2">
+            <Brain className="w-4 h-4 text-primary-600" />
+            <span className="text-sm font-medium">Análisis Avanzado</span>
+            <Switch
+              checked={advancedAnalysisMode}
+              onCheckedChange={handleAdvancedModeToggle}
+            />
+          </div>
+          
+          {/* Advanced Controls Sheet */}
+          {advancedAnalysisMode && (
+            <Sheet open={showAdvancedControls} onOpenChange={setShowAdvancedControls}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="border-primary-300 text-primary-600 hover:bg-primary-50">
+                  <Sliders className="w-4 h-4 mr-2" />
+                  Controles
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-96">
+                <SheetHeader>
+                  <SheetTitle>Controles de Análisis Avanzado</SheetTitle>
+                  <SheetDescription>
+                    Ajusta los parámetros para optimizar la segmentación por regresión
+                  </SheetDescription>
+                </SheetHeader>
+                
+                <div className="space-y-6 mt-6">
+                  {/* Real-time Statistics */}
+                  <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-4">
+                    <h4 className="font-semibold text-primary-800 dark:text-primary-200 mb-2">
+                      Estadísticas en Tiempo Real
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-mountain-600 dark:text-mountain-400">Segmentos:</span>
+                        <div className="font-bold text-primary-600">{advancedStats.totalSegments}</div>
+                      </div>
+                      <div>
+                        <span className="text-mountain-600 dark:text-mountain-400">R² Promedio:</span>
+                        <div className="font-bold text-primary-600">{advancedStats.avgRSquared.toFixed(3)}</div>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-mountain-600 dark:text-mountain-400">Calidad Global:</span>
+                        <div className="font-bold text-lg text-primary-600">{advancedStats.qualityScore}%</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Parameter Controls */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                        R² Threshold: {advancedParams.rSquaredThreshold.toFixed(3)}
+                      </label>
+                      <p className="text-xs text-mountain-500 mb-2">
+                        Calidad mínima de cada segmento (mayor = más preciso)
+                      </p>
+                      <Slider
+                        value={[advancedParams.rSquaredThreshold]}
+                        onValueChange={(value) => setAdvancedParams(prev => ({
+                          ...prev,
+                          rSquaredThreshold: value[0]
+                        }))}
+                        min={0.7}
+                        max={0.99}
+                        step={0.01}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                        Puntos Mínimos: {advancedParams.minSegmentPoints}
+                      </label>
+                      <p className="text-xs text-mountain-500 mb-2">
+                        Número mínimo de puntos por segmento
+                      </p>
+                      <Slider
+                        value={[advancedParams.minSegmentPoints]}
+                        onValueChange={(value) => setAdvancedParams(prev => ({
+                          ...prev,
+                          minSegmentPoints: value[0]
+                        }))}
+                        min={10}
+                        max={50}
+                        step={1}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                        Distancia Mínima: {advancedParams.minSegmentDistance.toFixed(1)} km
+                      </label>
+                      <p className="text-xs text-mountain-500 mb-2">
+                        Longitud mínima de cada segmento
+                      </p>
+                      <Slider
+                        value={[advancedParams.minSegmentDistance]}
+                        onValueChange={(value) => setAdvancedParams(prev => ({
+                          ...prev,
+                          minSegmentDistance: value[0]
+                        }))}
+                        min={0.1}
+                        max={2.0}
+                        step={0.1}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Reset Button */}
+                  <Button 
+                    onClick={resetAdvancedParams}
+                    variant="outline" 
+                    className="w-full"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Restaurar Defaults
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
+          
           <Button 
             onClick={() => setShowMap(!showMap)}
             variant="outline" 
@@ -265,12 +429,15 @@ const RouteDetail = () => {
             height: 400,
             backgroundColor: 'transparent'
           }}
+          advancedSegments={advancedSegments}
         />
       </div>
 
       {/* Segments Table */}
       <SegmentsTable 
         segments={segments}
+        advancedSegments={advancedSegments}
+        isAdvancedMode={advancedAnalysisMode}
         onSegmentHover={setHoveredSegment}
         hoveredSegment={hoveredSegment}
       />
