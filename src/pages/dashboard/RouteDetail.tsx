@@ -7,11 +7,11 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Slider } from '../../components/ui/slider';
 import { Switch } from '../../components/ui/switch';
-import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft, TrendingUp } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
-import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS } from '../../utils/advancedSegmentation';
+import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS, detectSlopeChanges, detectInflectionPoints } from '../../utils/advancedSegmentation';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -61,25 +61,63 @@ const RouteDetail = () => {
       return [];
     }
     
-    console.log('Calculating advanced segments with params:', advancedParams);
-    return segmentProfileAdvanced(processedElevationData, advancedParams);
+    console.log('Calculating enhanced segments with params:', advancedParams);
+    const segments = segmentProfileAdvanced(processedElevationData, advancedParams);
+    console.log('Generated segments:', segments.map(s => ({
+      startDistance: s.startPoint.displayDistance,
+      endDistance: s.endPoint.displayDistance,
+      type: s.type,
+      rSquared: s.rSquared
+    })));
+    return segments;
   }, [advancedAnalysisMode, processedElevationData, advancedParams]);
 
-  // Calculate advanced segments statistics
+  // Calculate slope changes and inflection points for visualization
+  const analysisData = useMemo(() => {
+    if (!advancedAnalysisMode || processedElevationData.length === 0) {
+      return { slopeChanges: [], inflectionPoints: [] };
+    }
+    
+    const slopeChanges = detectSlopeChanges(processedElevationData, 10, advancedParams.slopeChangeThreshold);
+    const inflectionPoints = advancedParams.detectInflectionPoints 
+      ? detectInflectionPoints(processedElevationData, advancedParams.inflectionSensitivity)
+      : [];
+      
+    return { slopeChanges, inflectionPoints };
+  }, [advancedAnalysisMode, processedElevationData, advancedParams]);
+
+  // Calculate enhanced statistics
   const advancedStats = useMemo(() => {
     if (advancedSegments.length === 0) {
-      return { avgRSquared: 0, totalSegments: 0, qualityScore: 0 };
+      return { 
+        avgRSquared: 0, 
+        totalSegments: 0, 
+        qualityScore: 0,
+        slopeChanges: 0,
+        inflectionPoints: 0,
+        cutReasons: {}
+      };
     }
     
     const avgRSquared = advancedSegments.reduce((acc, seg) => acc + seg.rSquared, 0) / advancedSegments.length;
     const qualityScore = Math.min(100, Math.round(avgRSquared * 100));
     
+    // Count cut reasons
+    const cutReasons = advancedSegments.reduce((acc, seg) => {
+      const reason = seg.cutReason || 'Unknown';
+      acc[reason] = (acc[reason] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
     return {
       avgRSquared,
       totalSegments: advancedSegments.length,
-      qualityScore
+      qualityScore,
+      slopeChanges: analysisData.slopeChanges.length,
+      inflectionPoints: analysisData.inflectionPoints.length,
+      cutReasons
     };
-  }, [advancedSegments]);
+  }, [advancedSegments, analysisData]);
 
   const handleBackToRoutes = () => {
     navigate('/dashboard/routes');
@@ -180,7 +218,7 @@ const RouteDetail = () => {
                 </h1>
                 {advancedAnalysisMode && (
                   <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                    Análisis Avanzado Activo
+                    Análisis Multi-Criterio Activo
                   </Badge>
                 )}
               </div>
@@ -233,7 +271,7 @@ const RouteDetail = () => {
               {/* Advanced Analysis Toggle */}
               <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg px-3 py-2">
                 <Brain className="w-4 h-4 text-primary-600" />
-                <span className="text-sm font-medium">Análisis Avanzado</span>
+                <span className="text-sm font-medium">Análisis Multi-Criterio</span>
                 <Switch
                   checked={advancedAnalysisMode}
                   onCheckedChange={handleAdvancedModeToggle}
@@ -272,7 +310,7 @@ const RouteDetail = () => {
             </div>
           </div>
 
-          {/* Stats Grid */}
+          {/* Enhanced Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
               <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
@@ -321,7 +359,7 @@ const RouteDetail = () => {
             />
           </div>
 
-          {/* Segments Table */}
+          {/* Enhanced Segments Table */}
           <SegmentsTable 
             segments={segments}
             advancedSegments={advancedSegments}
@@ -348,13 +386,13 @@ const RouteDetail = () => {
         </div>
       </div>
 
-      {/* Advanced Controls Sidebar */}
+      {/* Enhanced Advanced Controls Sidebar */}
       {showAdvancedControls && advancedAnalysisMode && (
         <div className="fixed right-0 top-0 h-full w-80 bg-white dark:bg-mountain-800 border-l border-primary-200 dark:border-mountain-700 shadow-lg z-50">
           <div className="p-6 h-full overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-                Controles Avanzados
+                Controles Multi-Criterio
               </h3>
               <Button 
                 onClick={() => setShowAdvancedControls(false)}
@@ -366,12 +404,12 @@ const RouteDetail = () => {
             </div>
             
             <div className="space-y-6">
-              {/* Real-time Statistics */}
+              {/* Enhanced Real-time Statistics */}
               <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-4">
                 <h4 className="font-semibold text-primary-800 dark:text-primary-200 mb-3">
-                  Estadísticas en Tiempo Real
+                  Estadísticas de Análisis
                 </h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                   <div>
                     <span className="text-mountain-600 dark:text-mountain-400">Segmentos:</span>
                     <div className="font-bold text-primary-600">{advancedStats.totalSegments}</div>
@@ -380,27 +418,51 @@ const RouteDetail = () => {
                     <span className="text-mountain-600 dark:text-mountain-400">R² Promedio:</span>
                     <div className="font-bold text-primary-600">{advancedStats.avgRSquared.toFixed(3)}</div>
                   </div>
-                  <div className="col-span-2">
-                    <span className="text-mountain-600 dark:text-mountain-400">Calidad Global:</span>
-                    <div className="font-bold text-lg text-primary-600">{advancedStats.qualityScore}%</div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                      <div 
-                        className="bg-primary-600 h-2 rounded-full transition-all duration-300" 
-                        style={{ width: `${advancedStats.qualityScore}%` }}
-                      ></div>
+                  <div>
+                    <span className="text-mountain-600 dark:text-mountain-400">Cambios Pendiente:</span>
+                    <div className="font-bold text-orange-600">{advancedStats.slopeChanges}</div>
+                  </div>
+                  <div>
+                    <span className="text-mountain-600 dark:text-mountain-400">Puntos Inflexión:</span>
+                    <div className="font-bold text-blue-600">{advancedStats.inflectionPoints}</div>
+                  </div>
+                </div>
+                
+                {/* Cut Reasons Summary */}
+                {Object.keys(advancedStats.cutReasons).length > 0 && (
+                  <div className="mt-4">
+                    <span className="text-xs font-medium text-mountain-600 dark:text-mountain-400">Razones de Corte:</span>
+                    <div className="mt-2 space-y-1">
+                      {Object.entries(advancedStats.cutReasons).map(([reason, count]) => (
+                        <div key={reason} className="text-xs flex justify-between">
+                          <span className="text-mountain-600 dark:text-mountain-400">{reason}:</span>
+                          <span className="font-medium">{count}</span>
+                        </div>
+                      ))}
                     </div>
+                  </div>
+                )}
+                
+                <div className="mt-4">
+                  <span className="text-mountain-600 dark:text-mountain-400">Relevancia Deportiva:</span>
+                  <div className="font-bold text-lg text-primary-600">{advancedStats.qualityScore}%</div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                    <div 
+                      className="bg-primary-600 h-2 rounded-full transition-all duration-300" 
+                      style={{ width: `${advancedStats.qualityScore}%` }}
+                    ></div>
                   </div>
                 </div>
               </div>
 
-              {/* Parameter Controls */}
+              {/* Enhanced Parameter Controls */}
               <div className="space-y-6">
                 <div>
                   <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
                     R² Threshold: {advancedParams.rSquaredThreshold.toFixed(3)}
                   </label>
                   <p className="text-xs text-mountain-500 mb-3">
-                    Calidad mínima de cada segmento (mayor = más preciso)
+                    Calidad mínima de ajuste lineal
                   </p>
                   <Slider
                     value={[advancedParams.rSquaredThreshold]}
@@ -411,6 +473,46 @@ const RouteDetail = () => {
                     min={0.7}
                     max={0.99}
                     step={0.01}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
+                    Sensibilidad a Cambios: {advancedParams.slopeChangeThreshold.toFixed(1)}%
+                  </label>
+                  <p className="text-xs text-mountain-500 mb-3">
+                    Cambio de pendiente que dispara un corte
+                  </p>
+                  <Slider
+                    value={[advancedParams.slopeChangeThreshold]}
+                    onValueChange={(value) => setAdvancedParams(prev => ({
+                      ...prev,
+                      slopeChangeThreshold: value[0]
+                    }))}
+                    min={1.0}
+                    max={15.0}
+                    step={0.5}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
+                    Sensibilidad Inflexión: {advancedParams.inflectionSensitivity.toFixed(1)}m
+                  </label>
+                  <p className="text-xs text-mountain-500 mb-3">
+                    Diferencia de elevación para detectar picos/valles
+                  </p>
+                  <Slider
+                    value={[advancedParams.inflectionSensitivity]}
+                    onValueChange={(value) => setAdvancedParams(prev => ({
+                      ...prev,
+                      inflectionSensitivity: value[0]
+                    }))}
+                    min={0.5}
+                    max={5.0}
+                    step={0.1}
                     className="w-full"
                   />
                 </div>
@@ -428,8 +530,8 @@ const RouteDetail = () => {
                       ...prev,
                       minSegmentPoints: value[0]
                     }))}
-                    min={10}
-                    max={50}
+                    min={5}
+                    max={30}
                     step={1}
                     className="w-full"
                   />
@@ -440,7 +542,7 @@ const RouteDetail = () => {
                     Distancia Mínima: {advancedParams.minSegmentDistance.toFixed(1)} km
                   </label>
                   <p className="text-xs text-mountain-500 mb-3">
-                    Longitud mínima de cada segmento
+                    Longitud mínima deportivamente relevante
                   </p>
                   <Slider
                     value={[advancedParams.minSegmentDistance]}
@@ -452,6 +554,25 @@ const RouteDetail = () => {
                     max={2.0}
                     step={0.1}
                     className="w-full"
+                  />
+                </div>
+
+                {/* Inflection Points Toggle */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-mountain-700 rounded-lg">
+                  <div>
+                    <span className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                      Detectar Puntos de Inflexión
+                    </span>
+                    <p className="text-xs text-mountain-500">
+                      Identifica picos, valles y cambios de dirección
+                    </p>
+                  </div>
+                  <Switch
+                    checked={advancedParams.detectInflectionPoints}
+                    onCheckedChange={(checked) => setAdvancedParams(prev => ({
+                      ...prev,
+                      detectInflectionPoints: checked
+                    }))}
                   />
                 </div>
               </div>
@@ -466,16 +587,28 @@ const RouteDetail = () => {
                 Restaurar Defaults
               </Button>
 
-              {/* Quality Interpretation Guide */}
+              {/* Enhanced Interpretation Guide */}
               <div className="bg-gray-50 dark:bg-mountain-700 rounded-lg p-4">
                 <h5 className="font-medium text-mountain-700 dark:text-mountain-300 mb-2">
-                  Guía de Interpretación
+                  Guía de Criterios
                 </h5>
                 <div className="text-xs text-mountain-600 dark:text-mountain-400 space-y-1">
-                  <div>• R² &gt; 0.95: Excelente ajuste</div>
-                  <div>• R² &gt; 0.90: Muy buen ajuste</div>
-                  <div>• R² &gt; 0.85: Buen ajuste</div>
-                  <div>• R² &lt; 0.85: Posible sobreajuste</div>
+                  <div>• <strong>R² &gt; 0.95:</strong> Excelente ajuste lineal</div>
+                  <div>• <strong>Cambio &gt; 5%:</strong> Pendiente significativa</div>
+                  <div>• <strong>Distancia &gt; 0.3km:</strong> Relevante para carrera</div>
+                  <div>• <strong>Inflexión:</strong> Picos/valles detectados</div>
+                </div>
+                
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-mountain-600">
+                  <span className="text-xs font-medium text-mountain-700 dark:text-mountain-300">
+                    Prioridad de Corte:
+                  </span>
+                  <div className="text-xs text-mountain-600 dark:text-mountain-400 mt-1">
+                    1. Distancia mínima<br/>
+                    2. Cambio de pendiente<br/>
+                    3. Puntos de inflexión<br/>
+                    4. Calidad R²
+                  </div>
                 </div>
               </div>
             </div>
