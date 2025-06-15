@@ -113,10 +113,10 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
-            Análisis Avanzado de Segmentos con Regresión Lineal
+            Análisis Corregido: Inflexiones con Tendencias Validadas
           </DialogTitle>
           <p className="text-sm text-mountain-600 dark:text-mountain-400">
-            Algoritmo de ventana creciente con control de calidad R²
+            Lógica de 3 prioridades con parámetros separados y coherentes
           </p>
         </DialogHeader>
         
@@ -125,49 +125,85 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
           <div className="lg:w-80 flex-shrink-0 space-y-6 overflow-y-auto">
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-                Parámetros de Segmentación Avanzada
+                Parámetros Corregidos
               </h3>
               
-              {/* R² Threshold */}
+              {/* R² Threshold (Priority 3) */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Umbral de Calidad R²: {params.rSquaredThreshold.toFixed(3)}
+                  R² Seguridad (P3): {params.rSquaredThreshold.toFixed(3)}
                 </label>
                 <Slider
                   value={[params.rSquaredThreshold]}
                   onValueChange={(value) => setParams(prev => ({ ...prev, rSquaredThreshold: value[0] }))}
-                  min={0.80}
-                  max={0.98}
+                  min={0.70}
+                  max={0.95}
                   step={0.01}
                   className="w-full"
                 />
                 <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Coeficiente de determinación mínimo para mantener un segmento
+                  Red de seguridad para casos complejos
                 </p>
               </div>
 
-              {/* Minimum Distance */}
+              {/* Window Distance - Now configurable */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Distancia Mínima: {params.minSegmentDistance.toFixed(1)} km
+                  Ventana Análisis: {params.windowDistance.toFixed(2)} km
                 </label>
                 <Slider
-                  value={[params.minSegmentDistance]}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, minSegmentDistance: value[0] }))}
-                  min={0.1}
-                  max={1.0}
+                  value={[params.windowDistance]}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, windowDistance: value[0] }))}
+                  min={0.05}
+                  max={0.5}
+                  step={0.01}
+                  className="w-full"
+                />
+                <p className="text-xs text-mountain-600 dark:text-mountain-400">
+                  Distancia para análisis local de inflexiones
+                </p>
+              </div>
+
+              {/* Inflection Sensitivity - Only for elevation */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                  Sensibilidad Elevación: {params.inflectionSensitivity.toFixed(1)}m
+                </label>
+                <Slider
+                  value={[params.inflectionSensitivity]}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, inflectionSensitivity: value[0] }))}
+                  min={0.5}
+                  max={8.0}
                   step={0.1}
                   className="w-full"
                 />
                 <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Distancia mínima para considerar un segmento
+                  Diferencia elevación para picos/valles (solo metros)
                 </p>
               </div>
 
-              {/* Slope Change Threshold */}
+              {/* NEW: Slope Threshold - Separate from elevation */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Sensibilidad a Cambios: {params.slopeChangeThreshold.toFixed(1)}%
+                  Umbral Pendiente: {params.slopeThreshold.toFixed(1)}%
+                </label>
+                <Slider
+                  value={[params.slopeThreshold]}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, slopeThreshold: value[0] }))}
+                  min={1.0}
+                  max={10.0}
+                  step={0.1}
+                  className="w-full"
+                />
+                <p className="text-xs text-mountain-600 dark:text-mountain-400">
+                  Pendiente mínima para cambios dirección (solo porcentaje)
+                </p>
+              </div>
+
+              {/* Slope Change Threshold - Early warning */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                  Alerta Cambio: {params.slopeChangeThreshold.toFixed(1)}%
                 </label>
                 <Slider
                   value={[params.slopeChangeThreshold]}
@@ -178,25 +214,25 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                   className="w-full"
                 />
                 <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Cambio de pendiente que dispara un corte
+                  Alerta temprana, no corte directo (Prioridad 2)
                 </p>
               </div>
 
-              {/* Inflection Sensitivity */}
+              {/* Minimum Distance - For trend validation */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                  Sensibilidad Inflexión: {params.inflectionSensitivity.toFixed(1)}m
+                  Validación Tendencia: {params.minSegmentDistance.toFixed(1)} km
                 </label>
                 <Slider
-                  value={[params.inflectionSensitivity]}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, inflectionSensitivity: value[0] }))}
-                  min={0.5}
-                  max={5.0}
+                  value={[params.minSegmentDistance]}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, minSegmentDistance: value[0] }))}
+                  min={0.1}
+                  max={1.0}
                   step={0.1}
                   className="w-full"
                 />
                 <p className="text-xs text-mountain-600 dark:text-mountain-400">
-                  Diferencia de elevación para detectar picos/valles
+                  Distancia para validar nueva tendencia post-inflexión
                 </p>
               </div>
 
@@ -204,10 +240,10 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
               <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-mountain-700 rounded-lg">
                 <div>
                   <span className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                    Detectar Puntos de Inflexión
+                    Inflexiones Validadas (P1)
                   </span>
                   <p className="text-xs text-mountain-500">
-                    Identifica picos, valles y cambios de dirección
+                    Máxima prioridad: tendencias post-inflexión validadas
                   </p>
                 </div>
                 <Switch
@@ -218,7 +254,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
 
               <Button onClick={handleResetParams} variant="outline" className="w-full">
                 <RotateCcw className="w-4 h-4 mr-2" />
-                Restaurar Valores por Defecto
+                Restaurar Parámetros Corregidos
               </Button>
             </div>
 
@@ -226,7 +262,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
             {stats && (
               <div className="space-y-3 border-t border-primary-200 dark:border-mountain-700 pt-4">
                 <h4 className="text-md font-semibold text-mountain-800 dark:text-mountain-200">
-                  Métricas de Calidad
+                  Métricas Corregidas
                 </h4>
                 
                 {/* Quality Rating */}
@@ -236,7 +272,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                       {stats.qualityRating}
                     </div>
                     <div className="text-xs text-mountain-600 dark:text-mountain-400">
-                      Calidad del Ajuste (R² = {stats.avgRSquared})
+                      Calidad con Lógica Corregida (R² = {stats.avgRSquared})
                     </div>
                   </div>
                 </div>
@@ -247,7 +283,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                       {stats.totalSegments}
                     </div>
                     <div className="text-xs text-mountain-600 dark:text-mountain-400">
-                      Total Segmentos
+                      Segmentos Totales
                     </div>
                   </div>
                   <div className="bg-green-50 dark:bg-mountain-700 p-2 rounded">
@@ -289,7 +325,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
             <div className="h-full flex flex-col">
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 mb-2">
-                  Vista Previa con Líneas de Regresión
+                  Vista Previa con Lógica Corregida
                 </h3>
                 <div className="flex gap-4 text-sm">
                   <span className="flex items-center gap-1">
@@ -306,7 +342,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                   </span>
                   <span className="flex items-center gap-1">
                     <div className="w-4 h-0.5 bg-red-600 border-dashed border-t"></div>
-                    Tendencias
+                    Regresiones
                   </span>
                 </div>
               </div>
@@ -327,7 +363,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
               {advancedSegments.length > 0 && (
                 <div className="mt-4 max-h-40 overflow-y-auto border border-primary-200 dark:border-mountain-700 rounded-lg">
                   <div className="bg-primary-50 dark:bg-mountain-700 px-3 py-2 text-sm font-semibold">
-                    Segmentos Detectados (con Calidad R²)
+                    Segmentos con Lógica Corregida (3 Prioridades)
                   </div>
                   <div className="divide-y divide-primary-200 dark:divide-mountain-700">
                     {advancedSegments.map((segment, index) => (
@@ -345,6 +381,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
                           <span>{segment.distance.toFixed(1)}km</span>
                           <span>R²={segment.rSquared.toFixed(3)}</span>
                           <span>{(segment.slope * 100).toFixed(1)}%</span>
+                          <span title={segment.cutReason}>✂️</span>
                         </div>
                       </div>
                     ))}
@@ -362,7 +399,7 @@ export const IntelligentSegmentationModal: React.FC<IntelligentSegmentationModal
           </Button>
           <Button onClick={handleSaveSegments} disabled={advancedSegments.length === 0}>
             <Save className="w-4 h-4 mr-2" />
-            Aplicar Segmentos Avanzados ({advancedSegments.length})
+            Aplicar Lógica Corregida ({advancedSegments.length})
           </Button>
         </div>
       </DialogContent>

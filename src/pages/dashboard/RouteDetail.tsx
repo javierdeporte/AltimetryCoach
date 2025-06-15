@@ -61,13 +61,14 @@ const RouteDetail = () => {
       return [];
     }
     
-    console.log('Calculating enhanced segments with params:', advancedParams);
+    console.log('Calculating enhanced segments with corrected params:', advancedParams);
     const segments = segmentProfileAdvanced(processedElevationData, advancedParams);
     console.log('Generated segments:', segments.map(s => ({
       startDistance: s.startPoint.displayDistance,
       endDistance: s.endPoint.displayDistance,
       type: s.type,
-      rSquared: s.rSquared
+      rSquared: s.rSquared,
+      cutReason: s.cutReason
     })));
     return segments;
   }, [advancedAnalysisMode, processedElevationData, advancedParams]);
@@ -392,7 +393,7 @@ const RouteDetail = () => {
           <div className="p-6 h-full overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-                Controles Multi-Criterio
+                Controles Corregidos
               </h3>
               <Button 
                 onClick={() => setShowAdvancedControls(false)}
@@ -407,7 +408,7 @@ const RouteDetail = () => {
               {/* Enhanced Real-time Statistics */}
               <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-4">
                 <h4 className="font-semibold text-primary-800 dark:text-primary-200 mb-3">
-                  Estadísticas de Análisis
+                  Estadísticas Corregidas
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                   <div>
@@ -423,7 +424,7 @@ const RouteDetail = () => {
                     <div className="font-bold text-orange-600">{advancedStats.slopeChanges}</div>
                   </div>
                   <div>
-                    <span className="text-mountain-600 dark:text-mountain-400">Puntos Inflexión:</span>
+                    <span className="text-mountain-600 dark:text-mountain-400">Inflexiones Validadas:</span>
                     <div className="font-bold text-blue-600">{advancedStats.inflectionPoints}</div>
                   </div>
                 </div>
@@ -444,7 +445,7 @@ const RouteDetail = () => {
                 )}
                 
                 <div className="mt-4">
-                  <span className="text-mountain-600 dark:text-mountain-400">Relevancia Deportiva:</span>
+                  <span className="text-mountain-600 dark:text-mountain-400">Calidad General:</span>
                   <div className="font-bold text-lg text-primary-600">{advancedStats.qualityScore}%</div>
                   <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                     <div 
@@ -455,14 +456,14 @@ const RouteDetail = () => {
                 </div>
               </div>
 
-              {/* Enhanced Parameter Controls */}
+              {/* UPDATED Parameter Controls with separated concepts */}
               <div className="space-y-6">
                 <div>
                   <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
-                    R² Threshold: {advancedParams.rSquaredThreshold.toFixed(3)}
+                    R² Threshold (Seguridad): {advancedParams.rSquaredThreshold.toFixed(3)}
                   </label>
                   <p className="text-xs text-mountain-500 mb-3">
-                    Calidad mínima de ajuste lineal
+                    Calidad mínima como red de seguridad (Prioridad 3)
                   </p>
                   <Slider
                     value={[advancedParams.rSquaredThreshold]}
@@ -471,7 +472,7 @@ const RouteDetail = () => {
                       rSquaredThreshold: value[0]
                     }))}
                     min={0.7}
-                    max={0.99}
+                    max={0.95}
                     step={0.01}
                     className="w-full"
                   />
@@ -479,10 +480,70 @@ const RouteDetail = () => {
 
                 <div>
                   <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
-                    Sensibilidad a Cambios: {advancedParams.slopeChangeThreshold.toFixed(1)}%
+                    Distancia Ventana: {advancedParams.windowDistance.toFixed(2)} km
                   </label>
                   <p className="text-xs text-mountain-500 mb-3">
-                    Cambio de pendiente que dispara un corte
+                    Ventana de análisis para inflexiones
+                  </p>
+                  <Slider
+                    value={[advancedParams.windowDistance]}
+                    onValueChange={(value) => setAdvancedParams(prev => ({
+                      ...prev,
+                      windowDistance: value[0]
+                    }))}
+                    min={0.05}
+                    max={0.5}
+                    step={0.01}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
+                    Sensibilidad Elevación: {advancedParams.inflectionSensitivity.toFixed(1)}m
+                  </label>
+                  <p className="text-xs text-mountain-500 mb-3">
+                    Diferencia elevación para picos/valles (metros)
+                  </p>
+                  <Slider
+                    value={[advancedParams.inflectionSensitivity]}
+                    onValueChange={(value) => setAdvancedParams(prev => ({
+                      ...prev,
+                      inflectionSensitivity: value[0]
+                    }))}
+                    min={0.5}
+                    max={8.0}
+                    step={0.1}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
+                    Umbral Pendiente: {advancedParams.slopeThreshold.toFixed(1)}%
+                  </label>
+                  <p className="text-xs text-mountain-500 mb-3">
+                    Pendiente mínima para cambios de dirección (porcentaje)
+                  </p>
+                  <Slider
+                    value={[advancedParams.slopeThreshold]}
+                    onValueChange={(value) => setAdvancedParams(prev => ({
+                      ...prev,
+                      slopeThreshold: value[0]
+                    }))}
+                    min={1.0}
+                    max={10.0}
+                    step={0.1}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
+                    Alerta Cambio: {advancedParams.slopeChangeThreshold.toFixed(1)}%
+                  </label>
+                  <p className="text-xs text-mountain-500 mb-3">
+                    Cambio que dispara alerta temprana (no corte directo)
                   </p>
                   <Slider
                     value={[advancedParams.slopeChangeThreshold]}
@@ -499,30 +560,10 @@ const RouteDetail = () => {
 
                 <div>
                   <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
-                    Sensibilidad Inflexión: {advancedParams.inflectionSensitivity.toFixed(1)}m
-                  </label>
-                  <p className="text-xs text-mountain-500 mb-3">
-                    Diferencia de elevación para detectar picos/valles
-                  </p>
-                  <Slider
-                    value={[advancedParams.inflectionSensitivity]}
-                    onValueChange={(value) => setAdvancedParams(prev => ({
-                      ...prev,
-                      inflectionSensitivity: value[0]
-                    }))}
-                    min={0.5}
-                    max={5.0}
-                    step={0.1}
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300 block mb-1">
                     Distancia Mínima: {advancedParams.minSegmentDistance.toFixed(1)} km
                   </label>
                   <p className="text-xs text-mountain-500 mb-3">
-                    Longitud mínima deportivamente relevante
+                    Distancia para validar nuevas tendencias
                   </p>
                   <Slider
                     value={[advancedParams.minSegmentDistance]}
@@ -541,10 +582,10 @@ const RouteDetail = () => {
                 <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-mountain-700 rounded-lg">
                   <div>
                     <span className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-                      Detectar Puntos de Inflexión
+                      Detectar Inflexiones Validadas
                     </span>
                     <p className="text-xs text-mountain-500">
-                      Identifica picos, valles y cambios de dirección
+                      Picos/valles con tendencias posteriores validadas
                     </p>
                   </div>
                   <Switch
@@ -564,31 +605,25 @@ const RouteDetail = () => {
                 className="w-full"
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
-                Restaurar Defaults
+                Restaurar Corregidos
               </Button>
 
-              {/* Enhanced Interpretation Guide */}
+              {/* Updated Interpretation Guide */}
               <div className="bg-gray-50 dark:bg-mountain-700 rounded-lg p-4">
                 <h5 className="font-medium text-mountain-700 dark:text-mountain-300 mb-2">
-                  Guía de Criterios
+                  Lógica Corregida (3 Prioridades)
                 </h5>
                 <div className="text-xs text-mountain-600 dark:text-mountain-400 space-y-1">
-                  <div>• <strong>R² &gt; 0.95:</strong> Excelente ajuste lineal</div>
-                  <div>• <strong>Cambio &gt; 5%:</strong> Pendiente significativa</div>
-                  <div>• <strong>Distancia &gt; 0.3km:</strong> Relevante para carrera</div>
-                  <div>• <strong>Inflexión:</strong> Picos/valles detectados</div>
-                </div>
-                
-                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-mountain-600">
-                  <span className="text-xs font-medium text-mountain-700 dark:text-mountain-300">
-                    Prioridad de Corte:
-                  </span>
-                  <div className="text-xs text-mountain-600 dark:text-mountain-400 mt-1">
-                    1. Distancia mínima<br/>
-                    2. Cambio de pendiente<br/>
-                    3. Puntos de inflexión<br/>
-                    4. Calidad R²
+                  <div>• <strong>P1:</strong> Inflexiones con tendencias validadas</div>
+                  <div>• <strong>P2:</strong> Inconsistencia pendiente acumulada</div>
+                  <div>• <strong>P3:</strong> R² como red de seguridad</div>
+                  <div className="mt-2">
+                    <strong>Parámetros Separados:</strong>
                   </div>
+                  <div>• Elevación: metros absolutos</div>
+                  <div>• Pendiente: porcentaje relativo</div>
+                  <div>• Ventana: distancia configurable</div>
+                  <div>• Validación: nueva tendencia sostenida</div>
                 </div>
               </div>
             </div>
