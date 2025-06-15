@@ -91,60 +91,85 @@ function createSegment(
 }
 
 /**
- * Phase 2 Refactored: Generates micro-segments based purely on the slope change threshold.
- * The minimum distance filter is applied in a later phase.
+ * Phase 2: Generates micro-segments within a larger macro-segment using a growing window with R² quality control.
  */
-function buildMicroSegments(
+function generateMicroSegments(
   macroSegmentData: ElevationPoint[],
   elevationData: ElevationPoint[],
   params: AdvancedSegmentationParams,
   globalIndexOffset: number
 ): AdvancedSegment[] {
-  if (macroSegmentData.length < 3) return [];
-
   const segments: AdvancedSegment[] = [];
-  let startIndex = 0;
+  let currentSegmentStartIndex = 0;
 
+  if (macroSegmentData.length < params.minSegmentPoints) {
+    if (macroSegmentData.length >= 2) {
+      const points = macroSegmentData.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+      const regression = calculateLinearRegression(points);
+      segments.push(createSegment(macroSegmentData, regression, globalIndexOffset, globalIndexOffset + macroSegmentData.length - 1));
+    }
+    return segments;
+  }
+  
   for (let i = 2; i < macroSegmentData.length; i++) {
-    const currentWindow = macroSegmentData.slice(startIndex, i);
-    const lookaheadWindow = macroSegmentData.slice(i - 1, Math.min(i + 2, macroSegmentData.length));
+    const windowPoints = macroSegmentData.slice(currentSegmentStartIndex, i + 1);
+    const regressionPoints = windowPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
 
-    if (currentWindow.length < 2 || lookaheadWindow.length < 2) continue;
+    if (regressionPoints.length < 2) continue;
 
-    const currentRegression = calculateLinearRegression(currentWindow.map(p => ({ x: p.displayDistance, y: p.displayElevation })));
-    const lookaheadRegression = calculateLinearRegression(lookaheadWindow.map(p => ({ x: p.displayDistance, y: p.displayElevation })));
+    const regression = calculateLinearRegression(regressionPoints);
+    const isQualityPoor = regression.rSquared < params.rSquaredThreshold;
 
-    const slopeDiff = Math.abs(currentRegression.slope - lookaheadRegression.slope);
-    
-    // If slope changes significantly, we cut the segment, regardless of its length for now.
-    if (slopeDiff > params.slopeChangeThreshold) {
-      const segmentToFinalizePoints = macroSegmentData.slice(startIndex, i - 1);
-      
-      if (segmentToFinalizePoints.length >= 2) {
-        const finalRegression = calculateLinearRegression(segmentToFinalizePoints.map(p => ({ x: p.displayDistance, y: p.displayElevation })));
+    if (isQualityPoor) {
+      const finalSegmentPoints = macroSegmentData.slice(currentSegmentStartIndex, i);
+      const finalSegmentDistance = finalSegmentPoints[finalSegmentPoints.length - 1].displayDistance - finalSegmentPoints[0].displayDistance;
+
+      if (finalSegmentPoints.length >= params.minSegmentPoints && finalSegmentDistance >= params.microMinDistance) {
+        const finalRegressionPoints = finalSegmentPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+        const finalRegression = calculateLinearRegression(finalRegressionPoints);
+        
         segments.push(createSegment(
-          segmentToFinalizePoints,
+          finalSegmentPoints,
           finalRegression,
-          globalIndexOffset + startIndex,
-          globalIndexOffset + i - 2 // end index
+          globalIndexOffset + currentSegmentStartIndex,
+          globalIndexOffset + i - 1
         ));
-        startIndex = i - 1; // New segment starts where the change was detected
+        
+        currentSegmentStartIndex = i - 1;
       }
     }
   }
 
-  // Handle the last segment remaining in the loop.
-  const lastSegmentPoints = macroSegmentData.slice(startIndex);
-  if (lastSegmentPoints.length >= 2) {
-    const finalRegression = calculateLinearRegression(lastSegmentPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation })));
-    segments.push(createSegment(
-      lastSegmentPoints,
-      finalRegression,
-      globalIndexOffset + startIndex,
-      globalIndexOffset + macroSegmentData.length - 1
-    ));
+  // Handle the last segment of the macro-segment
+  if (currentSegmentStartIndex < macroSegmentData.length - 1) {
+    const lastSegmentPoints = macroSegmentData.slice(currentSegmentStartIndex);
+    const lastSegmentDistance = lastSegmentPoints[lastSegmentPoints.length - 1].displayDistance - lastSegmentPoints[0].displayDistance;
+    
+    if (lastSegmentPoints.length >= params.minSegmentPoints && lastSegmentDistance >= params.microMinDistance) {
+      const lastRegressionPoints = lastSegmentPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+      const lastRegression = calculateLinearRegression(lastRegressionPoints);
+      
+      segments.push(createSegment(
+        lastSegmentPoints,
+        lastRegression,
+        globalIndexOffset + currentSegmentStartIndex,
+        globalIndexOffset + macroSegmentData.length - 1
+      ));
+    } else if (segments.length > 0) {
+      // If the last remaining part is too small, merge it with the previous segment.
+      const lastFinalSegment = segments[segments.length - 1];
+      const combinedPoints = elevationData.slice(lastFinalSegment.startIndex, globalIndexOffset + macroSegmentData.length - 1 + 1);
+      const combinedRegressionPoints = combinedPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+      const combinedRegression = calculateLinearRegression(combinedRegressionPoints);
+      segments[segments.length - 1] = createSegment(
+        combinedPoints,
+        combinedRegression,
+        lastFinalSegment.startIndex,
+        globalIndexOffset + macroSegmentData.length - 1
+      );
+    }
   }
-  
+
   return segments;
 }
 
@@ -213,81 +238,41 @@ function findSignificantExtrema(
 
 
 /**
- * Phase 3: Merges segments that are shorter than the minimum distance.
- * It iteratively finds the shortest segment and merges it with its most similar neighbor.
+ * Phase 3: Merges adjacent micro-segments if their slopes are similar.
  */
-function mergeShortSegments(
+function mergeSimilarSegments(
   segments: AdvancedSegment[],
   elevationData: ElevationPoint[],
-  minDistance: number
+  slopeThreshold: number
 ): AdvancedSegment[] {
-  if (segments.length < 2) return segments;
+    if (segments.length < 2) return segments;
 
-  let processedSegments = [...segments];
-  let hasChanges = true;
+    const mergedSegments: AdvancedSegment[] = [];
+    let currentSegment = segments[0];
 
-  // We loop until no more short segments can be merged.
-  while(hasChanges) {
-    hasChanges = false;
-    if (processedSegments.length < 2) break;
+    for (let i = 1; i < segments.length; i++) {
+        const nextSegment = segments[i];
+        const slopeDifference = Math.abs(currentSegment.slope - nextSegment.slope);
 
-    let shortestSegmentIndex = -1;
-    let shortestDistance = Infinity;
-
-    // Find the shortest segment in the current list
-    for (let i = 0; i < processedSegments.length; i++) {
-      if (processedSegments[i].distance < shortestDistance) {
-        shortestDistance = processedSegments[i].distance;
-        shortestSegmentIndex = i;
-      }
+        // Merge if types are the same and slope difference is below threshold
+        if (currentSegment.type === nextSegment.type && slopeDifference < slopeThreshold) {
+            const combinedPointsData = elevationData.slice(currentSegment.startIndex, nextSegment.endIndex + 1);
+            const regressionPoints = combinedPointsData.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+            const newRegression = calculateLinearRegression(regressionPoints);
+            
+            currentSegment = createSegment(
+                combinedPointsData,
+                newRegression,
+                currentSegment.startIndex,
+                nextSegment.endIndex
+            );
+        } else {
+            mergedSegments.push(currentSegment);
+            currentSegment = nextSegment;
+        }
     }
-    
-    // If the shortest segment is below the minimum distance, we need to merge it.
-    if (shortestDistance < minDistance) {
-      hasChanges = true;
-      const segmentToMerge = processedSegments[shortestSegmentIndex];
-
-      // Decide which neighbor to merge with.
-      let neighborIndex: number;
-      if (shortestSegmentIndex === 0) {
-        // First segment, merge with the one on the right
-        neighborIndex = 1;
-      } else if (shortestSegmentIndex === processedSegments.length - 1) {
-        // Last segment, merge with the one on the left
-        neighborIndex = shortestSegmentIndex - 1;
-      } else {
-        // Middle segment, merge with the neighbor that is most similar in slope
-        const leftNeighbor = processedSegments[shortestSegmentIndex - 1];
-        const rightNeighbor = processedSegments[shortestSegmentIndex + 1];
-        const diffLeft = Math.abs(segmentToMerge.slope - leftNeighbor.slope);
-        const diffRight = Math.abs(segmentToMerge.slope - rightNeighbor.slope);
-        neighborIndex = diffLeft <= diffRight 
-          ? shortestSegmentIndex - 1 
-          : shortestSegmentIndex + 1;
-      }
-
-      const neighborSegment = processedSegments[neighborIndex];
-      const startIndex = Math.min(segmentToMerge.startIndex, neighborSegment.startIndex);
-      const endIndex = Math.max(segmentToMerge.endIndex, neighborSegment.endIndex);
-      
-      const combinedPointsData = elevationData.slice(startIndex, endIndex + 1);
-      const regressionPoints = combinedPointsData.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-      const newRegression = calculateLinearRegression(regressionPoints);
-      
-      const mergedSegment = createSegment(
-          combinedPointsData,
-          newRegression,
-          startIndex,
-          endIndex
-      );
-
-      // Replace the two segments (the short one and its neighbor) with the new merged one.
-      const insertIndex = Math.min(shortestSegmentIndex, neighborIndex);
-      processedSegments.splice(insertIndex, 2, mergedSegment);
-    }
-  }
-
-  return processedSegments;
+    mergedSegments.push(currentSegment);
+    return mergedSegments;
 }
 
 
@@ -299,7 +284,7 @@ export function segmentProfileAdvanced(
   params: AdvancedSegmentationParams
 ): AdvancedSegmentationResult {
   
-  if (!elevationData || elevationData.length < 5) {
+  if (!elevationData || elevationData.length < params.minSegmentPoints) {
     return { segments: [], macroBoundaries: [] };
   }
 
@@ -313,17 +298,18 @@ export function segmentProfileAdvanced(
     const macroStart = macroIndices[i];
     const macroEnd = macroIndices[i+1];
     
+    // Ensure the slice is not empty or too small
     if (macroEnd > macroStart) {
         const macroSegmentData = elevationData.slice(macroStart, macroEnd + 1);
-        const microSegments = buildMicroSegments(macroSegmentData, elevationData, params, macroStart);
+        const microSegments = generateMicroSegments(macroSegmentData, elevationData, params, macroStart);
         allMicroSegments.push(...microSegments);
     }
   }
 
-  // Phase 3: Merge short segments to enforce minimum distance
-  const finalSegments = mergeShortSegments(allMicroSegments, elevationData, params.microMinDistance);
+  // Phase 3: Merge similar adjacent micro-segments
+  const finalSegments = mergeSimilarSegments(allMicroSegments, elevationData, params.slopeChangeThreshold);
 
-  console.log('Generated', finalSegments.length, 'final segments after merging');
+  console.log('Generated', finalSegments.length, 'hybrid segments');
   return { segments: finalSegments, macroBoundaries: macroIndices };
 }
 
@@ -331,9 +317,11 @@ export function segmentProfileAdvanced(
  * Default advanced segmentation parameters
  */
 export const DEFAULT_ADVANCED_SEGMENTATION_PARAMS: AdvancedSegmentationParams = {
-  microMinDistance: 0.5, // km
+  rSquaredThreshold: 0.92,
+  minSegmentPoints: 20,
+  microMinDistance: 0.2, // km
   macroProminence: 40, // meters
-  slopeChangeThreshold: 0.08, // 8% grade difference
+  slopeChangeThreshold: 0.10, // 10% grade difference
 };
 
 /**
