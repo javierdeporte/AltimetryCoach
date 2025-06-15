@@ -4,6 +4,7 @@ import { Button } from '../ui/button';
 import { Logo } from '../ui/logo';
 import { Home, Upload, Settings, ArrowUp, List } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 interface SidebarItem {
   icon: React.ComponentType<any>;
@@ -11,14 +12,6 @@ interface SidebarItem {
   href: string;
   disabled?: boolean;
 }
-
-const sidebarItems: SidebarItem[] = [
-  { icon: Home, label: 'Dashboard', href: '/dashboard' },
-  { icon: List, label: 'Mis Rutas', href: '/dashboard/routes' },
-  { icon: Upload, label: 'Subir', href: '/dashboard/upload' },
-  { icon: ArrowUp, label: 'Planes', href: '/dashboard/plans', disabled: true },
-  { icon: Settings, label: 'Configuración', href: '/dashboard/settings', disabled: true },
-];
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -28,6 +21,15 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
+
+  const sidebarItems: SidebarItem[] = [
+    { icon: Home, label: t('sidebar.dashboard'), href: '/dashboard' },
+    { icon: List, label: t('sidebar.my_routes'), href: '/dashboard/routes' },
+    { icon: Upload, label: t('sidebar.upload'), href: '/dashboard/upload' },
+    { icon: ArrowUp, label: t('sidebar.plans'), href: '/dashboard/plans', disabled: true },
+    { icon: Settings, label: t('sidebar.settings'), href: '/dashboard/settings', disabled: true },
+  ];
 
   const isActive = (href: string) => {
     if (href === '/dashboard') {
@@ -87,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
                   <span className="flex items-center justify-between w-full">
                     {item.label}
                     {item.disabled && (
-                      <span className="text-xs text-muted-foreground">Próximamente</span>
+                      <span className="text-xs text-muted-foreground">{t('sidebar.coming_soon')}</span>
                     )}
                   </span>
                 )}
@@ -107,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
           <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
           </svg>
-          {!isCollapsed && <span>Upgrade to Pro</span>}
+          {!isCollapsed && <span>{t('sidebar.upgrade_pro')}</span>}
         </Button>
       </div>
     </div>

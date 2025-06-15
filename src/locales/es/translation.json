@@ -65,5 +65,46 @@
     "title": "Dashboard",
     "welcome": "¡Bienvenido de nuevo, {{username}}!",
     "plan": "Plan Gratuito"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "my_routes": "Mis Rutas",
+    "upload": "Subir",
+    "plans": "Planes",
+    "settings": "Configuración",
+    "coming_soon": "Próximamente",
+    "upgrade_pro": "Actualizar a Pro"
+  },
+  "billing": {
+    "title": "Facturación y Planes",
+    "subtitle": "Gestiona tu suscripción y actualiza para desbloquear funciones avanzadas",
+    "current_plan_title": "Plan Actual",
+    "current_plan_name": "Plan Gratuito",
+    "current_plan_badge": "Actual",
+    "current_plan_usage": "{{used}} rutas usadas de {{total}} disponibles",
+    "price_period": "/mes",
+    "free_plan_name": "Gratis",
+    "pro_plan_name": "Atleta Pro",
+    "features": {
+      "free": [
+        "Hasta 3 rutas",
+        "Análisis básico de elevación",
+        "Visualización de rutas",
+        "Soporte comunitario"
+      ],
+      "pro": [
+        "Rutas ilimitadas",
+        "Análisis avanzado",
+        "Exportar a PDF/CSV",
+        "Planificación de nutrición",
+        "Modo sin conexión",
+        "Soporte prioritario"
+      ]
+    },
+    "upgrade_button": "Actualizar Ahora",
+    "current_plan_button": "Plan Actual",
+    "history_title": "Historial de Facturación",
+    "history_empty_title": "Sin historial de facturación",
+    "history_empty_desc": "Actualmente estás en el plan gratuito. Actualiza a Pro para ver el historial de facturación."
   }
 }

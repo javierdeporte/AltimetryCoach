@@ -65,5 +65,46 @@
     "title": "Dashboard",
     "welcome": "Welcome back, {{username}}!",
     "plan": "Free Plan"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "my_routes": "My Routes",
+    "upload": "Upload",
+    "plans": "Plans",
+    "settings": "Settings",
+    "coming_soon": "Coming soon",
+    "upgrade_pro": "Upgrade to Pro"
+  },
+  "billing": {
+    "title": "Billing & Plans",
+    "subtitle": "Manage your subscription and upgrade to unlock advanced features",
+    "current_plan_title": "Current Plan",
+    "current_plan_name": "Free Plan",
+    "current_plan_badge": "Current",
+    "current_plan_usage": "{{used}} routes used out of {{total}} available",
+    "price_period": "/month",
+    "free_plan_name": "Free",
+    "pro_plan_name": "Pro Athlete",
+    "features": {
+      "free": [
+        "Up to 3 routes",
+        "Basic elevation analysis",
+        "Route visualization",
+        "Community support"
+      ],
+      "pro": [
+        "Unlimited routes",
+        "Advanced analytics",
+        "Export to PDF/CSV",
+        "Nutrition planning",
+        "Offline mode",
+        "Priority support"
+      ]
+    },
+    "upgrade_button": "Upgrade Now",
+    "current_plan_button": "Current Plan",
+    "history_title": "Billing History",
+    "history_empty_title": "No billing history",
+    "history_empty_desc": "You're currently on the free plan. Upgrade to Pro to see billing history."
   }
 }
