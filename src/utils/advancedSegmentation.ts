@@ -1,4 +1,4 @@
-import { ElevationPoint, AdvancedSegment, AdvancedSegmentationParams, RegressionResult } from './types';
+import { ElevationPoint, AdvancedSegment, AdvancedSegmentationParams, RegressionResult, AdvancedSegmentationResult } from './types';
 
 const SEGMENT_COLORS = {
   asc: '#22c55e',   // Green for ascent
@@ -261,10 +261,10 @@ function mergeSimilarSegments(
 export function segmentProfileAdvanced(
   elevationData: ElevationPoint[], 
   params: AdvancedSegmentationParams
-): AdvancedSegment[] {
+): AdvancedSegmentationResult {
   
   if (!elevationData || elevationData.length < params.minSegmentPoints) {
-    return [];
+    return { segments: [], macroBoundaries: [] };
   }
 
   // Phase 1: Macro-segmentation
@@ -289,7 +289,7 @@ export function segmentProfileAdvanced(
   const finalSegments = mergeSimilarSegments(allMicroSegments, elevationData, params.slopeChangeThreshold);
 
   console.log('Generated', finalSegments.length, 'hybrid segments');
-  return finalSegments;
+  return { segments: finalSegments, macroBoundaries: macroIndices };
 }
 
 /**

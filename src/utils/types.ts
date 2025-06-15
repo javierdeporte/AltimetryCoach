@@ -28,6 +28,11 @@ export interface AdvancedSegment {
   color: string;
 }
 
+export interface AdvancedSegmentationResult {
+  segments: AdvancedSegment[];
+  macroBoundaries: number[];
+}
+
 export interface AdvancedSegmentationParams {
   rSquaredThreshold: number;
   minSegmentPoints: number;

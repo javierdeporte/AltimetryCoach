@@ -56,9 +56,9 @@ const RouteDetail = () => {
   }, [elevationData]);
 
   // Calculate advanced segments in real-time when mode is active
-  const advancedSegments = useMemo(() => {
+  const { segments: advancedSegments, macroBoundaries } = useMemo(() => {
     if (!advancedAnalysisMode || processedElevationData.length === 0) {
-      return [];
+      return { segments: [], macroBoundaries: [] };
     }
     
     console.log('Calculating advanced segments with params:', advancedParams);
@@ -315,6 +315,7 @@ const RouteDetail = () => {
                 backgroundColor: 'transparent'
               }}
               advancedSegments={advancedSegments}
+              macroBoundaries={macroBoundaries}
             />
           </div>
 

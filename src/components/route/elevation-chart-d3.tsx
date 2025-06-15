@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useCallback } from 'react';
 import * as d3 from 'd3';
 
@@ -52,6 +51,7 @@ interface ElevationChartD3Props {
     color: string;
   }>;
   advancedSegments?: AdvancedSegment[];
+  macroBoundaries?: number[];
   showGradientVisualization?: boolean;
 }
 
@@ -65,6 +65,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   options = {},
   intelligentSegments = [],
   advancedSegments = [],
+  macroBoundaries = [],
   showGradientVisualization = false
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -192,6 +193,28 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       });
     }
 
+    // Draw macro-segment backgrounds instead of micro-segment ones
+    if (macroBoundaries.length > 1) {
+      const colors = ["#fecaca", "#dbeafe", "#dcfce7", "#fae8ff", "#fef9c3", "#fee2e2"]; // Alternating colors
+      for (let i = 0; i < macroBoundaries.length - 1; i++) {
+        const startIndex = macroBoundaries[i];
+        const endIndex = macroBoundaries[i + 1];
+        
+        const startPoint = processedData[startIndex];
+        const endPoint = processedData[endIndex];
+
+        if (startPoint && endPoint) {
+          chartContent.append("rect")
+            .attr("x", xScale(startPoint.displayDistance))
+            .attr("y", opts.marginTop)
+            .attr("width", xScale(endPoint.displayDistance) - xScale(startPoint.displayDistance))
+            .attr("height", opts.height - opts.marginTop - opts.marginBottom)
+            .attr("fill", colors[i % colors.length])
+            .attr("opacity", 0.3);
+        }
+      }
+    }
+
     // Draw intelligent segments backgrounds if available
     if (intelligentSegments.length > 0) {
       intelligentSegments.forEach(segment => {
@@ -240,7 +263,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       .attr("stroke-linecap", "round")
       .attr("d", lineGenerator);
 
-    // Draw red regression trend lines for advanced segments - THIS IS THE KEY FIX
+    // Draw red regression trend lines for advanced segments
     if (advancedSegments.length > 0) {
       console.log('Drawing regression trend lines for', advancedSegments.length, 'segments');
       
@@ -279,23 +302,43 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       });
     }
 
-    // Draw segment dividers if available
-    if (intelligentSegments.length > 0) {
-      intelligentSegments.forEach((segment, index) => {
-        if (index < intelligentSegments.length - 1) {
+    // Draw micro and macro segment dividers
+    if (advancedSegments.length > 0) {
+      // Draw micro-segment dividers (dashed)
+      advancedSegments.forEach(segment => {
           const endPoint = processedData[segment.endIndex];
-          if (endPoint) {
-            chartContent.append("line")
-              .attr("x1", xScale(endPoint.displayDistance))
-              .attr("x2", xScale(endPoint.displayDistance))
-              .attr("y1", opts.marginTop)
-              .attr("y2", opts.height - opts.marginBottom)
-              .attr("stroke", "#dc2626")
-              .attr("stroke-width", 2)
-              .attr("stroke-dasharray", "5,5")
-              .attr("opacity", 0.7);
+          const isMacroBoundary = macroBoundaries.includes(segment.endIndex);
+          
+          if (endPoint && segment.endIndex < processedData.length - 1 && !isMacroBoundary) {
+              chartContent.append("line")
+                  .attr("class", "micro-segment-divider")
+                  .attr("x1", xScale(endPoint.displayDistance))
+                  .attr("x2", xScale(endPoint.displayDistance))
+                  .attr("y1", opts.marginTop)
+                  .attr("y2", opts.height - opts.marginBottom)
+                  .attr("stroke", "#9ca3af")
+                  .attr("stroke-width", 1)
+                  .attr("stroke-dasharray", "3,3")
+                  .attr("opacity", 0.7);
           }
-        }
+      });
+
+      // Draw macro-segment dividers (solid)
+      macroBoundaries.forEach((boundaryIndex, i) => {
+          if (i > 0 && i < macroBoundaries.length - 1) {
+              const point = processedData[boundaryIndex];
+              if (point) {
+                  chartContent.append("line")
+                      .attr("class", "macro-segment-divider")
+                      .attr("x1", xScale(point.displayDistance))
+                      .attr("x2", xScale(point.displayDistance))
+                      .attr("y1", opts.marginTop)
+                      .attr("y2", opts.height - opts.marginBottom)
+                      .attr("stroke", "#374151")
+                      .attr("stroke-width", 1.5)
+                      .attr("opacity", 1);
+              }
+          }
       });
     }
 
@@ -419,7 +462,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         }
       });
 
-  }, [processedData, opts, intelligentSegments, advancedSegments, onPointHover, showGradientVisualization, gradientColorScale]);
+  }, [processedData, opts, intelligentSegments, advancedSegments, onPointHover, showGradientVisualization, gradientColorScale, macroBoundaries]);
 
   return (
     <div 
@@ -452,15 +495,23 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       <svg ref={svgRef} style={{ display: 'block', width: '100%', height: `${opts.height}px` }} />
       
       {advancedSegments.length > 0 && (
-        <div className="mt-4 flex items-center gap-4 text-xs text-mountain-600 dark:text-mountain-400">
+        <div className="mt-4 flex items-center gap-x-4 gap-y-2 flex-wrap text-xs text-mountain-600 dark:text-mountain-400">
           <span>Leyenda:</span>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-0.5 bg-red-600 border-dashed border-t-2"></div>
-            <span>Líneas de regresión (tendencia)</span>
+            <div className="w-4 h-0.5 border-t-2 border-red-600 border-dashed"></div>
+            <span>Línea de Regresión</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-2 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 opacity-50"></div>
-            <span>Tipos de segmento</span>
+            <div className="w-4 h-4 bg-purple-200 opacity-70 rounded-sm"></div>
+            <span>Macro-Segmento</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-px h-4 border-l-2 border-gray-700"></div>
+            <span>Divisor Macro</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-px h-4 border-l border-gray-500 border-dashed"></div>
+            <span>Divisor Micro</span>
           </div>
         </div>
       )}
