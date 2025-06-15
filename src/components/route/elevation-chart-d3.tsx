@@ -193,9 +193,9 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       });
     }
 
-    // Draw macro-segment backgrounds instead of micro-segment ones
-    if (macroBoundaries.length > 1) {
-      const colors = ["#fecaca", "#dbeafe", "#dcfce7", "#fae8ff", "#fef9c3", "#fee2e2"]; // Alternating colors
+    // Draw macro-segment backgrounds with alternating colors, only in advanced mode
+    if (macroBoundaries.length > 1 && advancedSegments.length > 0) {
+      const colors = ["#e0f2fe", "#f0fdf4"]; // sky-100 and green-50
       for (let i = 0; i < macroBoundaries.length - 1; i++) {
         const startIndex = macroBoundaries[i];
         const endIndex = macroBoundaries[i + 1];
@@ -210,13 +210,13 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
             .attr("width", xScale(endPoint.displayDistance) - xScale(startPoint.displayDistance))
             .attr("height", opts.height - opts.marginTop - opts.marginBottom)
             .attr("fill", colors[i % colors.length])
-            .attr("opacity", 0.3);
+            .attr("opacity", 0.5);
         }
       }
     }
 
-    // Draw intelligent segments backgrounds if available
-    if (intelligentSegments.length > 0) {
+    // Draw intelligent segments backgrounds only if not in advanced mode
+    if (intelligentSegments.length > 0 && advancedSegments.length === 0) {
       intelligentSegments.forEach(segment => {
         const startPoint = processedData[segment.startIndex];
         const endPoint = processedData[segment.endIndex];
@@ -229,25 +229,6 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
             .attr("height", opts.height - opts.marginTop - opts.marginBottom)
             .attr("fill", segment.color)
             .attr("opacity", 0.1);
-        }
-      });
-    }
-
-    // Draw advanced segments backgrounds if available
-    if (advancedSegments.length > 0) {
-      console.log('Drawing advanced segment backgrounds:', advancedSegments.length);
-      advancedSegments.forEach(segment => {
-        const startPoint = processedData[segment.startIndex];
-        const endPoint = processedData[segment.endIndex];
-        
-        if (startPoint && endPoint) {
-          chartContent.append("rect")
-            .attr("x", xScale(startPoint.displayDistance))
-            .attr("y", opts.marginTop)
-            .attr("width", xScale(endPoint.displayDistance) - xScale(startPoint.displayDistance))
-            .attr("height", opts.height - opts.marginTop - opts.marginBottom)
-            .attr("fill", segment.color)
-            .attr("opacity", 0.15);
         }
       });
     }
@@ -304,7 +285,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
 
     // Draw micro and macro segment dividers
     if (advancedSegments.length > 0) {
-      // Draw micro-segment dividers (dashed)
+      // Draw micro-segment dividers (dashed) - from elevation line to bottom
       advancedSegments.forEach(segment => {
           const endPoint = processedData[segment.endIndex];
           const isMacroBoundary = macroBoundaries.includes(segment.endIndex);
@@ -314,7 +295,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
                   .attr("class", "micro-segment-divider")
                   .attr("x1", xScale(endPoint.displayDistance))
                   .attr("x2", xScale(endPoint.displayDistance))
-                  .attr("y1", opts.marginTop)
+                  .attr("y1", yScale(endPoint.displayElevation))
                   .attr("y2", opts.height - opts.marginBottom)
                   .attr("stroke", "#9ca3af")
                   .attr("stroke-width", 1)
@@ -323,7 +304,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
           }
       });
 
-      // Draw macro-segment dividers (solid)
+      // Draw macro-segment dividers (solid) - from elevation line to bottom
       macroBoundaries.forEach((boundaryIndex, i) => {
           if (i > 0 && i < macroBoundaries.length - 1) {
               const point = processedData[boundaryIndex];
@@ -332,7 +313,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
                       .attr("class", "macro-segment-divider")
                       .attr("x1", xScale(point.displayDistance))
                       .attr("x2", xScale(point.displayDistance))
-                      .attr("y1", opts.marginTop)
+                      .attr("y1", yScale(point.displayElevation))
                       .attr("y2", opts.height - opts.marginBottom)
                       .attr("stroke", "#374151")
                       .attr("stroke-width", 1.5)
@@ -502,7 +483,10 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
             <span>Línea de Regresión</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-purple-200 opacity-70 rounded-sm"></div>
+            <div className="flex items-center">
+                <div className="w-2 h-4 bg-sky-100 opacity-50 rounded-l-sm"></div>
+                <div className="w-2 h-4 bg-green-50 opacity-50 rounded-r-sm"></div>
+            </div>
             <span>Macro-Segmento</span>
           </div>
           <div className="flex items-center gap-2">
