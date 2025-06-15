@@ -175,43 +175,64 @@ function generateMicroSegments(
 
 
 /**
- * Phase 1: Finds significant peaks and valleys to define macro-segments.
+ * Phase 1: Finds significant peaks and valleys to define macro-segments based on trend reversals.
+ * This version identifies peaks/valleys based on significant elevation changes from a trend.
  */
 function findSignificantExtrema(
   points: ElevationPoint[],
-  prominence: number,
-  minDist: number
+  prominence: number
 ): number[] {
   if (points.length < 3) return [0, points.length > 1 ? points.length - 1 : 0];
 
+  enum Trend { Up, Down };
   const extrema: number[] = [0];
-  let lastExtremum = points[0];
-  let lastExtremumIndex = 0;
+  let trend: Trend;
+  
+  // Determine initial trend based on the first few points.
+  const initialCheckIndex = Math.min(10, points.length - 1);
+  trend = points[initialCheckIndex].displayElevation > points[0].displayElevation ? Trend.Up : Trend.Down;
 
-  for (let i = 1; i < points.length - 1; i++) {
-    const prev = points[i - 1].displayElevation;
-    const curr = points[i].displayElevation;
-    const next = points[i + 1].displayElevation;
+  let potentialExtremumIdx = 0;
+  
+  for (let i = 1; i < points.length; i++) {
+    const currentPoint = points[i];
+    const potentialExtremumPoint = points[potentialExtremumIdx];
 
-    const isPeak = prev < curr && curr > next;
-    const isValley = prev > curr && curr < next;
-
-    if (isPeak || isValley) {
-      const dist = points[i].displayDistance - lastExtremum.displayDistance;
-      const elevDiff = Math.abs(curr - lastExtremum.displayElevation);
-
-      if (dist >= minDist && elevDiff >= prominence) {
-        extrema.push(i);
-        lastExtremum = points[i];
-        lastExtremumIndex = i;
+    if (trend === Trend.Up) { // Looking for a peak
+      if (currentPoint.displayElevation >= potentialExtremumPoint.displayElevation) {
+        // Still climbing, this is our new candidate for the peak.
+        potentialExtremumIdx = i;
+      } else {
+        // Trend is reversing. Check if the drop is significant enough to confirm the peak.
+        const drop = potentialExtremumPoint.displayElevation - currentPoint.displayElevation;
+        if (drop >= prominence) {
+          extrema.push(potentialExtremumIdx);
+          trend = Trend.Down; // Switch to looking for a valley.
+          potentialExtremumIdx = i; // This point starts the new descending trend.
+        }
+      }
+    } else { // Trend.Down, looking for a valley
+      if (currentPoint.displayElevation <= potentialExtremumPoint.displayElevation) {
+        // Still descending, this is our new candidate for the valley.
+        potentialExtremumIdx = i;
+      } else {
+        // Trend is reversing. Check if the climb is significant enough to confirm the valley.
+        const climb = currentPoint.displayElevation - potentialExtremumPoint.displayElevation;
+        if (climb >= prominence) {
+          extrema.push(potentialExtremumIdx);
+          trend = Trend.Up; // Switch to looking for a peak.
+          potentialExtremumIdx = i; // This point starts the new ascending trend.
+        }
       }
     }
   }
 
-  if (lastExtremumIndex !== points.length - 1) {
-      extrema.push(points.length - 1);
+  // Add the very last point of the route to complete the final segment.
+  if (extrema[extrema.length - 1] !== points.length - 1) {
+    extrema.push(points.length - 1);
   }
-  
+
+  // Final cleanup: remove duplicates and sort.
   return [...new Set(extrema)].sort((a, b) => a - b);
 }
 
@@ -268,7 +289,7 @@ export function segmentProfileAdvanced(
   }
 
   // Phase 1: Macro-segmentation
-  const macroIndices = findSignificantExtrema(elevationData, params.macroProminence, params.macroMinDistance);
+  const macroIndices = findSignificantExtrema(elevationData, params.macroProminence);
   
   let allMicroSegments: AdvancedSegment[] = [];
 

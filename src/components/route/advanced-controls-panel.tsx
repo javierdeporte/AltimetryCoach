@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
@@ -79,14 +78,6 @@ export const AdvancedControlsPanel: React.FC<AdvancedControlsPanelProps> = ({
             onValueChange={(val) => setParams(p => ({...p, macroProminence: val}))}
             min={10} max={100} step={5}
             formatValue={(val) => `${val} m`}
-          />
-          <ParamSlider 
-            label="Distancia Mínima (Macro)"
-            description="Distancia mínima entre picos/valles principales para evitar divisiones muy seguidas."
-            value={params.macroMinDistance}
-            onValueChange={(val) => setParams(p => ({...p, macroMinDistance: val}))}
-            min={0.2} max={2.0} step={0.1}
-            formatValue={(val) => `${val.toFixed(1)} km`}
           />
         </div>
 

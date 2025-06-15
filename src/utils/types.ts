@@ -1,4 +1,3 @@
-
 export interface ElevationPoint {
   distance: number;
   elevation: number;
@@ -38,6 +37,5 @@ export interface AdvancedSegmentationParams {
   minSegmentPoints: number;
   microMinDistance: number; // in km
   macroProminence: number; // in meters
-  macroMinDistance: number; // in km
   slopeChangeThreshold: number; // as a slope value (e.g., 0.1 for 10%)
 }
