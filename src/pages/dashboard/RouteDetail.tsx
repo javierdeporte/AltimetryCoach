@@ -13,7 +13,9 @@ import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
 import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS } from '../../utils/advancedSegmentation';
+import { segmentProfileV2, DEFAULT_V2_PARAMS, AdvancedSegmentationV2Params } from '../../utils/advancedSegmentationV2';
 import { AdvancedControlsPanel } from '../../components/route/advanced-controls-panel';
+import { AdvancedControlsBarV2 } from '../../components/route/AdvancedControlsBarV2';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -21,9 +23,13 @@ const RouteDetail = () => {
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   const [showMap, setShowMap] = useState(false);
   
-  // Advanced analysis state
+  // Advanced analysis state (V1)
   const [advancedAnalysisMode, setAdvancedAnalysisMode] = useState(false);
   const [advancedParams, setAdvancedParams] = useState(DEFAULT_ADVANCED_SEGMENTATION_PARAMS);
+  
+  // Experimental analysis state (V2)
+  const [experimentalAnalysisMode, setExperimentalAnalysisMode] = useState(false);
+  const [experimentalParams, setExperimentalParams] = useState<AdvancedSegmentationV2Params>(DEFAULT_V2_PARAMS);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -56,46 +62,57 @@ const RouteDetail = () => {
     }));
   }, [elevationData]);
 
-  // Calculate advanced segments in real-time when mode is active
+  // Calculate advanced segments in real-time when V1 mode is active
   const { segments: advancedSegments, macroBoundaries } = useMemo(() => {
     if (!advancedAnalysisMode || processedElevationData.length === 0) {
       return { segments: [], macroBoundaries: [] };
     }
     
-    console.log('Calculating advanced segments with params:', advancedParams);
+    console.log('Calculating V1 advanced segments with params:', advancedParams);
     return segmentProfileAdvanced(processedElevationData, advancedParams);
   }, [advancedAnalysisMode, processedElevationData, advancedParams]);
 
-  // Calculate advanced segments statistics
-  const advancedStats = useMemo(() => {
-    if (!advancedSegments || advancedSegments.length === 0) return null;
+  // Calculate experimental V2 segments in real-time when V2 mode is active
+  const { segments: experimentalSegments, macroBoundaries: experimentalMacroBoundaries } = useMemo(() => {
+    if (!experimentalAnalysisMode || processedElevationData.length === 0) {
+      return { segments: [], macroBoundaries: [] };
+    }
     
-    const totalAscent = advancedSegments
+    console.log('Calculating V2 experimental segments with params:', experimentalParams);
+    return segmentProfileV2(processedElevationData, experimentalParams);
+  }, [experimentalAnalysisMode, processedElevationData, experimentalParams]);
+
+  // Calculate advanced segments statistics (works for both V1 and V2)
+  const currentSegments = experimentalAnalysisMode ? experimentalSegments : advancedSegments;
+  const advancedStats = useMemo(() => {
+    if (!currentSegments || currentSegments.length === 0) return null;
+    
+    const totalAscent = currentSegments
       .filter(s => s.type === 'asc')
       .reduce((sum, s) => sum + s.elevationGain, 0);
     
-    const totalDescent = advancedSegments
+    const totalDescent = currentSegments
       .filter(s => s.type === 'desc')
       .reduce((sum, s) => sum + s.elevationLoss, 0);
     
-    const totalDistance = advancedSegments.reduce((sum, s) => sum + s.distance, 0);
-    const avgSegmentDistance = totalDistance / advancedSegments.length;
+    const totalDistance = currentSegments.reduce((sum, s) => sum + s.distance, 0);
+    const avgSegmentDistance = totalDistance / currentSegments.length;
     
-    const avgRSquared = advancedSegments
-      .reduce((sum, s) => sum + s.rSquared, 0) / advancedSegments.length;
+    const avgRSquared = currentSegments
+      .reduce((sum, s) => sum + s.rSquared, 0) / currentSegments.length;
     
     return {
-      totalSegments: advancedSegments.length,
-      ascentSegments: advancedSegments.filter(s => s.type === 'asc').length,
-      descentSegments: advancedSegments.filter(s => s.type === 'desc').length,
-      horizontalSegments: advancedSegments.filter(s => s.type === 'hor').length,
+      totalSegments: currentSegments.length,
+      ascentSegments: currentSegments.filter(s => s.type === 'asc').length,
+      descentSegments: currentSegments.filter(s => s.type === 'desc').length,
+      horizontalSegments: currentSegments.filter(s => s.type === 'hor').length,
       totalAscent: Math.round(totalAscent),
       totalDescent: Math.round(totalDescent),
       avgSegmentDistance: isNaN(avgSegmentDistance) ? '0.0' : avgSegmentDistance.toFixed(1),
       avgRSquared: isNaN(avgRSquared) ? '0.000' : avgRSquared.toFixed(3),
       qualityRating: avgRSquared >= 0.95 ? 'Excelente' : avgRSquared >= 0.90 ? 'Bueno' : avgRSquared >= 0.85 ? 'Regular' : 'Bajo'
     };
-  }, [advancedSegments]);
+  }, [currentSegments]);
 
   const handleBackToRoutes = () => {
     navigate('/dashboard/routes');
@@ -111,6 +128,20 @@ const RouteDetail = () => {
 
   const handleAdvancedModeToggle = (enabled: boolean) => {
     setAdvancedAnalysisMode(enabled);
+    if (enabled) {
+      setExperimentalAnalysisMode(false); // Mutually exclusive
+    }
+  };
+
+  const handleExperimentalModeToggle = (enabled: boolean) => {
+    setExperimentalAnalysisMode(enabled);
+    if (enabled) {
+      setAdvancedAnalysisMode(false); // Mutually exclusive
+    }
+  };
+
+  const resetExperimentalParams = () => {
+    setExperimentalParams(DEFAULT_V2_PARAMS);
   };
 
   if (isLoading) {
@@ -193,7 +224,12 @@ const RouteDetail = () => {
                   </h1>
                   {advancedAnalysisMode && (
                     <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                      Análisis Avanzado Activo
+                      Análisis Avanzado V1 Activo
+                    </Badge>
+                  )}
+                  {experimentalAnalysisMode && (
+                    <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                      Análisis Experimental V2 Activo
                     </Badge>
                   )}
                 </div>
@@ -269,44 +305,39 @@ const RouteDetail = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                    <div>
-                      <div className="font-semibold text-red-600">{avgGrade.toFixed(1)}%</div>
-                      <div className="text-xs">Pend. Prom.</div>
-                    </div>
-                  </div>
                   
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                     </svg>
                     <div>
-                      <div className="font-semibold text-rose-600">{maxGrade.toFixed(1)}%</div>
+                      <div className="font-semibold text-rose-600">{Math.min(maxGrade, 50).toFixed(1)}%</div>
                       <div className="text-xs">Pend. Máx.</div>
                     </div>
                   </div>
                 </div>
-                
-                {route.description && (
-                  <p className="text-mountain-600 dark:text-mountain-400 mt-3">
-                    {route.description}
-                  </p>
-                )}
               </div>
             </div>
             
             {/* Row 2: Action buttons */}
             <div className="flex flex-wrap gap-3 justify-center lg:justify-end">
-              {/* Advanced Analysis Toggle */}
+              {/* Advanced Analysis Toggle V1 */}
               <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg px-3 py-2">
                 <Brain className="w-4 h-4 text-primary-600" />
                 <span className="text-sm font-medium">Análisis Avanzado</span>
                 <Switch
                   checked={advancedAnalysisMode}
                   onCheckedChange={handleAdvancedModeToggle}
+                />
+              </div>
+
+              {/* Experimental Analysis Toggle V2 */}
+              <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-blue-200 dark:border-blue-700 rounded-lg px-3 py-2">
+                <span className="w-4 h-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"></span>
+                <span className="text-sm font-medium">Análisis Experimental</span>
+                <Switch
+                  checked={experimentalAnalysisMode}
+                  onCheckedChange={handleExperimentalModeToggle}
                 />
               </div>
               
@@ -329,6 +360,17 @@ const RouteDetail = () => {
             </div>
           </div>
 
+          {/* Experimental V2 Controls Bar */}
+          {experimentalAnalysisMode && (
+            <AdvancedControlsBarV2
+              params={experimentalParams}
+              setParams={setExperimentalParams}
+              stats={advancedStats}
+              onReset={resetExperimentalParams}
+              onClose={() => setExperimentalAnalysisMode(false)}
+            />
+          )}
+
           {/* Advanced Elevation Chart */}
           <div className="w-full">
             <ElevationChartD3
@@ -339,16 +381,16 @@ const RouteDetail = () => {
                 height: 400,
                 backgroundColor: 'transparent'
               }}
-              advancedSegments={advancedSegments}
-              macroBoundaries={macroBoundaries}
+              advancedSegments={experimentalAnalysisMode ? experimentalSegments : advancedSegments}
+              macroBoundaries={experimentalAnalysisMode ? experimentalMacroBoundaries : macroBoundaries}
             />
           </div>
 
           {/* Segments Table */}
           <SegmentsTable 
             segments={segments}
-            advancedSegments={advancedSegments}
-            isAdvancedMode={advancedAnalysisMode}
+            advancedSegments={experimentalAnalysisMode ? experimentalSegments : advancedSegments}
+            isAdvancedMode={advancedAnalysisMode || experimentalAnalysisMode}
             onSegmentHover={setHoveredSegment}
             hoveredSegment={hoveredSegment}
           />
