@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
@@ -173,73 +174,132 @@ const RouteDetail = () => {
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-6 space-y-6">
-          {/* Enhanced Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Button 
-                  onClick={handleBackToRoutes} 
-                  variant="ghost" 
-                  size="sm"
-                  className="p-1"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
-                <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200">
-                  {route.name}
-                </h1>
-                {advancedAnalysisMode && (
-                  <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                    Análisis Avanzado Activo
+          {/* Enhanced Header - Row 1: Route Info */}
+          <div className="space-y-4">
+            <div className="flex items-start gap-4">
+              <Button 
+                onClick={handleBackToRoutes} 
+                variant="ghost" 
+                size="sm"
+                className="p-1 mt-1"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200">
+                    {route.name}
+                  </h1>
+                  {advancedAnalysisMode && (
+                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                      Análisis Avanzado Activo
+                    </Badge>
+                  )}
+                </div>
+                
+                {/* Route type and date info */}
+                <div className="flex items-center gap-4 mb-3">
+                  <Badge className={`${getRouteTypeColor(route.route_type)} text-sm`}>
+                    {getRouteTypeLabel(route.route_type)}
                   </Badge>
-                )}
-              </div>
-              
-              {/* Route type and date info */}
-              <div className="flex items-center gap-3 mb-3">
-                <Badge className={`${getRouteTypeColor(route.route_type)} text-sm`}>
-                  {getRouteTypeLabel(route.route_type)}
-                </Badge>
-                <span className="text-sm text-mountain-600 dark:text-mountain-400" title={getDateSourceLabel(route.date_source)}>
-                  {getDisplayDate(route)}
-                </span>
-                <span className="text-sm text-mountain-600 dark:text-mountain-400">
-                  Dificultad: {route.difficulty_level}
-                </span>
-              </div>
-              
-              <div className="flex flex-wrap gap-6 text-sm text-mountain-600 dark:text-mountain-400">
-                <span className="flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  {route.distance_km.toFixed(1)} km
-                </span>
-                <span className="flex items-center gap-1">
-                  <ArrowUp className="w-4 h-4 text-primary-600" />
-                  +{route.elevation_gain_m}m
-                </span>
-                {totalElevationLoss > 0 && (
-                  <span className="flex items-center gap-1">
-                    <ArrowDown className="w-4 h-4 text-blue-600" />
-                    -{Math.round(totalElevationLoss)}m
+                  <span className="text-sm text-mountain-600 dark:text-mountain-400" title={getDateSourceLabel(route.date_source)}>
+                    {getDisplayDate(route)}
                   </span>
+                  <span className="text-sm text-mountain-600 dark:text-mountain-400">
+                    Dificultad: {route.difficulty_level}
+                  </span>
+                </div>
+                
+                {/* Complete route statistics in a single comprehensive row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 text-sm text-mountain-600 dark:text-mountain-400">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <div>
+                      <div className="font-semibold text-primary-600">{route.distance_km.toFixed(1)} km</div>
+                      <div className="text-xs">Distancia</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <ArrowUp className="w-4 h-4 text-green-600" />
+                    <div>
+                      <div className="font-semibold text-green-600">+{route.elevation_gain_m}m</div>
+                      <div className="text-xs">Ascenso</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <ArrowDown className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <div className="font-semibold text-blue-600">-{Math.round(totalElevationLoss)}m</div>
+                      <div className="text-xs">Descenso</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <div className="font-semibold text-purple-600">{totalTime}</div>
+                      <div className="text-xs">Tiempo Est.</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                    </svg>
+                    <div>
+                      <div className="font-semibold text-orange-600">{Math.round(maxElevation)}m</div>
+                      <div className="text-xs">Máx. Elev.</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                    <div>
+                      <div className="font-semibold text-teal-600">{Math.round(minElevation)}m</div>
+                      <div className="text-xs">Mín. Elev.</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                    <div>
+                      <div className="font-semibold text-red-600">{avgGrade.toFixed(1)}%</div>
+                      <div className="text-xs">Pend. Prom.</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                    <div>
+                      <div className="font-semibold text-rose-600">{maxGrade.toFixed(1)}%</div>
+                      <div className="text-xs">Pend. Máx.</div>
+                    </div>
+                  </div>
+                </div>
+                
+                {route.description && (
+                  <p className="text-mountain-600 dark:text-mountain-400 mt-3">
+                    {route.description}
+                  </p>
                 )}
-                <span className="flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {totalTime}
-                </span>
               </div>
-              {route.description && (
-                <p className="text-mountain-600 dark:text-mountain-400 mt-2">
-                  {route.description}
-                </p>
-              )}
             </div>
             
-            <div className="flex gap-3">
+            {/* Row 2: Action buttons */}
+            <div className="flex flex-wrap gap-3 justify-center lg:justify-end">
               {/* Advanced Analysis Toggle */}
               <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg px-3 py-2">
                 <Brain className="w-4 h-4 text-primary-600" />
@@ -266,40 +326,6 @@ const RouteDetail = () => {
                 <Map className="w-4 h-4 mr-2" />
                 Share Route
               </Button>
-            </div>
-          </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
-              <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                {Math.round(maxElevation)}m
-              </div>
-              <div className="text-sm text-mountain-600 dark:text-mountain-400">Max Elevation</div>
-            </div>
-            <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {Math.round(minElevation)}m
-              </div>
-              <div className="text-sm text-mountain-600 dark:text-mountain-400">Min Elevation</div>
-            </div>
-            <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
-              <div className="text-2xl font-bold text-earth-600 dark:text-earth-400">
-                {avgGrade.toFixed(1)}%
-              </div>
-              <div className="text-sm text-mountain-600 dark:text-mountain-400">Avg Grade</div>
-            </div>
-            <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
-              <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                {maxGrade.toFixed(1)}%
-              </div>
-              <div className="text-sm text-mountain-600 dark:text-mountain-400">Max Grade</div>
-            </div>
-            <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {Math.round(totalElevationLoss)}m
-              </div>
-              <div className="text-sm text-mountain-600 dark:text-mountain-400">Total Descent</div>
             </div>
           </div>
 
