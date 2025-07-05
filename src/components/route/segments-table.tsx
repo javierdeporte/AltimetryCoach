@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { AdvancedSegment } from '@/utils/types';
@@ -35,8 +36,12 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
         const elevationGain = advSeg.elevationGain;
         const elevationLoss = advSeg.elevationLoss;
         
-        // Calculate grade from slope 
-        const gradePercent = advSeg.slope * 100;
+        // Calculate grade correctly from elevation change and distance
+        // slope from regression is in elevation/distance (km), convert to percentage
+        // For coherent gradient calculation: (elevation_change_m / distance_m) * 100
+        const elevationChange = advSeg.endPoint.displayElevation - advSeg.startPoint.displayElevation;
+        const distanceInMeters = distance * 1000; // Convert km to meters
+        const gradePercent = distanceInMeters > 0 ? (elevationChange / distanceInMeters) * 100 : 0;
         
         return {
           id: `advanced-${index}`,
