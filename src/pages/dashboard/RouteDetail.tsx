@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
@@ -6,16 +5,14 @@ import { ElevationChartD3 } from '../../components/route/elevation-chart-d3';
 import { SegmentsTable } from '../../components/route/segments-table';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
+import { Slider } from '../../components/ui/slider';
 import { Switch } from '../../components/ui/switch';
-import { Sheet, SheetContent, SheetTrigger } from '../../components/ui/sheet';
-import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff } from 'lucide-react';
+import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
 import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS } from '../../utils/advancedSegmentation';
-import { segmentProfileAdvancedV2, DEFAULT_ADVANCED_SEGMENTATION_PARAMS_V2 } from '../../utils/advancedSegmentationV2';
 import { AdvancedControlsPanel } from '../../components/route/advanced-controls-panel';
-import { AdvancedControlsPanelV2 } from '../../components/route/AdvancedControlsPanelV2';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -23,15 +20,9 @@ const RouteDetail = () => {
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   const [showMap, setShowMap] = useState(false);
   
-  // Feature flag for V2 analysis
-  const [useV2Analysis, setUseV2Analysis] = useState(true);
-  
   // Advanced analysis state
   const [advancedAnalysisMode, setAdvancedAnalysisMode] = useState(false);
   const [advancedParams, setAdvancedParams] = useState(DEFAULT_ADVANCED_SEGMENTATION_PARAMS);
-  const [advancedParamsV2, setAdvancedParamsV2] = useState(DEFAULT_ADVANCED_SEGMENTATION_PARAMS_V2);
-  const [showTacticalHighlights, setShowTacticalHighlights] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(false);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -64,21 +55,15 @@ const RouteDetail = () => {
     }));
   }, [elevationData]);
 
-  // Calculate advanced segments based on selected version
-  const { segments: advancedSegments, macroBoundaries, tacticalHighlights } = useMemo(() => {
+  // Calculate advanced segments in real-time when mode is active
+  const { segments: advancedSegments, macroBoundaries } = useMemo(() => {
     if (!advancedAnalysisMode || processedElevationData.length === 0) {
-      return { segments: [], macroBoundaries: [], tacticalHighlights: [] };
+      return { segments: [], macroBoundaries: [] };
     }
     
-    if (useV2Analysis) {
-      console.log('Calculating V2 advanced segments with params:', advancedParamsV2);
-      return segmentProfileAdvancedV2(processedElevationData, advancedParamsV2);
-    } else {
-      console.log('Calculating V1 advanced segments with params:', advancedParams);
-      const result = segmentProfileAdvanced(processedElevationData, advancedParams);
-      return { ...result, tacticalHighlights: [] };
-    }
-  }, [advancedAnalysisMode, processedElevationData, useV2Analysis, advancedParams, advancedParamsV2]);
+    console.log('Calculating advanced segments with params:', advancedParams);
+    return segmentProfileAdvanced(processedElevationData, advancedParams);
+  }, [advancedAnalysisMode, processedElevationData, advancedParams]);
 
   // Calculate advanced segments statistics
   const advancedStats = useMemo(() => {
@@ -107,10 +92,9 @@ const RouteDetail = () => {
       totalDescent: Math.round(totalDescent),
       avgSegmentDistance: isNaN(avgSegmentDistance) ? '0.0' : avgSegmentDistance.toFixed(1),
       avgRSquared: isNaN(avgRSquared) ? '0.000' : avgRSquared.toFixed(3),
-      qualityRating: avgRSquared >= 0.95 ? 'Excelente' : avgRSquared >= 0.90 ? 'Bueno' : avgRSquared >= 0.85 ? 'Regular' : 'Bajo',
-      tacticalHighlights: tacticalHighlights?.length || 0
+      qualityRating: avgRSquared >= 0.95 ? 'Excelente' : avgRSquared >= 0.90 ? 'Bueno' : avgRSquared >= 0.85 ? 'Regular' : 'Bajo'
     };
-  }, [advancedSegments, tacticalHighlights]);
+  }, [advancedSegments]);
 
   const handleBackToRoutes = () => {
     navigate('/dashboard/routes');
@@ -121,18 +105,11 @@ const RouteDetail = () => {
   };
 
   const resetAdvancedParams = () => {
-    if (useV2Analysis) {
-      setAdvancedParamsV2(DEFAULT_ADVANCED_SEGMENTATION_PARAMS_V2);
-    } else {
-      setAdvancedParams(DEFAULT_ADVANCED_SEGMENTATION_PARAMS);
-    }
+    setAdvancedParams(DEFAULT_ADVANCED_SEGMENTATION_PARAMS);
   };
 
   const handleAdvancedModeToggle = (enabled: boolean) => {
     setAdvancedAnalysisMode(enabled);
-    if (enabled) {
-      setPanelOpen(true);
-    }
   };
 
   if (isLoading) {
@@ -176,17 +153,15 @@ const RouteDetail = () => {
   const maxElevation = elevationData.length > 0 ? Math.max(...elevationData.map(p => p.elevation)) : 0;
   const minElevation = elevationData.length > 0 ? Math.min(...elevationData.map(p => p.elevation)) : 0;
   
-  // Fixed max grade calculation
-  const maxGrade = elevationData.length > 1 ? elevationData.reduce((maxGrad, point, index) => {
+  const grades = elevationData.map((point, index) => {
     if (index === 0) return 0;
     const elevationDiff = point.elevation - elevationData[index - 1].elevation;
-    const distanceDiff = (point.distance - elevationData[index - 1].distance) * 1000; // Convert to meters
-    if (distanceDiff > 0) {
-      const grade = Math.abs((elevationDiff / distanceDiff) * 100);
-      return Math.max(maxGrad, grade);
-    }
-    return maxGrad;
-  }, 0) : 0;
+    const distanceDiff = (point.distance - elevationData[index - 1].distance) * 1000;
+    return distanceDiff > 0 ? (elevationDiff / distanceDiff) * 100 : 0;
+  });
+
+  const avgGrade = grades.length > 0 ? grades.reduce((acc, grade) => acc + grade, 0) / grades.length : 0;
+  const maxGrade = grades.length > 0 ? Math.max(...grades.map(g => Math.abs(g))) : 0;
 
   const estimatedTime = (route.distance_km / 5) * 60;
   const hours = Math.floor(estimatedTime / 60);
@@ -198,126 +173,77 @@ const RouteDetail = () => {
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-6 space-y-6">
-          {/* Enhanced Header - Row 1: Route Info */}
-          <div className="space-y-4">
-            <div className="flex items-start gap-4">
-              <Button 
-                onClick={handleBackToRoutes} 
-                variant="ghost" 
-                size="sm"
-                className="p-1 mt-1"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-              
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200">
-                    {route.name}
-                  </h1>
-                  {advancedAnalysisMode && (
-                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                      {useV2Analysis ? 'Análisis V2 Activo' : 'Análisis Avanzado Activo'}
-                    </Badge>
-                  )}
-                </div>
-                
-                {/* Route type and date info */}
-                <div className="flex items-center gap-4 mb-3">
-                  <Badge className={`${getRouteTypeColor(route.route_type)} text-sm`}>
-                    {getRouteTypeLabel(route.route_type)}
+          {/* Enhanced Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Button 
+                  onClick={handleBackToRoutes} 
+                  variant="ghost" 
+                  size="sm"
+                  className="p-1"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+                <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200">
+                  {route.name}
+                </h1>
+                {advancedAnalysisMode && (
+                  <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                    Análisis Avanzado Activo
                   </Badge>
-                  <span className="text-sm text-mountain-600 dark:text-mountain-400" title={getDateSourceLabel(route.date_source)}>
-                    {getDisplayDate(route)}
-                  </span>
-                  <span className="text-sm text-mountain-600 dark:text-mountain-400">
-                    Dificultad: {route.difficulty_level}
-                  </span>
-                </div>
-                
-                {/* Complete route statistics in a single comprehensive row */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 text-sm text-mountain-600 dark:text-mountain-400">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <div>
-                      <div className="font-semibold text-primary-600">{route.distance_km.toFixed(1)} km</div>
-                      <div className="text-xs">Distancia</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <ArrowUp className="w-4 h-4 text-green-600" />
-                    <div>
-                      <div className="font-semibold text-green-600">+{route.elevation_gain_m}m</div>
-                      <div className="text-xs">Ascenso</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <ArrowDown className="w-4 h-4 text-blue-600" />
-                    <div>
-                      <div className="font-semibold text-blue-600">-{Math.round(totalElevationLoss)}m</div>
-                      <div className="text-xs">Descenso</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div>
-                      <div className="font-semibold text-purple-600">{totalTime}</div>
-                      <div className="text-xs">Tiempo Est.</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                    </svg>
-                    <div>
-                      <div className="font-semibold text-orange-600">{Math.round(maxElevation)}m</div>
-                      <div className="text-xs">Máx. Elev.</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
-                    <div>
-                      <div className="font-semibold text-teal-600">{Math.round(minElevation)}m</div>
-                      <div className="text-xs">Mín. Elev.</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                    <div>
-                      <div className="font-semibold text-rose-600">{maxGrade.toFixed(1)}%</div>
-                      <div className="text-xs">Pend. Máx.</div>
-                    </div>
-                  </div>
-                </div>
-                
-                {route.description && (
-                  <p className="text-mountain-600 dark:text-mountain-400 mt-3">
-                    {route.description}
-                  </p>
                 )}
               </div>
+              
+              {/* Route type and date info */}
+              <div className="flex items-center gap-3 mb-3">
+                <Badge className={`${getRouteTypeColor(route.route_type)} text-sm`}>
+                  {getRouteTypeLabel(route.route_type)}
+                </Badge>
+                <span className="text-sm text-mountain-600 dark:text-mountain-400" title={getDateSourceLabel(route.date_source)}>
+                  {getDisplayDate(route)}
+                </span>
+                <span className="text-sm text-mountain-600 dark:text-mountain-400">
+                  Dificultad: {route.difficulty_level}
+                </span>
+              </div>
+              
+              <div className="flex flex-wrap gap-6 text-sm text-mountain-600 dark:text-mountain-400">
+                <span className="flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  {route.distance_km.toFixed(1)} km
+                </span>
+                <span className="flex items-center gap-1">
+                  <ArrowUp className="w-4 h-4 text-primary-600" />
+                  +{route.elevation_gain_m}m
+                </span>
+                {totalElevationLoss > 0 && (
+                  <span className="flex items-center gap-1">
+                    <ArrowDown className="w-4 h-4 text-blue-600" />
+                    -{Math.round(totalElevationLoss)}m
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {totalTime}
+                </span>
+              </div>
+              {route.description && (
+                <p className="text-mountain-600 dark:text-mountain-400 mt-2">
+                  {route.description}
+                </p>
+              )}
             </div>
             
-            {/* Row 2: Action buttons */}
-            <div className="flex flex-wrap gap-3 justify-center lg:justify-end">
+            <div className="flex gap-3">
               {/* Advanced Analysis Toggle */}
               <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg px-3 py-2">
                 <Brain className="w-4 h-4 text-primary-600" />
-                <span className="text-sm font-medium">{useV2Analysis ? 'Análisis V2' : 'Análisis Avanzado'}</span>
+                <span className="text-sm font-medium">Análisis Avanzado</span>
                 <Switch
                   checked={advancedAnalysisMode}
                   onCheckedChange={handleAdvancedModeToggle}
@@ -343,6 +269,40 @@ const RouteDetail = () => {
             </div>
           </div>
 
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
+              <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                {Math.round(maxElevation)}m
+              </div>
+              <div className="text-sm text-mountain-600 dark:text-mountain-400">Max Elevation</div>
+            </div>
+            <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                {Math.round(minElevation)}m
+              </div>
+              <div className="text-sm text-mountain-600 dark:text-mountain-400">Min Elevation</div>
+            </div>
+            <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
+              <div className="text-2xl font-bold text-earth-600 dark:text-earth-400">
+                {avgGrade.toFixed(1)}%
+              </div>
+              <div className="text-sm text-mountain-600 dark:text-mountain-400">Avg Grade</div>
+            </div>
+            <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
+              <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                {maxGrade.toFixed(1)}%
+              </div>
+              <div className="text-sm text-mountain-600 dark:text-mountain-400">Max Grade</div>
+            </div>
+            <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-xl p-4">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                {Math.round(totalElevationLoss)}m
+              </div>
+              <div className="text-sm text-mountain-600 dark:text-mountain-400">Total Descent</div>
+            </div>
+          </div>
+
           {/* Advanced Elevation Chart */}
           <div className="w-full">
             <ElevationChartD3
@@ -355,8 +315,6 @@ const RouteDetail = () => {
               }}
               advancedSegments={advancedSegments}
               macroBoundaries={macroBoundaries}
-              tacticalHighlights={tacticalHighlights}
-              showTacticalHighlights={showTacticalHighlights}
             />
           </div>
 
@@ -387,40 +345,15 @@ const RouteDetail = () => {
         </div>
       </div>
 
-      {/* Advanced Controls Panel as Sheet Overlay */}
+      {/* Advanced Controls Panel */}
       {advancedAnalysisMode && (
-        <Sheet open={panelOpen} onOpenChange={setPanelOpen}>
-          <SheetTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="fixed right-4 top-1/2 transform -translate-y-1/2 z-40 shadow-lg"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-96 p-0">
-            {useV2Analysis ? (
-              <AdvancedControlsPanelV2
-                params={advancedParamsV2}
-                setParams={setAdvancedParamsV2}
-                stats={advancedStats}
-                showTacticalHighlights={showTacticalHighlights}
-                setShowTacticalHighlights={setShowTacticalHighlights}
-                onReset={resetAdvancedParams}
-                onClose={() => setPanelOpen(false)}
-              />
-            ) : (
-              <AdvancedControlsPanel
-                params={advancedParams}
-                setParams={setAdvancedParams}
-                stats={advancedStats}
-                onReset={resetAdvancedParams}
-                onClose={() => setPanelOpen(false)}
-              />
-            )}
-          </SheetContent>
-        </Sheet>
+        <AdvancedControlsPanel
+          params={advancedParams}
+          setParams={setAdvancedParams}
+          stats={advancedStats}
+          onReset={resetAdvancedParams}
+          onClose={() => setAdvancedAnalysisMode(false)}
+        />
       )}
     </div>
   );

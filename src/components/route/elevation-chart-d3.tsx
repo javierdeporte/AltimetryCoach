@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import * as d3 from 'd3';
 
@@ -21,12 +20,6 @@ interface AdvancedSegment {
   rSquared: number;
   type: 'asc' | 'desc' | 'hor';
   color: string;
-}
-
-interface TacticalHighlight {
-  startIndex: number;
-  endIndex: number;
-  maxSlope: number;
 }
 
 interface ElevationChartD3Props {
@@ -59,8 +52,6 @@ interface ElevationChartD3Props {
   }>;
   advancedSegments?: AdvancedSegment[];
   macroBoundaries?: number[];
-  tacticalHighlights?: TacticalHighlight[];
-  showTacticalHighlights?: boolean;
   showGradientVisualization?: boolean;
 }
 
@@ -75,8 +66,6 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   intelligentSegments = [],
   advancedSegments = [],
   macroBoundaries = [],
-  tacticalHighlights = [],
-  showTacticalHighlights = false,
   showGradientVisualization = false
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -164,7 +153,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   useEffect(() => {
     if (!svgRef.current || !containerRef.current || processedData.length === 0 || containerWidth === 0) return;
 
-    console.log('Drawing chart with advanced segments:', advancedSegments.length, 'tactical highlights:', tacticalHighlights.length);
+    console.log('Drawing chart with advanced segments:', advancedSegments.length);
     const width = containerWidth;
 
     const svg = d3.select(svgRef.current)
@@ -176,8 +165,8 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
     svg.selectAll("*").remove();
 
     // Calculate domains
-    const elevationValues = processedData.map(p => p.displayElevation);
-    const [minEle, maxEle] = d3.extent(elevationValues) as [number, number];
+    const elevationPoints = processedData.map(p => p.displayElevation);
+    const [minEle, maxEle] = d3.extent(elevationPoints) as [number, number];
     const eleRange = maxEle - minEle;
     let padding = eleRange * 0.1;
     if (eleRange === 0) padding = opts.useFeet ? 50 * 3.28084 : 15;
@@ -248,36 +237,6 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
             .attr("opacity", 0.5);
         }
       }
-    }
-
-    // Draw tactical highlights if enabled
-    if (showTacticalHighlights && tacticalHighlights.length > 0) {
-      tacticalHighlights.forEach(highlight => {
-        const startPoint = processedData[highlight.startIndex];
-        const endPoint = processedData[Math.min(highlight.endIndex, processedData.length - 1)];
-        
-        if (startPoint && endPoint) {
-          // Draw highlight rectangle
-          chartContent.append("rect")
-            .attr("x", xScale(startPoint.displayDistance))
-            .attr("y", opts.marginTop)
-            .attr("width", xScale(endPoint.displayDistance) - xScale(startPoint.displayDistance))
-            .attr("height", opts.height - opts.marginTop - opts.marginBottom)
-            .attr("fill", "#ff6b35")
-            .attr("opacity", 0.3);
-          
-          // Add label for max slope
-          const midX = (xScale(startPoint.displayDistance) + xScale(endPoint.displayDistance)) / 2;
-          chartContent.append("text")
-            .attr("x", midX)
-            .attr("y", opts.marginTop + 15)
-            .attr("text-anchor", "middle")
-            .attr("fill", "#ff6b35")
-            .attr("font-size", "10px")
-            .attr("font-weight", "bold")
-            .text(`${highlight.maxSlope.toFixed(1)}%`);
-        }
-      });
     }
 
     // Draw intelligent segments backgrounds only if not in advanced mode
@@ -508,9 +467,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         }
       });
 
-  }, [processedData, opts, intelligentSegments, advancedSegments, onPointHover, showGradientVisualization, gradientColorScale, macroBoundaries, containerWidth, tacticalHighlights, showTacticalHighlights]);
-
-  const chartTitle = advancedSegments.length > 0 ? "Perfil de Elevación con Análisis V2" : "Perfil de Elevación con Análisis de Regresión";
+  }, [processedData, opts, intelligentSegments, advancedSegments, onPointHover, showGradientVisualization, gradientColorScale, macroBoundaries, containerWidth]);
 
   return (
     <div 
@@ -525,7 +482,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
     >
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-          {chartTitle}
+          Perfil de Elevación con Análisis de Regresión
         </h3>
         <div className="flex gap-4 text-sm text-mountain-600 dark:text-mountain-400">
           <span>📏 Distancia: {processedData.length > 0 ? processedData[processedData.length - 1]?.displayDistance.toFixed(1) : '0'} {opts.useMiles ? 'mi' : 'km'}</span>
@@ -534,9 +491,6 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
           )}
           {advancedSegments.length > 0 && (
             <span>📊 R² promedio: {(advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length).toFixed(3)}</span>
-          )}
-          {showTacticalHighlights && tacticalHighlights.length > 0 && (
-            <span>⚠️ Rampas críticas: {tacticalHighlights.length}</span>
           )}
         </div>
       </div>
@@ -565,12 +519,6 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
             <div className="w-px h-4 border-l border-gray-500 border-dashed"></div>
             <span>Divisor Micro</span>
           </div>
-          {showTacticalHighlights && (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-2 bg-orange-400 opacity-60 rounded-sm"></div>
-              <span>Rampa Crítica</span>
-            </div>
-          )}
         </div>
       )}
       
