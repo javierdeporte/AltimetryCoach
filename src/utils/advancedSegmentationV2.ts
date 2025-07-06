@@ -209,16 +209,16 @@ function generateSeedBreakpoints(
 }
 
 /**
- * ETAPA 2B: Refinamiento por Convergencia
- * Refines breakpoints through iterative positioning and validation
+ * ETAPA 2B: Refinamiento por Convergencia DENTRO de un macro-segmento
+ * Refines breakpoints through iterative positioning and validation within macro boundaries
  */
-function refineBreakpoints(
-  elevationData: ElevationPoint[],
-  initialBreakpoints: number[],
+function refineBreakpointsWithinMacroSegment(
+  macroSegmentData: ElevationPoint[],
+  initialLocalBreakpoints: number[],
   params: AdvancedSegmentationV2Params
 ): number[] {
-  // Inicializar la lista de breakpoints a refinar
-  let currentBreakpoints = [...initialBreakpoints];
+  // Inicializar la lista de breakpoints a refinar (índices locales)
+  let currentBreakpoints = [...initialLocalBreakpoints];
   
   // Limitar las iteraciones para seguridad
   const MAX_ITERATIONS = 30;
@@ -227,10 +227,9 @@ function refineBreakpoints(
     let wasChangeMadeInThisPass = false;
 
     // --- PASADA 1: POSICIONAMIENTO ÓPTIMO ("WIGGLE") ---
-    // Recorrer todos los breakpoints y mover cada uno a su posición de mínimo error local
     const wiggledBreakpoints = currentBreakpoints.map((breakpoint, index) => {
-      // Skip boundary breakpoints that can't be moved safely
-      if (breakpoint <= 1 || breakpoint >= elevationData.length - 2) {
+      // Skip boundary breakpoints that can't be moved safely within the macro-segment
+      if (breakpoint <= 1 || breakpoint >= macroSegmentData.length - 2) {
         return breakpoint;
       }
       
@@ -239,21 +238,21 @@ function refineBreakpoints(
       let bestCombinedError = Infinity;
       
       for (const candidatePosition of positions) {
-        if (candidatePosition <= 0 || candidatePosition >= elevationData.length - 1) {
+        if (candidatePosition <= 0 || candidatePosition >= macroSegmentData.length - 1) {
           continue;
         }
         
-        // Get adjacent breakpoints to define segment boundaries
+        // Get adjacent breakpoints within the macro-segment
         const prevBreakpoint = index > 0 ? currentBreakpoints[index - 1] : 0;
-        const nextBreakpoint = index < currentBreakpoints.length - 1 ? currentBreakpoints[index + 1] : elevationData.length - 1;
+        const nextBreakpoint = index < currentBreakpoints.length - 1 ? currentBreakpoints[index + 1] : macroSegmentData.length - 1;
         
         // Calculate error for segment A (before the candidate position)
-        const segmentAPoints = elevationData.slice(prevBreakpoint, candidatePosition + 1);
+        const segmentAPoints = macroSegmentData.slice(prevBreakpoint, candidatePosition + 1);
         const segmentARegressionPoints = segmentAPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
         const segmentARegression = calculateLinearRegression(segmentARegressionPoints);
         
         // Calculate error for segment B (after the candidate position)
-        const segmentBPoints = elevationData.slice(candidatePosition, nextBreakpoint + 1);
+        const segmentBPoints = macroSegmentData.slice(candidatePosition, nextBreakpoint + 1);
         const segmentBRegressionPoints = segmentBPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
         const segmentBRegression = calculateLinearRegression(segmentBRegressionPoints);
         
@@ -277,20 +276,19 @@ function refineBreakpoints(
     currentBreakpoints = wiggledBreakpoints;
 
     // --- PASADA 2: VALIDACIÓN Y ELIMINACIÓN ---
-    // Crear una nueva lista para los breakpoints que sobrevivan la validación
     const validatedBreakpoints: number[] = [];
     
     for (let j = 0; j < currentBreakpoints.length; j++) {
       const breakpointToValidate = currentBreakpoints[j];
       
-      // Obtener los segmentos adyacentes (SegmentA y SegmentB)
+      // Obtener los segmentos adyacentes dentro del macro-segmento
       const prevBreakpoint = j > 0 ? currentBreakpoints[j - 1] : 0;
-      const nextBreakpoint = j < currentBreakpoints.length - 1 ? currentBreakpoints[j + 1] : elevationData.length - 1;
+      const nextBreakpoint = j < currentBreakpoints.length - 1 ? currentBreakpoints[j + 1] : macroSegmentData.length - 1;
       
       // Get segment A (before the breakpoint)
-      const segmentAPoints = elevationData.slice(prevBreakpoint, breakpointToValidate + 1);
+      const segmentAPoints = macroSegmentData.slice(prevBreakpoint, breakpointToValidate + 1);
       // Get segment B (after the breakpoint)  
-      const segmentBPoints = elevationData.slice(breakpointToValidate, nextBreakpoint + 1);
+      const segmentBPoints = macroSegmentData.slice(breakpointToValidate, nextBreakpoint + 1);
       
       if (segmentAPoints.length >= 2 && segmentBPoints.length >= 2) {
         // Calculate regression for both segments
@@ -298,17 +296,15 @@ function refineBreakpoints(
         const segmentBRegression = calculateLinearRegression(segmentBPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation })));
         
         // Aplicar los criterios del usuario
-        const segmentADistance = elevationData[breakpointToValidate].displayDistance - elevationData[prevBreakpoint].displayDistance;
+        const segmentADistance = macroSegmentData[breakpointToValidate].displayDistance - macroSegmentData[prevBreakpoint].displayDistance;
         const isDistanceValid = segmentADistance >= params.distanciaMinima;
         
         const slopeDifference = Math.abs(segmentARegression.slope - segmentBRegression.slope);
         const isSlopeChangeSignificant = slopeDifference >= params.diferenciaPendiente;
 
         if (isDistanceValid && isSlopeChangeSignificant) {
-          // Si el breakpoint es válido, se mantiene
           validatedBreakpoints.push(breakpointToValidate);
         } else {
-          // Si no es válido, no se añade, lo que es una eliminación implícita
           wasChangeMadeInThisPass = true;
         }
       }
@@ -318,14 +314,43 @@ function refineBreakpoints(
 
     // --- CONDICIÓN DE SALIDA DEL BUCLE ---
     if (!wasChangeMadeInThisPass) {
-      // Si una pasada completa no produjo cambios, el sistema es estable
-      console.log(`V2 Convergence achieved after ${i + 1} iterations`);
+      console.log(`V2 Macro-segment convergence achieved after ${i + 1} iterations`);
       break;
     }
   }
 
-  // Devolver la lista final de breakpoints estables
   return currentBreakpoints;
+}
+
+/**
+ * ETAPA 2C: Reconstrucción y Renderizado Final DENTRO de un macro-segmento
+ * Creates final segment objects from refined local breakpoints within a macro-segment
+ */
+function createFinalSegmentsForMacro(
+  macroSegmentData: ElevationPoint[],
+  localBreakpoints: number[],
+  globalIndexOffset: number
+): AdvancedSegment[] {
+  const segments: AdvancedSegment[] = [];
+  const allLocalBreakpoints = [0, ...localBreakpoints, macroSegmentData.length - 1];
+  
+  for (let i = 0; i < allLocalBreakpoints.length - 1; i++) {
+    const localStartIndex = allLocalBreakpoints[i];
+    const localEndIndex = allLocalBreakpoints[i + 1];
+    
+    const segmentPoints = macroSegmentData.slice(localStartIndex, localEndIndex + 1);
+    const regressionPoints = segmentPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+    
+    if (regressionPoints.length >= 2) {
+      const regression = calculateLinearRegression(regressionPoints);
+      // Convert local indices to global indices
+      const globalStartIndex = globalIndexOffset + localStartIndex;
+      const globalEndIndex = globalIndexOffset + localEndIndex;
+      segments.push(createSegment(segmentPoints, regression, globalStartIndex, globalEndIndex));
+    }
+  }
+  
+  return segments;
 }
 
 /**
@@ -387,7 +412,7 @@ export function segmentProfileV2(
   }
   
   // ETAPA 2: Micro-Segmentación dentro de cada macro-tramo
-  let allBreakpoints: number[] = [];
+  const finalSegments: AdvancedSegment[] = [];
   
   for (let i = 0; i < macroBoundaries.length - 1; i++) {
     const macroStart = macroBoundaries[i];
@@ -396,17 +421,28 @@ export function segmentProfileV2(
     if (macroEnd > macroStart) {
       const macroSegmentData = elevationData.slice(macroStart, macroEnd + 1);
       
-      // Sub-Paso A: Generación de "Semillas Inteligentes"
+      // Sub-Paso A: Generación de "Semillas Inteligentes" DENTRO del macro-tramo
       const seedBreakpoints = generateSeedBreakpoints(macroSegmentData, macroStart, params.distanciaMinima);
-      allBreakpoints.push(...seedBreakpoints);
+      
+      // Sub-Paso B: Refinamiento por Convergencia DENTRO del macro-tramo
+      // Convertir breakpoints globales a índices locales para este macro-segmento
+      const localBreakpoints = seedBreakpoints.map(bp => bp - macroStart);
+      const refinedLocalBreakpoints = refineBreakpointsWithinMacroSegment(
+        macroSegmentData, 
+        localBreakpoints, 
+        params
+      );
+      
+      // Sub-Paso C: Reconstrucción DENTRO del macro-tramo
+      const macroSegments = createFinalSegmentsForMacro(
+        macroSegmentData, 
+        refinedLocalBreakpoints, 
+        macroStart
+      );
+      
+      finalSegments.push(...macroSegments);
     }
   }
-  
-  // Sub-Paso B: Refinamiento por Convergencia
-  const refinedBreakpoints = refineBreakpoints(elevationData, allBreakpoints, params);
-  
-  // Sub-Paso C: Reconstrucción y Renderizado Final
-  const finalSegments = createFinalSegments(elevationData, refinedBreakpoints);
   
   console.log(`V2 Generated ${finalSegments.length} refined segments`);
   
