@@ -217,99 +217,114 @@ function refineBreakpoints(
   initialBreakpoints: number[],
   params: AdvancedSegmentationV2Params
 ): number[] {
-  const MAX_ITERATIONS = 30;
+  // Inicializar la lista de breakpoints a refinar
   let currentBreakpoints = [...initialBreakpoints];
-  let iteration = 0;
   
-  while (iteration < MAX_ITERATIONS) {
-    let hasChanged = false;
-    
-    // PASADA DE POSICIONAMIENTO ("Wiggle")
-    const wiggledBreakpoints = currentBreakpoints.map(breakpoint => {
-      if (breakpoint <= 1 || breakpoint >= elevationData.length - 2) return breakpoint;
+  // Limitar las iteraciones para seguridad
+  const MAX_ITERATIONS = 30;
+
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    let wasChangeMadeInThisPass = false;
+
+    // --- PASADA 1: POSICIONAMIENTO ÓPTIMO ("WIGGLE") ---
+    // Recorrer todos los breakpoints y mover cada uno a su posición de mínimo error local
+    const wiggledBreakpoints = currentBreakpoints.map((breakpoint, index) => {
+      // Skip boundary breakpoints that can't be moved safely
+      if (breakpoint <= 1 || breakpoint >= elevationData.length - 2) {
+        return breakpoint;
+      }
       
       const positions = [breakpoint - 1, breakpoint, breakpoint + 1];
       let bestPosition = breakpoint;
-      let bestError = Infinity;
+      let bestCombinedError = Infinity;
       
-      for (const pos of positions) {
-        if (pos <= 0 || pos >= elevationData.length - 1) continue;
+      for (const candidatePosition of positions) {
+        if (candidatePosition <= 0 || candidatePosition >= elevationData.length - 1) {
+          continue;
+        }
         
-        // Calculate combined error for both adjacent segments
-        const leftStart = currentBreakpoints.findIndex(bp => bp < pos);
-        const rightEnd = currentBreakpoints.findIndex(bp => bp > pos);
+        // Get adjacent breakpoints to define segment boundaries
+        const prevBreakpoint = index > 0 ? currentBreakpoints[index - 1] : 0;
+        const nextBreakpoint = index < currentBreakpoints.length - 1 ? currentBreakpoints[index + 1] : elevationData.length - 1;
         
-        const leftStartIdx = leftStart >= 0 ? currentBreakpoints[leftStart] : 0;
-        const rightEndIdx = rightEnd >= 0 ? currentBreakpoints[rightEnd] : elevationData.length - 1;
+        // Calculate error for segment A (before the candidate position)
+        const segmentAPoints = elevationData.slice(prevBreakpoint, candidatePosition + 1);
+        const segmentARegressionPoints = segmentAPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+        const segmentARegression = calculateLinearRegression(segmentARegressionPoints);
         
-        // Calculate error for left segment
-        const leftPoints = elevationData.slice(leftStartIdx, pos + 1);
-        const leftRegressionPoints = leftPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-        const leftRegression = calculateLinearRegression(leftRegressionPoints);
+        // Calculate error for segment B (after the candidate position)
+        const segmentBPoints = elevationData.slice(candidatePosition, nextBreakpoint + 1);
+        const segmentBRegressionPoints = segmentBPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+        const segmentBRegression = calculateLinearRegression(segmentBRegressionPoints);
         
-        // Calculate error for right segment
-        const rightPoints = elevationData.slice(pos, rightEndIdx + 1);
-        const rightRegressionPoints = rightPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-        const rightRegression = calculateLinearRegression(rightRegressionPoints);
+        // Combined error (lower is better)
+        const combinedError = (1 - segmentARegression.rSquared) + (1 - segmentBRegression.rSquared);
         
-        const combinedError = (1 - leftRegression.rSquared) + (1 - rightRegression.rSquared);
-        
-        if (combinedError < bestError) {
-          bestError = combinedError;
-          bestPosition = pos;
+        if (combinedError < bestCombinedError) {
+          bestCombinedError = combinedError;
+          bestPosition = candidatePosition;
         }
       }
       
+      // If any breakpoint changed position, mark the pass as having made changes
       if (bestPosition !== breakpoint) {
-        hasChanged = true;
+        wasChangeMadeInThisPass = true;
       }
       
       return bestPosition;
     });
     
     currentBreakpoints = wiggledBreakpoints;
-    
-    // PASADA DE VALIDACIÓN Y ELIMINACIÓN
+
+    // --- PASADA 2: VALIDACIÓN Y ELIMINACIÓN ---
+    // Crear una nueva lista para los breakpoints que sobrevivan la validación
     const validatedBreakpoints: number[] = [];
     
-    for (let i = 0; i < currentBreakpoints.length; i++) {
-      const breakpoint = currentBreakpoints[i];
-      const prevBreakpoint = i > 0 ? currentBreakpoints[i - 1] : 0;
-      const nextBreakpoint = i < currentBreakpoints.length - 1 ? currentBreakpoints[i + 1] : elevationData.length - 1;
+    for (let j = 0; j < currentBreakpoints.length; j++) {
+      const breakpointToValidate = currentBreakpoints[j];
       
-      // Condición 1: Distancia mínima del segmento precedente
-      const precedingSegmentDistance = elevationData[breakpoint].displayDistance - elevationData[prevBreakpoint].displayDistance;
-      const condition1 = precedingSegmentDistance >= params.distanciaMinima;
+      // Obtener los segmentos adyacentes (SegmentA y SegmentB)
+      const prevBreakpoint = j > 0 ? currentBreakpoints[j - 1] : 0;
+      const nextBreakpoint = j < currentBreakpoints.length - 1 ? currentBreakpoints[j + 1] : elevationData.length - 1;
       
-      // Condición 2: Diferencia de pendiente entre segmentos adyacentes
-      const precedingPoints = elevationData.slice(prevBreakpoint, breakpoint + 1);
-      const followingPoints = elevationData.slice(breakpoint, nextBreakpoint + 1);
+      // Get segment A (before the breakpoint)
+      const segmentAPoints = elevationData.slice(prevBreakpoint, breakpointToValidate + 1);
+      // Get segment B (after the breakpoint)  
+      const segmentBPoints = elevationData.slice(breakpointToValidate, nextBreakpoint + 1);
       
-      if (precedingPoints.length >= 2 && followingPoints.length >= 2) {
-        const precedingRegression = calculateLinearRegression(precedingPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation })));
-        const followingRegression = calculateLinearRegression(followingPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation })));
+      if (segmentAPoints.length >= 2 && segmentBPoints.length >= 2) {
+        // Calculate regression for both segments
+        const segmentARegression = calculateLinearRegression(segmentAPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation })));
+        const segmentBRegression = calculateLinearRegression(segmentBPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation })));
         
-        const slopeDifference = Math.abs(precedingRegression.slope - followingRegression.slope);
-        const condition2 = slopeDifference >= params.diferenciaPendiente;
+        // Aplicar los criterios del usuario
+        const segmentADistance = elevationData[breakpointToValidate].displayDistance - elevationData[prevBreakpoint].displayDistance;
+        const isDistanceValid = segmentADistance >= params.distanciaMinima;
         
-        if (condition1 && condition2) {
-          validatedBreakpoints.push(breakpoint);
+        const slopeDifference = Math.abs(segmentARegression.slope - segmentBRegression.slope);
+        const isSlopeChangeSignificant = slopeDifference >= params.diferenciaPendiente;
+
+        if (isDistanceValid && isSlopeChangeSignificant) {
+          // Si el breakpoint es válido, se mantiene
+          validatedBreakpoints.push(breakpointToValidate);
         } else {
-          hasChanged = true; // A breakpoint was removed
+          // Si no es válido, no se añade, lo que es una eliminación implícita
+          wasChangeMadeInThisPass = true;
         }
       }
     }
     
     currentBreakpoints = validatedBreakpoints;
-    
-    if (!hasChanged) {
-      console.log(`V2 Convergence achieved after ${iteration + 1} iterations`);
+
+    // --- CONDICIÓN DE SALIDA DEL BUCLE ---
+    if (!wasChangeMadeInThisPass) {
+      // Si una pasada completa no produjo cambios, el sistema es estable
+      console.log(`V2 Convergence achieved after ${i + 1} iterations`);
       break;
     }
-    
-    iteration++;
   }
-  
+
+  // Devolver la lista final de breakpoints estables
   return currentBreakpoints;
 }
 
