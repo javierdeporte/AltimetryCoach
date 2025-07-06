@@ -299,8 +299,11 @@ function refineBreakpointsWithinMacroSegment(
         const segmentADistance = macroSegmentData[breakpointToValidate].displayDistance - macroSegmentData[prevBreakpoint].displayDistance;
         const isDistanceValid = segmentADistance >= params.distanciaMinima;
         
-        const slopeDifference = Math.abs(segmentARegression.slope - segmentBRegression.slope);
-        const isSlopeChangeSignificant = slopeDifference >= params.diferenciaPendiente;
+        // Convert slopes from m/km to percentage for comparison with user parameter
+        const segmentASlopePercent = (segmentARegression.slope / 1000) * 100; // m/km to %
+        const segmentBSlopePercent = (segmentBRegression.slope / 1000) * 100; // m/km to %
+        const slopeDifference = Math.abs(segmentASlopePercent - segmentBSlopePercent);
+        const isSlopeChangeSignificant = slopeDifference >= (params.diferenciaPendiente * 100);
 
         if (isDistanceValid && isSlopeChangeSignificant) {
           validatedBreakpoints.push(breakpointToValidate);
