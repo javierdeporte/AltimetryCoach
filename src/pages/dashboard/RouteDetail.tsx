@@ -13,7 +13,7 @@ import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
 import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS } from '../../utils/advancedSegmentation';
-import { generatePreviewSegments, refineSegments, AdvancedSegmentationV2Params } from '../../utils/advancedSegmentationV2';
+import { segmentProfileV2, DEFAULT_V2_PARAMS, AdvancedSegmentationV2Params } from '../../utils/advancedSegmentationV2';
 import { AdvancedControlsPanel } from '../../components/route/advanced-controls-panel';
 import { AdvancedControlsBarV2 } from '../../components/route/AdvancedControlsBarV2';
 
@@ -29,15 +29,7 @@ const RouteDetail = () => {
   
   // Experimental analysis state (V2)
   const [experimentalAnalysisMode, setExperimentalAnalysisMode] = useState(false);
-  const [experimentalParams, setExperimentalParams] = useState<AdvancedSegmentationV2Params>({
-    prominenciaMinima: 40,
-    distanciaMinima: 0.2,
-    diferenciaPendiente: 0.10
-  });
-  const [isRefining, setIsRefining] = useState(false);
-  const [refineProgress, setRefineProgress] = useState(0);
-  const [refinedSegments, setRefinedSegments] = useState<any[]>([]);
-  const [hasRefinedOnce, setHasRefinedOnce] = useState(false);
+  const [experimentalParams, setExperimentalParams] = useState<AdvancedSegmentationV2Params>(DEFAULT_V2_PARAMS);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -80,20 +72,18 @@ const RouteDetail = () => {
     return segmentProfileAdvanced(processedElevationData, advancedParams);
   }, [advancedAnalysisMode, processedElevationData, advancedParams]);
 
-  // Calculate experimental V2 preview segments in real-time when V2 mode is active
-  const { segments: experimentalPreviewSegments, macroBoundaries: experimentalMacroBoundaries } = useMemo(() => {
+  // Calculate experimental V2 segments in real-time when V2 mode is active
+  const { segments: experimentalSegments, macroBoundaries: experimentalMacroBoundaries } = useMemo(() => {
     if (!experimentalAnalysisMode || processedElevationData.length === 0) {
       return { segments: [], macroBoundaries: [] };
     }
     
-    console.log('Calculating V2 preview segments with params:', experimentalParams);
-    return generatePreviewSegments(processedElevationData, experimentalParams);
+    console.log('Calculating V2 experimental segments with params:', experimentalParams);
+    return segmentProfileV2(processedElevationData, experimentalParams);
   }, [experimentalAnalysisMode, processedElevationData, experimentalParams]);
 
   // Calculate advanced segments statistics (works for both V1 and V2)
-  const currentSegments = experimentalAnalysisMode 
-    ? (refinedSegments.length > 0 ? refinedSegments : experimentalPreviewSegments)
-    : advancedSegments;
+  const currentSegments = experimentalAnalysisMode ? experimentalSegments : advancedSegments;
   const advancedStats = useMemo(() => {
     if (!currentSegments || currentSegments.length === 0) return null;
     
@@ -151,104 +141,7 @@ const RouteDetail = () => {
   };
 
   const resetExperimentalParams = () => {
-    setExperimentalParams({
-      prominenciaMinima: 40,
-      distanciaMinima: 0.2,
-      diferenciaPendiente: 0.10
-    });
-    setRefinedSegments([]);
-    setHasRefinedOnce(false);
-  };
-
-  const handleRefineSegments = async () => {
-    if (!experimentalPreviewSegments.length || isRefining) return;
-    
-    setIsRefining(true);
-    setRefineProgress(0);
-    
-    try {
-      // Extract breakpoints from preview segments
-      const initialBreakpoints = experimentalPreviewSegments
-        .slice(0, -1) // Exclude last segment
-        .map(segment => segment.endIndex);
-      
-      // Run refinement with progress callback
-      const refinedBreakpoints = await new Promise<number[]>((resolve) => {
-        // Use setTimeout to allow UI to update
-        setTimeout(() => {
-          const result = refineSegments(
-            initialBreakpoints,
-            processedElevationData,
-            experimentalParams,
-            (progress) => {
-              setRefineProgress(progress);
-            }
-          );
-          resolve(result);
-        }, 100);
-      });
-      
-      // Create final segments from refined breakpoints
-      const allBreakpoints = [0, ...refinedBreakpoints, processedElevationData.length - 1];
-      const finalSegments = [];
-      
-      for (let i = 0; i < allBreakpoints.length - 1; i++) {
-        const startIndex = allBreakpoints[i];
-        const endIndex = allBreakpoints[i + 1];
-        
-        const segmentPoints = processedElevationData.slice(startIndex, endIndex + 1);
-        const regressionPoints = segmentPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-        
-        if (regressionPoints.length >= 2) {
-          // Simple regression calculation for final segments
-          const n = regressionPoints.length;
-          let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
-
-          for (const p of regressionPoints) {
-            sumX += p.x;
-            sumY += p.y;
-            sumXY += p.x * p.y;
-            sumX2 += p.x * p.x;
-            sumY2 += p.y * p.y;
-          }
-
-          const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-          const intercept = (sumY - slope * sumX) / n;
-          
-          const rNumerator = (n * sumXY - sumX * sumY);
-          const rDenominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
-          const rSquared = rDenominator === 0 ? 1 : Math.pow(rNumerator / rDenominator, 2);
-          
-          const startPoint = segmentPoints[0];
-          const endPoint = segmentPoints[segmentPoints.length - 1];
-          const elevationChange = endPoint.displayElevation - startPoint.displayElevation;
-          const slopePercent = slope * 100;
-          
-          finalSegments.push({
-            startIndex,
-            endIndex,
-            startPoint,
-            endPoint,
-            slope,
-            intercept,
-            rSquared,
-            distance: endPoint.displayDistance - startPoint.displayDistance,
-            elevationGain: elevationChange > 0 ? elevationChange : 0,
-            elevationLoss: elevationChange < 0 ? Math.abs(elevationChange) : 0,
-            type: slopePercent > 2 ? 'asc' : slopePercent < -2 ? 'desc' : 'hor',
-            color: slopePercent > 2 ? '#22c55e' : slopePercent < -2 ? '#3b82f6' : '#6b7280'
-          });
-        }
-      }
-      
-      setRefinedSegments(finalSegments);
-      setHasRefinedOnce(true);
-    } catch (error) {
-      console.error('Error during refinement:', error);
-    } finally {
-      setIsRefining(false);
-      setRefineProgress(0);
-    }
+    setExperimentalParams(DEFAULT_V2_PARAMS);
   };
 
   if (isLoading) {
@@ -475,10 +368,6 @@ const RouteDetail = () => {
               stats={advancedStats}
               onReset={resetExperimentalParams}
               onClose={() => setExperimentalAnalysisMode(false)}
-              onRefineSegments={handleRefineSegments}
-              isRefining={isRefining}
-              refineProgress={refineProgress}
-              hasRefinedOnce={hasRefinedOnce}
             />
           )}
 
@@ -492,7 +381,7 @@ const RouteDetail = () => {
                 height: 400,
                 backgroundColor: 'transparent'
               }}
-              advancedSegments={experimentalAnalysisMode ? (refinedSegments.length > 0 ? refinedSegments : experimentalPreviewSegments) : advancedSegments}
+              advancedSegments={experimentalAnalysisMode ? experimentalSegments : advancedSegments}
               macroBoundaries={experimentalAnalysisMode ? experimentalMacroBoundaries : macroBoundaries}
             />
           </div>
@@ -500,7 +389,7 @@ const RouteDetail = () => {
           {/* Segments Table */}
           <SegmentsTable 
             segments={segments}
-            advancedSegments={experimentalAnalysisMode ? (refinedSegments.length > 0 ? refinedSegments : experimentalPreviewSegments) : advancedSegments}
+            advancedSegments={experimentalAnalysisMode ? experimentalSegments : advancedSegments}
             isAdvancedMode={advancedAnalysisMode || experimentalAnalysisMode}
             onSegmentHover={setHoveredSegment}
             hoveredSegment={hoveredSegment}
