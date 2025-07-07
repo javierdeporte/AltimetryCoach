@@ -1,7 +1,8 @@
 import React from 'react';
 import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
-import { RotateCcw, X } from 'lucide-react';
+import { Progress } from '../ui/progress';
+import { RotateCcw, X, Brain } from 'lucide-react';
 import { AdvancedSegmentationV2Params, DEFAULT_V2_PARAMS } from '../../utils/advancedSegmentationV2';
 
 interface AdvancedControlsBarV2Props {
@@ -9,6 +10,9 @@ interface AdvancedControlsBarV2Props {
   setParams: (params: AdvancedSegmentationV2Params) => void;
   onReset: () => void;
   onClose: () => void;
+  onRefineSegments: () => void;
+  isRefining: boolean;
+  refineProgress: number;
   stats?: {
     totalSegments: number;
     ascentSegments: number;
@@ -24,6 +28,9 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
   setParams,
   onReset,
   onClose,
+  onRefineSegments,
+  isRefining,
+  refineProgress,
   stats
 }) => {
   const handleProminenciaChange = (value: number[]) => {
@@ -47,10 +54,21 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
         </h3>
         <div className="flex items-center gap-2">
           <Button
+            onClick={onRefineSegments}
+            disabled={isRefining}
+            variant="default"
+            size="sm"
+            className="text-xs bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+          >
+            <Brain className="w-3 h-3 mr-1" />
+            {isRefining ? 'Refinando...' : 'Refinar Segmentos'}
+          </Button>
+          <Button
             onClick={onReset}
             variant="outline"
             size="sm"
             className="text-xs"
+            disabled={isRefining}
           >
             <RotateCcw className="w-3 h-3 mr-1" />
             Reset
@@ -136,6 +154,21 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
           </p>
         </div>
       </div>
+
+      {/* Progress Bar for Refinement */}
+      {isRefining && (
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+              Optimizando segmentos...
+            </span>
+            <span className="text-xs text-mountain-500 dark:text-mountain-400">
+              {Math.round(refineProgress)}%
+            </span>
+          </div>
+          <Progress value={refineProgress} className="w-full" />
+        </div>
+      )}
 
       {/* Statistics Display */}
       {stats && (
