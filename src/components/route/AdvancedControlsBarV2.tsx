@@ -13,6 +13,7 @@ interface AdvancedControlsBarV2Props {
   onRefineSegments: () => void;
   isRefining: boolean;
   refineProgress: number;
+  hasRefinedOnce: boolean;
   stats?: {
     totalSegments: number;
     ascentSegments: number;
@@ -31,6 +32,7 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
   onRefineSegments,
   isRefining,
   refineProgress,
+  hasRefinedOnce,
   stats
 }) => {
   const handleProminenciaChange = (value: number[]) => {
@@ -85,7 +87,7 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Slider 1: Prominencia Mínima (Estratégico) */}
+        {/* Slider 1: Prominencia Mínima (Estratégico) - Always visible */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
@@ -108,51 +110,55 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
           </p>
         </div>
 
-        {/* Slider 2: Distancia Mínima (Relevancia) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-              Distancia Mínima
-            </label>
-            <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
-              {params.distanciaMinima.toFixed(2)}km
-            </span>
+        {/* Slider 2: Distancia Mínima (Relevancia) - Only after refinement */}
+        {hasRefinedOnce && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                Distancia Mínima
+              </label>
+              <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
+                {params.distanciaMinima.toFixed(2)}km
+              </span>
+            </div>
+            <Slider
+              value={[params.distanciaMinima]}
+              onValueChange={handleDistanciaChange}
+              min={0.05}
+              max={1.0}
+              step={0.05}
+              className="w-full"
+            />
+            <p className="text-xs text-mountain-500 dark:text-mountain-400">
+              Relevancia: Longitud mínima de segmentos
+            </p>
           </div>
-          <Slider
-            value={[params.distanciaMinima]}
-            onValueChange={handleDistanciaChange}
-            min={0.05}
-            max={1.0}
-            step={0.05}
-            className="w-full"
-          />
-          <p className="text-xs text-mountain-500 dark:text-mountain-400">
-            Relevancia: Longitud mínima de segmentos
-          </p>
-        </div>
+        )}
 
-        {/* Slider 3: Diferencia de Pendiente (Sensibilidad) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-              Diferencia de Pendiente
-            </label>
-            <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
-              {(params.diferenciaPendiente * 100).toFixed(1)}%
-            </span>
+        {/* Slider 3: Diferencia de Pendiente (Sensibilidad) - Only after refinement */}
+        {hasRefinedOnce && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                Diferencia de Pendiente
+              </label>
+              <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
+                {(params.diferenciaPendiente * 100).toFixed(1)}%
+              </span>
+            </div>
+            <Slider
+              value={[params.diferenciaPendiente]}
+              onValueChange={handleDiferenciaChange}
+              min={0.01}
+              max={0.15}
+              step={0.005}
+              className="w-full"
+            />
+            <p className="text-xs text-mountain-500 dark:text-mountain-400">
+              Sensibilidad: Cambio mínimo para dividir
+            </p>
           </div>
-          <Slider
-            value={[params.diferenciaPendiente]}
-            onValueChange={handleDiferenciaChange}
-            min={0.01}
-            max={0.15}
-            step={0.005}
-            className="w-full"
-          />
-          <p className="text-xs text-mountain-500 dark:text-mountain-400">
-            Sensibilidad: Cambio mínimo para dividir
-          </p>
-        </div>
+        )}
       </div>
 
       {/* Progress Bar for Refinement */}

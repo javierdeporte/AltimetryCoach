@@ -37,6 +37,7 @@ const RouteDetail = () => {
   const [isRefining, setIsRefining] = useState(false);
   const [refineProgress, setRefineProgress] = useState(0);
   const [refinedSegments, setRefinedSegments] = useState<any[]>([]);
+  const [hasRefinedOnce, setHasRefinedOnce] = useState(false);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -156,6 +157,7 @@ const RouteDetail = () => {
       diferenciaPendiente: 0.10
     });
     setRefinedSegments([]);
+    setHasRefinedOnce(false);
   };
 
   const handleRefineSegments = async () => {
@@ -240,6 +242,7 @@ const RouteDetail = () => {
       }
       
       setRefinedSegments(finalSegments);
+      setHasRefinedOnce(true);
     } catch (error) {
       console.error('Error during refinement:', error);
     } finally {
@@ -475,6 +478,7 @@ const RouteDetail = () => {
               onRefineSegments={handleRefineSegments}
               isRefining={isRefining}
               refineProgress={refineProgress}
+              hasRefinedOnce={hasRefinedOnce}
             />
           )}
 

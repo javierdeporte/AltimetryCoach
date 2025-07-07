@@ -242,7 +242,7 @@ function generateSeedBreakpointsWithDualCriteria(
 ): number[] {
   const R_SQUARED_THRESHOLD = 0.98;
   const GRADIENT_CHANGE_THRESHOLD = 3.0; // 3% gradient change
-  const FIXED_MIN_DISTANCE = 0.1; // 100 meters in km
+  const FIXED_MIN_DISTANCE = 0.2; // 200 meters in km
   
   const breakpoints: number[] = [];
   let currentStart = 0;
