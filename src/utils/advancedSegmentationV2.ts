@@ -1,3 +1,4 @@
+
 import { ElevationPoint, AdvancedSegment, RegressionResult } from './types';
 
 const SEGMENT_COLORS = {
@@ -443,47 +444,6 @@ export const refineSegments = (
   console.log(`Final refined breakpoints: ${currentBreakpoints.length}`);
   return currentBreakpoints;
 };
-
-/**
- * Determines segment type based on slope
- */
-function getSegmentType(slope: number): 'asc' | 'desc' | 'hor' {
-  const slopePercent = slope * 100;
-  
-  if (slopePercent > 2) return 'asc';
-  if (slopePercent < -2) return 'desc';
-  return 'hor';
-}
-
-/**
- * Creates a segment object from a set of points and regression results
- */
-function createSegment(
-  points: ElevationPoint[],
-  regression: RegressionResult,
-  startIndex: number,
-  endIndex: number
-): AdvancedSegment {
-  const startPoint = points[0];
-  const endPoint = points[points.length - 1];
-  const segmentType = getSegmentType(regression.slope);
-  const elevationChange = endPoint.displayElevation - startPoint.displayElevation;
-
-  return {
-    startIndex,
-    endIndex,
-    startPoint,
-    endPoint,
-    slope: regression.slope,
-    intercept: regression.intercept,
-    rSquared: regression.rSquared,
-    distance: endPoint.displayDistance - startPoint.displayDistance,
-    elevationGain: elevationChange > 0 ? elevationChange : 0,
-    elevationLoss: elevationChange < 0 ? Math.abs(elevationChange) : 0,
-    type: segmentType,
-    color: SEGMENT_COLORS[segmentType]
-  };
-}
 
 /**
  * Main macro-segmentation function - shows immediate linear regression for each macro-segment
