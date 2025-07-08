@@ -158,24 +158,24 @@ function findSignificantExtrema(
 }
 
 /**
- * Sub-Paso A: Generación de Semillas Inteligentes
+ * Sub-Paso A: Generación de Semillas Inteligentes (WITHIN A MACRO-SEGMENT)
  * Creates initial breakpoint candidates using double-criterion detection
  */
-function findInitialBreakpoints(points: ElevationPoint[]): number[] {
+function findInitialBreakpointsInMacroSegment(macroSegmentPoints: ElevationPoint[]): number[] {
   const R_SQUARED_THRESHOLD = 0.98;
   const GRADIENT_CHANGE_THRESHOLD = 0.03; // 3%
   const HORIZON_WINDOW_KM = 0.1; // 100 meters
-  const MIN_SEED_DISTANCE_KM = 0.1; // 100 meters minimum for seed validation
+  const MIN_SEED_DISTANCE_KM = 0.2; // 200 meters minimum for seed validation
   
-  const breakpoints: number[] = [];
+  const localBreakpoints: number[] = [];
   let currentStart = 0;
 
-  while (currentStart < points.length - 1) {
+  while (currentStart < macroSegmentPoints.length - 1) {
     let currentEnd = currentStart + 1;
     
     // Grow segment until one of the double criteria is met
-    while (currentEnd < points.length) {
-      const segmentPoints = points.slice(currentStart, currentEnd + 1);
+    while (currentEnd < macroSegmentPoints.length) {
+      const segmentPoints = macroSegmentPoints.slice(currentStart, currentEnd + 1);
       const regressionPoints = segmentPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
       
       if (regressionPoints.length >= 2) {
@@ -186,11 +186,11 @@ function findInitialBreakpoints(points: ElevationPoint[]): number[] {
         
         // Criterion 2: Future gradient change
         let gradientBreak = false;
-        if (currentEnd < points.length - 1) {
-          const currentPoint = points[currentEnd];
-          const futurePoint = points.find(p => 
+        if (currentEnd < macroSegmentPoints.length - 1) {
+          const currentPoint = macroSegmentPoints[currentEnd];
+          const futurePoint = macroSegmentPoints.find(p => 
             p.displayDistance >= currentPoint.displayDistance + HORIZON_WINDOW_KM
-          ) || points[points.length - 1];
+          ) || macroSegmentPoints[macroSegmentPoints.length - 1];
           
           if (futurePoint && futurePoint !== currentPoint) {
             const currentSlope = regression.slope / 1000; // Convert to percentage
@@ -203,10 +203,10 @@ function findInitialBreakpoints(points: ElevationPoint[]): number[] {
         
         // If either criterion is met, validate distance and create breakpoint
         if (linearityBreak || gradientBreak) {
-          const segmentDistance = points[currentEnd - 1].displayDistance - points[currentStart].displayDistance;
+          const segmentDistance = macroSegmentPoints[currentEnd - 1].displayDistance - macroSegmentPoints[currentStart].displayDistance;
           
           if (segmentDistance >= MIN_SEED_DISTANCE_KM) {
-            breakpoints.push(currentEnd - 1);
+            localBreakpoints.push(currentEnd - 1);
             currentStart = currentEnd - 1;
             break;
           }
@@ -217,58 +217,58 @@ function findInitialBreakpoints(points: ElevationPoint[]): number[] {
     }
     
     // If we reached the end without breaking, finish
-    if (currentEnd >= points.length) {
+    if (currentEnd >= macroSegmentPoints.length) {
       break;
     }
   }
 
-  return breakpoints;
+  return localBreakpoints;
 }
 
 /**
- * Sub-Paso B: Refinamiento por Convergencia
- * Implements the convergence refinement algorithm
+ * Sub-Paso B: Refinamiento por Convergencia (WITHIN A MACRO-SEGMENT)
+ * Implements the convergence refinement algorithm within a single macro-segment
  */
-function calculateOptimalBreakpoints(
-  points: ElevationPoint[], 
-  initialBreakpoints: number[],
+function refineBreakpointsInMacroSegment(
+  macroSegmentPoints: ElevationPoint[],
+  initialLocalBreakpoints: number[],
   params: AdvancedSegmentationV2Params
 ): number[] {
-  let currentBreakpoints = [...initialBreakpoints];
+  let currentBreakpoints = [...initialLocalBreakpoints];
   const MAX_ITERATIONS = 30;
 
-  console.log('Starting convergence refinement with', currentBreakpoints.length, 'initial breakpoints');
+  console.log('Starting convergence refinement within macro-segment with', currentBreakpoints.length, 'initial breakpoints');
 
   for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
     let wasChangeMadeInThisPass = false;
 
     // Pasada de Posicionamiento ("Wiggle")
-    const wiggledBreakpoints = currentBreakpoints.map((breakpoint, index) => {
+    const wiggledBreakpoints = currentBreakpoints.map((localBreakpoint, index) => {
       // Skip boundary breakpoints that can't be moved safely
-      if (breakpoint <= 1 || breakpoint >= points.length - 2) {
-        return breakpoint;
+      if (localBreakpoint <= 1 || localBreakpoint >= macroSegmentPoints.length - 2) {
+        return localBreakpoint;
       }
       
-      const positions = [breakpoint - 1, breakpoint, breakpoint + 1];
-      let bestPosition = breakpoint;
+      const positions = [localBreakpoint - 1, localBreakpoint, localBreakpoint + 1];
+      let bestPosition = localBreakpoint;
       let bestCombinedError = Infinity;
       
       for (const candidatePosition of positions) {
-        if (candidatePosition <= 0 || candidatePosition >= points.length - 1) {
+        if (candidatePosition <= 0 || candidatePosition >= macroSegmentPoints.length - 1) {
           continue;
         }
         
-        // Get adjacent breakpoints
+        // Get adjacent breakpoints (local indices within this macro-segment)
         const prevBreakpoint = index > 0 ? currentBreakpoints[index - 1] : 0;
-        const nextBreakpoint = index < currentBreakpoints.length - 1 ? currentBreakpoints[index + 1] : points.length - 1;
+        const nextBreakpoint = index < currentBreakpoints.length - 1 ? currentBreakpoints[index + 1] : macroSegmentPoints.length - 1;
         
         // Calculate error for segment A (before the candidate position)
-        const segmentAPoints = points.slice(prevBreakpoint, candidatePosition + 1);
+        const segmentAPoints = macroSegmentPoints.slice(prevBreakpoint, candidatePosition + 1);
         const segmentARegressionPoints = segmentAPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
         const segmentARegression = calculateLinearRegression(segmentARegressionPoints);
         
         // Calculate error for segment B (after the candidate position)
-        const segmentBPoints = points.slice(candidatePosition, nextBreakpoint + 1);
+        const segmentBPoints = macroSegmentPoints.slice(candidatePosition, nextBreakpoint + 1);
         const segmentBRegressionPoints = segmentBPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
         const segmentBRegression = calculateLinearRegression(segmentBRegressionPoints);
         
@@ -281,7 +281,7 @@ function calculateOptimalBreakpoints(
         }
       }
       
-      if (bestPosition !== breakpoint) {
+      if (bestPosition !== localBreakpoint) {
         wasChangeMadeInThisPass = true;
       }
       
@@ -296,14 +296,14 @@ function calculateOptimalBreakpoints(
     for (let j = 0; j < currentBreakpoints.length; j++) {
       const breakpointToValidate = currentBreakpoints[j];
       
-      // Get adjacent breakpoints
+      // Get adjacent breakpoints (local indices within this macro-segment)
       const prevBreakpoint = j > 0 ? currentBreakpoints[j - 1] : 0;
-      const nextBreakpoint = j < currentBreakpoints.length - 1 ? currentBreakpoints[j + 1] : points.length - 1;
+      const nextBreakpoint = j < currentBreakpoints.length - 1 ? currentBreakpoints[j + 1] : macroSegmentPoints.length - 1;
       
       // Get segment A (before the breakpoint)
-      const segmentAPoints = points.slice(prevBreakpoint, breakpointToValidate + 1);
+      const segmentAPoints = macroSegmentPoints.slice(prevBreakpoint, breakpointToValidate + 1);
       // Get segment B (after the breakpoint)  
-      const segmentBPoints = points.slice(breakpointToValidate, nextBreakpoint + 1);
+      const segmentBPoints = macroSegmentPoints.slice(breakpointToValidate, nextBreakpoint + 1);
       
       if (segmentAPoints.length >= 2 && segmentBPoints.length >= 2) {
         // Calculate regression for both segments
@@ -311,7 +311,7 @@ function calculateOptimalBreakpoints(
         const segmentBRegression = calculateLinearRegression(segmentBPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation })));
         
         // Apply user criteria
-        const segmentADistance = points[breakpointToValidate].displayDistance - points[prevBreakpoint].displayDistance;
+        const segmentADistance = macroSegmentPoints[breakpointToValidate].displayDistance - macroSegmentPoints[prevBreakpoint].displayDistance;
         const isDistanceValid = segmentADistance >= params.distanciaMinima;
         
         // Convert slopes to percentage for comparison
@@ -332,35 +332,38 @@ function calculateOptimalBreakpoints(
 
     // Check for convergence
     if (!wasChangeMadeInThisPass) {
-      console.log(`Convergence achieved after ${iteration + 1} iterations`);
+      console.log(`Convergence achieved after ${iteration + 1} iterations within macro-segment`);
       break;
     }
   }
 
-  console.log('Final breakpoints:', currentBreakpoints.length);
   return currentBreakpoints;
 }
 
 /**
- * Creates final segment objects from breakpoints
+ * Creates final segment objects from breakpoints within a macro-segment
  */
-function createFinalSegments(
-  elevationData: ElevationPoint[],
-  breakpoints: number[]
+function createSegmentsFromBreakpoints(
+  macroSegmentPoints: ElevationPoint[],
+  localBreakpoints: number[],
+  globalStartIndex: number
 ): AdvancedSegment[] {
   const segments: AdvancedSegment[] = [];
-  const allBreakpoints = [0, ...breakpoints, elevationData.length - 1];
+  const allLocalBreakpoints = [0, ...localBreakpoints, macroSegmentPoints.length - 1];
   
-  for (let i = 0; i < allBreakpoints.length - 1; i++) {
-    const startIndex = allBreakpoints[i];
-    const endIndex = allBreakpoints[i + 1];
+  for (let i = 0; i < allLocalBreakpoints.length - 1; i++) {
+    const localStartIndex = allLocalBreakpoints[i];
+    const localEndIndex = allLocalBreakpoints[i + 1];
     
-    const segmentPoints = elevationData.slice(startIndex, endIndex + 1);
+    const segmentPoints = macroSegmentPoints.slice(localStartIndex, localEndIndex + 1);
     const regressionPoints = segmentPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
     
     if (regressionPoints.length >= 2) {
       const regression = calculateLinearRegression(regressionPoints);
-      segments.push(createSegment(segmentPoints, regression, startIndex, endIndex));
+      // Convert local indices to global indices
+      const globalStartIndexForSegment = globalStartIndex + localStartIndex;
+      const globalEndIndexForSegment = globalStartIndex + localEndIndex;
+      segments.push(createSegment(segmentPoints, regression, globalStartIndexForSegment, globalEndIndexForSegment));
     }
   }
   
@@ -399,42 +402,58 @@ export function getMacroSegments(
 }
 
 /**
- * Main refinement function - executes the heavy calculation once
+ * Main refinement function - executes the heavy calculation once with hierarchical processing
+ * PASO 1: Calcula Macro-Segmentos
+ * PASO 2: Itera sobre cada Macro-Segmento y ejecuta Micro-Segmentación
+ * PASO 3: Consolida los resultados
  */
 export function executeRefinement(
   elevationData: ElevationPoint[],
   macroBoundaries: number[],
   params: AdvancedSegmentationV2Params
 ): number[] {
-  console.log('Executing refinement calculation...');
+  console.log('Executing hierarchical refinement calculation...');
   
   const allOptimalBreakpoints: number[] = [];
   
-  // Process each macro-segment independently
+  // PASO 2: Iterar sobre cada Macro-Segmento y procesar individualmente
   for (let i = 0; i < macroBoundaries.length - 1; i++) {
-    const macroStart = macroBoundaries[i];
-    const macroEnd = macroBoundaries[i + 1];
+    const macroStartGlobalIndex = macroBoundaries[i];
+    const macroEndGlobalIndex = macroBoundaries[i + 1];
     
-    if (macroEnd > macroStart) {
-      const macroSegmentData = elevationData.slice(macroStart, macroEnd + 1);
+    console.log(`Processing macro-segment ${i + 1}/${macroBoundaries.length - 1}: indices ${macroStartGlobalIndex} to ${macroEndGlobalIndex}`);
+    
+    if (macroEndGlobalIndex > macroStartGlobalIndex) {
+      // Extract the points that belong to this specific macro-segment
+      const macroSegmentData = elevationData.slice(macroStartGlobalIndex, macroEndGlobalIndex + 1);
       
-      // Sub-Paso A: Generación de Semillas Inteligentes
-      const seedBreakpoints = findInitialBreakpoints(macroSegmentData);
+      // PASO 3: Ejecutar Micro-Segmentación dentro de este macro-segmento
+      // Sub-Paso A: Generación de Semillas Inteligentes (usando índices locales)
+      const localSeedBreakpoints = findInitialBreakpointsInMacroSegment(macroSegmentData);
+      console.log(`Found ${localSeedBreakpoints.length} seed breakpoints in macro-segment ${i + 1}`);
       
-      // Convert to global indices
-      const globalSeedBreakpoints = seedBreakpoints.map(bp => bp + macroStart);
-      
-      // Sub-Paso B: Refinamiento por Convergencia
-      const optimalBreakpoints = calculateOptimalBreakpoints(
-        elevationData, 
-        globalSeedBreakpoints, 
-        params
-      );
-      
-      allOptimalBreakpoints.push(...optimalBreakpoints);
+      if (localSeedBreakpoints.length > 0) {
+        // Sub-Paso B: Refinamiento por Convergencia (usando índices locales)
+        const localOptimalBreakpoints = refineBreakpointsInMacroSegment(
+          macroSegmentData, 
+          localSeedBreakpoints, 
+          params
+        );
+        
+        console.log(`Refined to ${localOptimalBreakpoints.length} optimal breakpoints in macro-segment ${i + 1}`);
+        
+        // Convert local indices back to global indices
+        const globalOptimalBreakpoints = localOptimalBreakpoints.map(localIndex => 
+          macroStartGlobalIndex + localIndex
+        );
+        
+        allOptimalBreakpoints.push(...globalOptimalBreakpoints);
+      }
     }
   }
   
+  // PASO 4: Consolidar los resultados
+  console.log(`Total optimal breakpoints across all macro-segments: ${allOptimalBreakpoints.length}`);
   return allOptimalBreakpoints.sort((a, b) => a - b);
 }
 
@@ -478,7 +497,24 @@ export function applyVisualFilters(
     }
   }
   
-  return createFinalSegments(elevationData, filteredBreakpoints);
+  // Create final segments from filtered breakpoints
+  const segments: AdvancedSegment[] = [];
+  const finalBreakpoints = [0, ...filteredBreakpoints, elevationData.length - 1];
+  
+  for (let i = 0; i < finalBreakpoints.length - 1; i++) {
+    const startIndex = finalBreakpoints[i];
+    const endIndex = finalBreakpoints[i + 1];
+    
+    const segmentPoints = elevationData.slice(startIndex, endIndex + 1);
+    const regressionPoints = segmentPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+    
+    if (regressionPoints.length >= 2) {
+      const regression = calculateLinearRegression(regressionPoints);
+      segments.push(createSegment(segmentPoints, regression, startIndex, endIndex));
+    }
+  }
+  
+  return segments;
 }
 
 /**
