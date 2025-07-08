@@ -1,6 +1,8 @@
+
 import React from 'react';
 import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
+import { Progress } from '../ui/progress';
 import { RotateCcw, X } from 'lucide-react';
 import { AdvancedSegmentationV2Params, DEFAULT_V2_PARAMS } from '../../utils/advancedSegmentationV2';
 
@@ -9,6 +11,9 @@ interface AdvancedControlsBarV2Props {
   setParams: (params: AdvancedSegmentationV2Params) => void;
   onReset: () => void;
   onClose: () => void;
+  onRefineSegments?: () => void;
+  isLoading?: boolean;
+  progress?: number;
   stats?: {
     totalSegments: number;
     ascentSegments: number;
@@ -24,6 +29,9 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
   setParams,
   onReset,
   onClose,
+  onRefineSegments,
+  isLoading = false,
+  progress = 0,
   stats
 }) => {
   const handleProminenciaChange = (value: number[]) => {
@@ -40,12 +48,51 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
 
   return (
     <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg p-4 mb-4 shadow-sm">
+      {/* Compact Header with Stats */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200 flex items-center gap-2">
-          <span className="w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"></span>
-          Análisis Experimental V2
-        </h3>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"></span>
+            <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
+              Análisis Experimental V2
+            </h3>
+          </div>
+          
+          {/* Inline Stats */}
+          {stats && (
+            <div className="flex items-center gap-4 text-xs text-mountain-600 dark:text-mountain-400">
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-mountain-800 dark:text-mountain-200">{stats.totalSegments}</span>
+                <span>Total</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-green-600">{stats.ascentSegments}</span>
+                <span>Ascensos</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-blue-600">{stats.descentSegments}</span>
+                <span>Descensos</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-gray-600">{stats.horizontalSegments}</span>
+                <span>Planos</span>
+              </div>
+            </div>
+          )}
+        </div>
+        
         <div className="flex items-center gap-2">
+          {onRefineSegments && (
+            <Button
+              onClick={onRefineSegments}
+              disabled={isLoading}
+              variant="default"
+              size="sm"
+              className="text-xs bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+            >
+              {isLoading ? 'Calculando...' : 'Calcular/Refinar Segmentos'}
+            </Button>
+          )}
           <Button
             onClick={onReset}
             variant="outline"
@@ -66,8 +113,19 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Slider 1: Prominencia Mínima (Estratégico) */}
+      {/* Progress Bar */}
+      {isLoading && (
+        <div className="mb-4">
+          <Progress value={progress} className="w-full h-2" />
+          <p className="text-xs text-center text-mountain-500 dark:text-mountain-400 mt-1">
+            {progress.toFixed(0)}% completado
+          </p>
+        </div>
+      )}
+
+      {/* Compact Sliders Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Slider 1: Prominencia Mínima */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
@@ -90,7 +148,7 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
           </p>
         </div>
 
-        {/* Slider 2: Distancia Mínima (Relevancia) */}
+        {/* Slider 2: Distancia Mínima */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
@@ -113,7 +171,7 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
           </p>
         </div>
 
-        {/* Slider 3: Diferencia de Pendiente (Sensibilidad) */}
+        {/* Slider 3: Diferencia de Pendiente */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
@@ -136,38 +194,6 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
           </p>
         </div>
       </div>
-
-      {/* Statistics Display */}
-      {stats && (
-        <div className="mt-4 pt-4 border-t border-mountain-200 dark:border-mountain-700">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-xs">
-            <div className="text-center">
-              <div className="font-semibold text-mountain-800 dark:text-mountain-200">{stats.totalSegments}</div>
-              <div className="text-mountain-500 dark:text-mountain-400">Total</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-green-600">{stats.ascentSegments}</div>
-              <div className="text-mountain-500 dark:text-mountain-400">Ascensos</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-blue-600">{stats.descentSegments}</div>
-              <div className="text-mountain-500 dark:text-mountain-400">Descensos</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-gray-600">{stats.horizontalSegments}</div>
-              <div className="text-mountain-500 dark:text-mountain-400">Planos</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-purple-600">{stats.avgRSquared}</div>
-              <div className="text-mountain-500 dark:text-mountain-400">R² Prom.</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-orange-600">{stats.qualityRating}</div>
-              <div className="text-mountain-500 dark:text-mountain-400">Calidad</div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
