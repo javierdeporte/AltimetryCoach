@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
@@ -12,7 +13,7 @@ import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
 import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS } from '../../utils/advancedSegmentation';
-import { getMacroSegments, executeRefinement, applyVisualFilters, DEFAULT_V2_PARAMS, AdvancedSegmentationV2Params } from '../../utils/advancedSegmentationV2';
+import { segmentProfileV2, DEFAULT_V2_PARAMS, AdvancedSegmentationV2Params } from '../../utils/advancedSegmentationV2';
 import { AdvancedControlsPanel } from '../../components/route/advanced-controls-panel';
 import { AdvancedControlsBarV2 } from '../../components/route/AdvancedControlsBarV2';
 
@@ -29,14 +30,10 @@ const RouteDetail = () => {
   // Experimental analysis state (V2)
   const [experimentalAnalysisMode, setExperimentalAnalysisMode] = useState(false);
   const [experimentalParams, setExperimentalParams] = useState<AdvancedSegmentationV2Params>(DEFAULT_V2_PARAMS);
-
-  // New V2 refinement state
-  const [isRefined, setIsRefined] = useState(false);
-  const [optimalBreakpoints, setOptimalBreakpoints] = useState<number[]>([]);
-  const [macroBoundaries, setMacroBoundaries] = useState<number[]>([]);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
+  // Verificar que tenemos un routeId válido antes de proceder
   if (!routeId) {
     console.error('No routeId found in URL parameters');
     return (
@@ -66,7 +63,7 @@ const RouteDetail = () => {
   }, [elevationData]);
 
   // Calculate advanced segments in real-time when V1 mode is active
-  const { segments: advancedSegments, macroBoundaries: advancedMacroBoundaries } = useMemo(() => {
+  const { segments: advancedSegments, macroBoundaries } = useMemo(() => {
     if (!advancedAnalysisMode || processedElevationData.length === 0) {
       return { segments: [], macroBoundaries: [] };
     }
@@ -75,43 +72,18 @@ const RouteDetail = () => {
     return segmentProfileAdvanced(processedElevationData, advancedParams);
   }, [advancedAnalysisMode, processedElevationData, advancedParams]);
 
-  // Calculate macro-segments for V2 when experimental mode is active
-  const { segments: macroSegments, macroBoundaries: currentMacroBoundaries } = useMemo(() => {
+  // Calculate experimental V2 segments in real-time when V2 mode is active
+  const { segments: experimentalSegments, macroBoundaries: experimentalMacroBoundaries } = useMemo(() => {
     if (!experimentalAnalysisMode || processedElevationData.length === 0) {
       return { segments: [], macroBoundaries: [] };
     }
     
-    console.log('Calculating V2 macro segments with prominence:', experimentalParams.prominenciaMinima);
-    const result = getMacroSegments(processedElevationData, experimentalParams.prominenciaMinima);
-    
-    // Update macro boundaries for refinement
-    if (result.macroBoundaries.length > 0) {
-      setMacroBoundaries(result.macroBoundaries);
-    }
-    
-    return result;
-  }, [experimentalAnalysisMode, processedElevationData, experimentalParams.prominenciaMinima]);
+    console.log('Calculating V2 experimental segments with params:', experimentalParams);
+    return segmentProfileV2(processedElevationData, experimentalParams);
+  }, [experimentalAnalysisMode, processedElevationData, experimentalParams]);
 
-  // Apply visual filters to refined segments when sliders change
-  const refinedSegments = useMemo(() => {
-    if (!experimentalAnalysisMode || !isRefined || optimalBreakpoints.length === 0) {
-      return [];
-    }
-    
-    console.log('Applying visual filters with params:', experimentalParams);
-    return applyVisualFilters(processedElevationData, optimalBreakpoints, experimentalParams);
-  }, [experimentalAnalysisMode, isRefined, optimalBreakpoints, processedElevationData, experimentalParams.distanciaMinima, experimentalParams.diferenciaPendiente]);
-
-  // Determine which segments to show
-  const currentSegments = experimentalAnalysisMode 
-    ? (isRefined ? refinedSegments : macroSegments)
-    : advancedSegments;
-  
-  const currentMacroBoundariesForChart = experimentalAnalysisMode 
-    ? currentMacroBoundaries
-    : advancedMacroBoundaries;
-
-  // Calculate segments statistics
+  // Calculate advanced segments statistics (works for both V1 and V2)
+  const currentSegments = experimentalAnalysisMode ? experimentalSegments : advancedSegments;
   const advancedStats = useMemo(() => {
     if (!currentSegments || currentSegments.length === 0) return null;
     
@@ -158,8 +130,6 @@ const RouteDetail = () => {
     setAdvancedAnalysisMode(enabled);
     if (enabled) {
       setExperimentalAnalysisMode(false); // Mutually exclusive
-      setIsRefined(false);
-      setOptimalBreakpoints([]);
     }
   };
 
@@ -167,40 +137,11 @@ const RouteDetail = () => {
     setExperimentalAnalysisMode(enabled);
     if (enabled) {
       setAdvancedAnalysisMode(false); // Mutually exclusive
-      setIsRefined(false);
-      setOptimalBreakpoints([]);
-    } else {
-      setIsRefined(false);
-      setOptimalBreakpoints([]);
     }
   };
 
   const resetExperimentalParams = () => {
     setExperimentalParams(DEFAULT_V2_PARAMS);
-    setIsRefined(false);
-    setOptimalBreakpoints([]);
-  };
-
-  const handleRefineSegments = () => {
-    if (processedElevationData.length === 0 || macroBoundaries.length === 0) {
-      console.warn('Cannot refine: no data or macro boundaries');
-      return;
-    }
-    
-    console.log('Starting refinement process...');
-    
-    // Execute the heavy calculation once
-    const optimalBreakpointsResult = executeRefinement(
-      processedElevationData, 
-      macroBoundaries, 
-      experimentalParams
-    );
-    
-    // Save the results and mark as refined
-    setOptimalBreakpoints(optimalBreakpointsResult);
-    setIsRefined(true);
-    
-    console.log('Refinement completed, optimal breakpoints:', optimalBreakpointsResult.length);
   };
 
   if (isLoading) {
@@ -288,7 +229,7 @@ const RouteDetail = () => {
                   )}
                   {experimentalAnalysisMode && (
                     <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
-                      Análisis Experimental V2 {isRefined ? '- Refinado' : '- Macro'}
+                      Análisis Experimental V2 Activo
                     </Badge>
                   )}
                 </div>
@@ -364,6 +305,7 @@ const RouteDetail = () => {
                     </div>
                   </div>
                   
+                  
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -426,8 +368,6 @@ const RouteDetail = () => {
               stats={advancedStats}
               onReset={resetExperimentalParams}
               onClose={() => setExperimentalAnalysisMode(false)}
-              onRefineSegments={handleRefineSegments}
-              isRefined={isRefined}
             />
           )}
 
@@ -441,15 +381,15 @@ const RouteDetail = () => {
                 height: 400,
                 backgroundColor: 'transparent'
               }}
-              advancedSegments={currentSegments}
-              macroBoundaries={currentMacroBoundariesForChart}
+              advancedSegments={experimentalAnalysisMode ? experimentalSegments : advancedSegments}
+              macroBoundaries={experimentalAnalysisMode ? experimentalMacroBoundaries : macroBoundaries}
             />
           </div>
 
           {/* Segments Table */}
           <SegmentsTable 
             segments={segments}
-            advancedSegments={currentSegments}
+            advancedSegments={experimentalAnalysisMode ? experimentalSegments : advancedSegments}
             isAdvancedMode={advancedAnalysisMode || experimentalAnalysisMode}
             onSegmentHover={setHoveredSegment}
             hoveredSegment={hoveredSegment}
