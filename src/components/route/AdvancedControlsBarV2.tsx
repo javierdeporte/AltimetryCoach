@@ -1,8 +1,6 @@
-
 import React from 'react';
 import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
-import { Progress } from '../ui/progress';
 import { RotateCcw, X } from 'lucide-react';
 import { AdvancedSegmentationV2Params, DEFAULT_V2_PARAMS } from '../../utils/advancedSegmentationV2';
 
@@ -11,9 +9,6 @@ interface AdvancedControlsBarV2Props {
   setParams: (params: AdvancedSegmentationV2Params) => void;
   onReset: () => void;
   onClose: () => void;
-  onRefineSegments: () => void;
-  isLoading: boolean;
-  progress: number;
   stats?: {
     totalSegments: number;
     ascentSegments: number;
@@ -29,9 +24,6 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
   setParams,
   onReset,
   onClose,
-  onRefineSegments,
-  isLoading,
-  progress,
   stats
 }) => {
   const handleProminenciaChange = (value: number[]) => {
@@ -59,7 +51,6 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
             variant="outline"
             size="sm"
             className="text-xs"
-            disabled={isLoading}
           >
             <RotateCcw className="w-3 h-3 mr-1" />
             Reset
@@ -93,7 +84,6 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
             max={100}
             step={5}
             className="w-full"
-            disabled={isLoading}
           />
           <p className="text-xs text-mountain-500 dark:text-mountain-400">
             Estratégico: Define picos y valles principales
@@ -117,7 +107,6 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
             max={1.0}
             step={0.05}
             className="w-full"
-            disabled={isLoading}
           />
           <p className="text-xs text-mountain-500 dark:text-mountain-400">
             Relevancia: Longitud mínima de segmentos
@@ -141,38 +130,11 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
             max={0.15}
             step={0.005}
             className="w-full"
-            disabled={isLoading}
           />
           <p className="text-xs text-mountain-500 dark:text-mountain-400">
             Sensibilidad: Cambio mínimo para dividir
           </p>
         </div>
-      </div>
-
-      {/* Progress Bar (initially hidden) */}
-      {isLoading && (
-        <div className="mt-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-              Refinando Segmentos...
-            </span>
-            <span className="text-xs text-mountain-500 dark:text-mountain-400">
-              {Math.round(progress)}%
-            </span>
-          </div>
-          <Progress value={progress} className="w-full" />
-        </div>
-      )}
-
-      {/* Refine Button */}
-      <div className="mt-4 flex justify-center">
-        <Button
-          onClick={onRefineSegments}
-          disabled={isLoading}
-          className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-2"
-        >
-          {isLoading ? 'Refinando...' : 'Calcular/Refinar Segmentos'}
-        </Button>
       </div>
 
       {/* Statistics Display */}
