@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
-import { RotateCcw, X } from 'lucide-react';
+import { RotateCcw, X, Sparkles } from 'lucide-react';
 import { AdvancedSegmentationV2Params, DEFAULT_V2_PARAMS } from '../../utils/advancedSegmentationV2';
 
 interface AdvancedControlsBarV2Props {
@@ -9,6 +10,8 @@ interface AdvancedControlsBarV2Props {
   setParams: (params: AdvancedSegmentationV2Params) => void;
   onReset: () => void;
   onClose: () => void;
+  onRefineSegments: () => void;
+  isRefined: boolean;
   stats?: {
     totalSegments: number;
     ascentSegments: number;
@@ -24,6 +27,8 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
   setParams,
   onReset,
   onClose,
+  onRefineSegments,
+  isRefined,
   stats
 }) => {
   const handleProminenciaChange = (value: number[]) => {
@@ -46,6 +51,17 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
           Análisis Experimental V2
         </h3>
         <div className="flex items-center gap-2">
+          {!isRefined && (
+            <Button
+              onClick={onRefineSegments}
+              variant="default"
+              size="sm"
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+            >
+              <Sparkles className="w-3 h-3 mr-1" />
+              Refinar Segmentos
+            </Button>
+          )}
           <Button
             onClick={onReset}
             variant="outline"
@@ -66,8 +82,8 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Slider 1: Prominencia Mínima (Estratégico) */}
+      <div className={`grid gap-6 ${isRefined ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1'}`}>
+        {/* Slider 1: Prominencia Mínima (Always visible) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
@@ -90,51 +106,55 @@ export const AdvancedControlsBarV2: React.FC<AdvancedControlsBarV2Props> = ({
           </p>
         </div>
 
-        {/* Slider 2: Distancia Mínima (Relevancia) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-              Distancia Mínima
-            </label>
-            <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
-              {params.distanciaMinima.toFixed(2)}km
-            </span>
+        {/* Slider 2: Distancia Mínima (Only visible after refinement) */}
+        {isRefined && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                Distancia Mínima
+              </label>
+              <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
+                {params.distanciaMinima.toFixed(2)}km
+              </span>
+            </div>
+            <Slider
+              value={[params.distanciaMinima]}
+              onValueChange={handleDistanciaChange}
+              min={0.05}
+              max={1.0}
+              step={0.05}
+              className="w-full"
+            />
+            <p className="text-xs text-mountain-500 dark:text-mountain-400">
+              Filtro: Longitud mínima de segmentos
+            </p>
           </div>
-          <Slider
-            value={[params.distanciaMinima]}
-            onValueChange={handleDistanciaChange}
-            min={0.05}
-            max={1.0}
-            step={0.05}
-            className="w-full"
-          />
-          <p className="text-xs text-mountain-500 dark:text-mountain-400">
-            Relevancia: Longitud mínima de segmentos
-          </p>
-        </div>
+        )}
 
-        {/* Slider 3: Diferencia de Pendiente (Sensibilidad) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-              Diferencia de Pendiente
-            </label>
-            <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
-              {(params.diferenciaPendiente * 100).toFixed(1)}%
-            </span>
+        {/* Slider 3: Diferencia de Pendiente (Only visible after refinement) */}
+        {isRefined && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+                Diferencia de Pendiente
+              </label>
+              <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
+                {(params.diferenciaPendiente * 100).toFixed(1)}%
+              </span>
+            </div>
+            <Slider
+              value={[params.diferenciaPendiente]}
+              onValueChange={handleDiferenciaChange}
+              min={0.01}
+              max={0.15}
+              step={0.005}
+              className="w-full"
+            />
+            <p className="text-xs text-mountain-500 dark:text-mountain-400">
+              Filtro: Cambio mínimo para mantener división
+            </p>
           </div>
-          <Slider
-            value={[params.diferenciaPendiente]}
-            onValueChange={handleDiferenciaChange}
-            min={0.01}
-            max={0.15}
-            step={0.005}
-            className="w-full"
-          />
-          <p className="text-xs text-mountain-500 dark:text-mountain-400">
-            Sensibilidad: Cambio mínimo para dividir
-          </p>
-        </div>
+        )}
       </div>
 
       {/* Statistics Display */}
