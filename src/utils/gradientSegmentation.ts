@@ -7,9 +7,6 @@ const SEGMENT_COLORS = {
   hor: '#6b7280'    // Gray for horizontal
 };
 
-// Constante interna fija para el criterio de linealidad
-const INTERNAL_R2_THRESHOLD = 0.98;
-
 export interface GradientSegmentationParams {
   prominenciaMinima: number;     // For macro-segmentation (meters)
   distanciaMinima: number;       // Minimum segment distance (km)
@@ -172,11 +169,9 @@ function calculateGradient(point1: ElevationPoint, point2: ElevationPoint): numb
 }
 
 /**
- * ETAPA 2: Micro-Segmentación con Doble Criterio de Corte
- * Criterio 1: Cambio de Gradiente Futuro
- * Criterio 2: Criterio de Linealidad (R² interno fijo)
+ * ETAPA 2: Micro-Segmentación Táctica con Criterio de Gradiente Futuro
  */
-function generateDualCriteriaBreakpoints(
+function generateGradientBasedBreakpoints(
   macroSegmentData: ElevationPoint[],
   globalIndexOffset: number,
   params: GradientSegmentationParams
@@ -189,36 +184,17 @@ function generateDualCriteriaBreakpoints(
 
   while (currentStart < macroSegmentData.length - 1) {
     let currentEnd = currentStart + 1;
-    let shouldBreak = false;
+    let candidateSegmentGradient = 0;
     
     // Grow segment point by point
-    while (currentEnd < macroSegmentData.length && !shouldBreak) {
+    while (currentEnd < macroSegmentData.length) {
       const candidatePoints = macroSegmentData.slice(currentStart, currentEnd + 1);
       
       if (candidatePoints.length >= 2) {
-        // CRITERIO 2: Evaluar R² del segmento candidato actual
-        const regressionPoints = candidatePoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-        const candidateRegression = calculateLinearRegression(regressionPoints);
-        
-        // Si el R² cae por debajo del umbral interno, forzar corte
-        if (candidateRegression.rSquared < INTERNAL_R2_THRESHOLD) {
-          const startPoint = candidatePoints[0];
-          const endPoint = candidatePoints[candidatePoints.length - 1];
-          const segmentDistance = endPoint.displayDistance - startPoint.displayDistance;
-          
-          if (segmentDistance >= params.distanciaMinima) {
-            console.log(`R² breakpoint detected: R²=${candidateRegression.rSquared.toFixed(3)} < ${INTERNAL_R2_THRESHOLD}`);
-            breakpoints.push(globalIndexOffset + currentEnd - 1); // Cortar en el punto anterior
-            currentStart = currentEnd - 1;
-            shouldBreak = true;
-            continue;
-          }
-        }
-        
-        // CRITERIO 1: Evaluar cambio de gradiente futuro
+        // Calculate current candidate segment gradient
         const startPoint = candidatePoints[0];
         const endPoint = candidatePoints[candidatePoints.length - 1];
-        const candidateSegmentGradient = calculateGradient(startPoint, endPoint);
+        candidateSegmentGradient = calculateGradient(startPoint, endPoint);
         
         // Look ahead for future gradient window
         let futureWindowEnd = currentEnd;
@@ -244,11 +220,10 @@ function generateDualCriteriaBreakpoints(
             const segmentDistance = endPoint.displayDistance - startPoint.displayDistance;
             
             if (segmentDistance >= params.distanciaMinima) {
-              console.log(`Gradient breakpoint detected: change=${gradientChange.toFixed(1)}% >= ${params.cambioGradiente}%`);
+              // Confirm breakpoint
               breakpoints.push(globalIndexOffset + currentEnd);
               currentStart = currentEnd;
-              shouldBreak = true;
-              continue;
+              break;
             }
           }
         }
@@ -296,7 +271,7 @@ function createFinalSegmentsForMacro(
 }
 
 /**
- * Main Gradient-Based Segmentation Function with Dual Criteria
+ * Main Gradient-Based Segmentation Function
  */
 export function segmentProfileGradient(
   elevationData: ElevationPoint[],
@@ -306,14 +281,13 @@ export function segmentProfileGradient(
     return { segments: [], macroBoundaries: [] };
   }
 
-  console.log('Starting Dual-Criteria Gradient segmentation with params:', params);
-  console.log('Internal R² threshold:', INTERNAL_R2_THRESHOLD);
+  console.log('Starting Gradient-based segmentation with params:', params);
   
   // ETAPA 1: Macro-Segmentación Estratégica
   const macroBoundaries = findSignificantExtrema(elevationData, params.prominenciaMinima);
   console.log('Gradient Macro boundaries found:', macroBoundaries.length);
   
-  // ETAPA 2: Micro-Segmentación con Doble Criterio de Corte
+  // ETAPA 2: Micro-Segmentación con Criterio de Gradiente Futuro
   const finalSegments: AdvancedSegment[] = [];
   
   for (let i = 0; i < macroBoundaries.length - 1; i++) {
@@ -323,15 +297,15 @@ export function segmentProfileGradient(
     if (macroEnd > macroStart) {
       const macroSegmentData = elevationData.slice(macroStart, macroEnd + 1);
       
-      // Generate breakpoints using dual criteria (gradient + R²)
-      const dualCriteriaBreakpoints = generateDualCriteriaBreakpoints(
+      // Generate breakpoints using gradient criteria
+      const gradientBreakpoints = generateGradientBasedBreakpoints(
         macroSegmentData, 
         macroStart, 
         params
       );
       
       // Convert global breakpoints to local indices
-      const localBreakpoints = dualCriteriaBreakpoints.map(bp => bp - macroStart);
+      const localBreakpoints = gradientBreakpoints.map(bp => bp - macroStart);
       
       // Create final segments for this macro
       const macroSegments = createFinalSegmentsForMacro(
@@ -344,7 +318,7 @@ export function segmentProfileGradient(
     }
   }
   
-  console.log(`Dual-criteria segmentation generated ${finalSegments.length} segments`);
+  console.log(`Gradient segmentation generated ${finalSegments.length} segments`);
   
   return { segments: finalSegments, macroBoundaries };
 }
