@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
@@ -8,14 +7,16 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Slider } from '../../components/ui/slider';
 import { Switch } from '../../components/ui/switch';
-import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft, Zap } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
 import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS } from '../../utils/advancedSegmentation';
 import { segmentProfileV2, DEFAULT_V2_PARAMS, AdvancedSegmentationV2Params } from '../../utils/advancedSegmentationV2';
+import { segmentProfileGradient, DEFAULT_GRADIENT_PARAMS, GradientSegmentationParams } from '../../utils/gradientSegmentation';
 import { AdvancedControlsPanel } from '../../components/route/advanced-controls-panel';
 import { AdvancedControlsBarV2 } from '../../components/route/AdvancedControlsBarV2';
+import { GradientControlsBar } from '../../components/route/GradientControlsBar';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -30,6 +31,10 @@ const RouteDetail = () => {
   // Experimental analysis state (V2)
   const [experimentalAnalysisMode, setExperimentalAnalysisMode] = useState(false);
   const [experimentalParams, setExperimentalParams] = useState<AdvancedSegmentationV2Params>(DEFAULT_V2_PARAMS);
+  
+  // Gradient analysis state (V3)
+  const [gradientAnalysisMode, setGradientAnalysisMode] = useState(false);
+  const [gradientParams, setGradientParams] = useState<GradientSegmentationParams>(DEFAULT_GRADIENT_PARAMS);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -82,8 +87,25 @@ const RouteDetail = () => {
     return segmentProfileV2(processedElevationData, experimentalParams);
   }, [experimentalAnalysisMode, processedElevationData, experimentalParams]);
 
-  // Calculate advanced segments statistics (works for both V1 and V2)
-  const currentSegments = experimentalAnalysisMode ? experimentalSegments : advancedSegments;
+  // Calculate gradient V3 segments in real-time when V3 mode is active
+  const { segments: gradientSegments, macroBoundaries: gradientMacroBoundaries } = useMemo(() => {
+    if (!gradientAnalysisMode || processedElevationData.length === 0) {
+      return { segments: [], macroBoundaries: [] };
+    }
+    
+    console.log('Calculating V3 gradient segments with params:', gradientParams);
+    return segmentProfileGradient(processedElevationData, gradientParams);
+  }, [gradientAnalysisMode, processedElevationData, gradientParams]);
+
+  // Calculate advanced segments statistics (works for V1, V2, and V3)
+  const currentSegments = gradientAnalysisMode ? gradientSegments : 
+                          experimentalAnalysisMode ? experimentalSegments : 
+                          advancedSegments;
+  
+  const currentMacroBoundaries = gradientAnalysisMode ? gradientMacroBoundaries :
+                                experimentalAnalysisMode ? experimentalMacroBoundaries :
+                                macroBoundaries;
+
   const advancedStats = useMemo(() => {
     if (!currentSegments || currentSegments.length === 0) return null;
     
@@ -126,22 +148,36 @@ const RouteDetail = () => {
     setAdvancedParams(DEFAULT_ADVANCED_SEGMENTATION_PARAMS);
   };
 
+  const resetExperimentalParams = () => {
+    setExperimentalParams(DEFAULT_V2_PARAMS);
+  };
+
+  const resetGradientParams = () => {
+    setGradientParams(DEFAULT_GRADIENT_PARAMS);
+  };
+
   const handleAdvancedModeToggle = (enabled: boolean) => {
     setAdvancedAnalysisMode(enabled);
     if (enabled) {
-      setExperimentalAnalysisMode(false); // Mutually exclusive
+      setExperimentalAnalysisMode(false);
+      setGradientAnalysisMode(false);
     }
   };
 
   const handleExperimentalModeToggle = (enabled: boolean) => {
     setExperimentalAnalysisMode(enabled);
     if (enabled) {
-      setAdvancedAnalysisMode(false); // Mutually exclusive
+      setAdvancedAnalysisMode(false);
+      setGradientAnalysisMode(false);
     }
   };
 
-  const resetExperimentalParams = () => {
-    setExperimentalParams(DEFAULT_V2_PARAMS);
+  const handleGradientModeToggle = (enabled: boolean) => {
+    setGradientAnalysisMode(enabled);
+    if (enabled) {
+      setAdvancedAnalysisMode(false);
+      setExperimentalAnalysisMode(false);
+    }
   };
 
   if (isLoading) {
@@ -230,6 +266,11 @@ const RouteDetail = () => {
                   {experimentalAnalysisMode && (
                     <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
                       Análisis Experimental V2 Activo
+                    </Badge>
+                  )}
+                  {gradientAnalysisMode && (
+                    <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
+                      Análisis por Gradiente Activo
                     </Badge>
                   )}
                 </div>
@@ -340,6 +381,16 @@ const RouteDetail = () => {
                   onCheckedChange={handleExperimentalModeToggle}
                 />
               </div>
+
+              {/* Gradient Analysis Toggle V3 */}
+              <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-yellow-200 dark:border-yellow-700 rounded-lg px-3 py-2">
+                <Zap className="w-4 h-4 text-yellow-500" />
+                <span className="text-sm font-medium">Análisis por Gradiente</span>
+                <Switch
+                  checked={gradientAnalysisMode}
+                  onCheckedChange={handleGradientModeToggle}
+                />
+              </div>
               
               <Button 
                 onClick={() => setShowMap(!showMap)}
@@ -371,6 +422,17 @@ const RouteDetail = () => {
             />
           )}
 
+          {/* Gradient V3 Controls Bar */}
+          {gradientAnalysisMode && (
+            <GradientControlsBar
+              params={gradientParams}
+              setParams={setGradientParams}
+              stats={advancedStats}
+              onReset={resetGradientParams}
+              onClose={() => setGradientAnalysisMode(false)}
+            />
+          )}
+
           {/* Advanced Elevation Chart */}
           <div className="w-full">
             <ElevationChartD3
@@ -381,16 +443,16 @@ const RouteDetail = () => {
                 height: 400,
                 backgroundColor: 'transparent'
               }}
-              advancedSegments={experimentalAnalysisMode ? experimentalSegments : advancedSegments}
-              macroBoundaries={experimentalAnalysisMode ? experimentalMacroBoundaries : macroBoundaries}
+              advancedSegments={currentSegments}
+              macroBoundaries={currentMacroBoundaries}
             />
           </div>
 
           {/* Segments Table */}
           <SegmentsTable 
             segments={segments}
-            advancedSegments={experimentalAnalysisMode ? experimentalSegments : advancedSegments}
-            isAdvancedMode={advancedAnalysisMode || experimentalAnalysisMode}
+            advancedSegments={currentSegments}
+            isAdvancedMode={advancedAnalysisMode || experimentalAnalysisMode || gradientAnalysisMode}
             onSegmentHover={setHoveredSegment}
             hoveredSegment={hoveredSegment}
           />
