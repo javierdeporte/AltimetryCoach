@@ -1,4 +1,3 @@
-
 import { ElevationPoint, AdvancedSegment, RegressionResult } from './types';
 
 const SEGMENT_COLORS = {
@@ -174,11 +173,9 @@ function findSignificantExtrema(
 }
 
 /**
- * ETAPA 1: Detección Híbrida R²-Gradiente (CORREGIDA)
- * 1. Construye segmentos con R² de alta calidad (98%)
- * 2. Valida cambios de gradiente en ventana futura fija (~100m)
- * 3. NO aplica distancia mínima durante construcción (para no saltar cambios de pendiente)
- * 4. Genera puntos de corte basados en R² + gradiente
+ * ETAPA 1: Detección Híbrida R²-Gradiente con Control de Distancia Mínima
+ * Utiliza R² como criterio principal y detecta cambios de gradiente significativos
+ * Respeta la distancia mínima durante la detección
  */
 export async function detectRawSegments(
   elevationData: ElevationPoint[],
@@ -189,20 +186,20 @@ export async function detectRawSegments(
     return [];
   }
 
-  console.log('🔍 ETAPA 1: Detección Híbrida R²-Gradiente (CORREGIDA)...');
+  console.log('🔍 ETAPA 1: Detección Híbrida R²-Gradiente con Control de Distancia...');
   console.log(`📊 R² mínimo: ${params.calidadR2Minima}%`);
   console.log(`📐 Cambio gradiente: ${params.cambioGradiente}°`);
-  console.log(`📏 Ventana futura fija: ~100m (no afectada por distancia mínima)`);
+  console.log(`📏 Distancia mínima: ${params.distanciaMinima}km`);
   
   // Macro-segmentation: Find significant extrema
   const macroBoundaries = findSignificantExtrema(elevationData, params.prominenciaMinima);
-  console.log(`📍 Encontrados ${macroBoundaries.length} límites macro (prominencias)`);
+  console.log(`📍 Encontrados ${macroBoundaries.length} límites macro`);
   
   const rawSegments: AdvancedSegment[] = [];
   let totalSegmentsFound = 0;
   const r2Threshold = params.calidadR2Minima / 100; // Convert percentage to decimal
   const gradientThresholdDegrees = params.cambioGradiente;
-  const FUTURE_WINDOW_DISTANCE = 0.10; // Fixed 100m window for gradient detection
+  const minDistanceKm = params.distanciaMinima;
 
   // Process each macro segment
   for (let macroIdx = 0; macroIdx < macroBoundaries.length - 1; macroIdx++) {
@@ -227,57 +224,52 @@ export async function detectRawSegments(
         // Calculate R² for current segment
         const currentSegment = createSegment(elevationData, macroStart + currentStart, macroStart + currentEnd);
         
-        // PRIMARY CRITERION: Check R² quality
+        // FIRST: Check if segment meets minimum distance requirement
+        if (currentSegment.distance < minDistanceKm) {
+          currentEnd++;
+          bestEndpoint = currentEnd;
+          continue; // Keep growing until we meet minimum distance
+        }
+        
+        // SECOND: Check R² quality
         if (currentSegment.rSquared < r2Threshold) {
           console.log(`📊 R² cayó a ${(currentSegment.rSquared * 100).toFixed(1)}% - Punto de corte por calidad`);
           bestEndpoint = currentEnd - 1; // Use previous endpoint with good R²
+          
+          // Ensure we still meet minimum distance
+          const testSegment = createSegment(elevationData, macroStart + currentStart, macroStart + bestEndpoint);
+          if (testSegment.distance < minDistanceKm && bestEndpoint < macroSegmentData.length - 1) {
+            // If we don't meet minimum distance, keep the current endpoint
+            bestEndpoint = currentEnd;
+          }
+          
           foundCutPoint = true;
           break;
         }
         
-        // SECONDARY CRITERION: Check gradient change with FIXED future window
-        if (currentEnd + 5 < macroSegmentData.length) {
-          // Find future window endpoint based on FIXED distance (~100m)
-          let futureEndIndex = currentEnd + 5;
-          const currentDistance = elevationData[macroStart + currentEnd].displayDistance;
+        // THIRD: Check gradient change if we have enough future points
+        if (currentEnd + 10 < macroSegmentData.length) {
+          // Current segment slope
+          const currentSlope = currentSegment.slope;
+          const currentGradientDegrees = Math.abs(slopeToDegrees(currentSlope));
           
-          // Look for endpoint at ~100m ahead
-          for (let i = currentEnd + 5; i < macroSegmentData.length; i++) {
-            const futureDistance = elevationData[macroStart + i].displayDistance;
-            if (futureDistance - currentDistance >= FUTURE_WINDOW_DISTANCE) {
-              futureEndIndex = i;
-              break;
-            }
-          }
+          // Look-ahead segment slope
+          const futureSegment = createSegment(
+            elevationData, 
+            macroStart + currentEnd, 
+            macroStart + Math.min(currentEnd + 10, macroSegmentData.length - 1)
+          );
+          const futureSlope = futureSegment.slope;
+          const futureGradientDegrees = Math.abs(slopeToDegrees(futureSlope));
           
-          // Only proceed if we have enough points for future window
-          if (futureEndIndex < macroSegmentData.length) {
-            // Current segment slope
-            const currentSlope = currentSegment.slope;
-            const currentGradientDegrees = Math.abs(slopeToDegrees(currentSlope));
-            
-            // Future window segment slope
-            const futureSegment = createSegment(
-              elevationData, 
-              macroStart + currentEnd, 
-              macroStart + futureEndIndex
-            );
-            
-            // Only consider future window if it has good R² quality
-            if (futureSegment.rSquared >= 0.90) { // Lower threshold for future window to avoid noise
-              const futureSlope = futureSegment.slope;
-              const futureGradientDegrees = Math.abs(slopeToDegrees(futureSlope));
-              
-              // Calculate gradient change in degrees
-              const gradientChangeDegrees = Math.abs(currentGradientDegrees - futureGradientDegrees);
-              
-              if (gradientChangeDegrees >= gradientThresholdDegrees) {
-                console.log(`📐 Cambio de gradiente detectado: ${gradientChangeDegrees.toFixed(1)}° - Punto de corte`);
-                bestEndpoint = currentEnd;
-                foundCutPoint = true;
-                break;
-              }
-            }
+          // Calculate gradient change in degrees
+          const gradientChangeDegrees = Math.abs(currentGradientDegrees - futureGradientDegrees);
+          
+          if (gradientChangeDegrees >= gradientThresholdDegrees) {
+            console.log(`📐 Cambio de gradiente detectado: ${gradientChangeDegrees.toFixed(1)}° - Punto de corte`);
+            bestEndpoint = currentEnd;
+            foundCutPoint = true;
+            break;
           }
         }
         
@@ -285,9 +277,29 @@ export async function detectRawSegments(
         bestEndpoint = currentEnd;
       }
       
-      // Create segment (WITHOUT distance validation in Phase 1)
+      // Create segment and ensure it meets minimum distance
       const segment = createSegment(elevationData, macroStart + currentStart, macroStart + bestEndpoint);
-      rawSegments.push(segment);
+      
+      // Final check: if segment is still too short and we can extend it, do so
+      if (segment.distance < minDistanceKm && bestEndpoint < macroSegmentData.length - 1) {
+        // Try to extend to meet minimum distance
+        let extendedEnd = bestEndpoint;
+        while (extendedEnd < macroSegmentData.length - 1) {
+          const extendedSegment = createSegment(elevationData, macroStart + currentStart, macroStart + extendedEnd);
+          if (extendedSegment.distance >= minDistanceKm) {
+            bestEndpoint = extendedEnd;
+            break;
+          }
+          extendedEnd++;
+        }
+        
+        // Recreate segment with extended endpoint
+        const finalSegment = createSegment(elevationData, macroStart + currentStart, macroStart + bestEndpoint);
+        rawSegments.push(finalSegment);
+      } else {
+        rawSegments.push(segment);
+      }
+      
       totalSegmentsFound++;
       
       console.log(`✅ Segmento detectado: ${totalSegmentsFound} (R²: ${(segment.rSquared * 100).toFixed(1)}%, Distancia: ${segment.distance.toFixed(3)}km)`);
@@ -307,14 +319,13 @@ export async function detectRawSegments(
   }
   
   console.log(`🎯 ETAPA 1 COMPLETADA: ${totalSegmentsFound} segmentos de alta calidad detectados`);
-  console.log(`⚠️ NOTA: Algunos segmentos pueden ser menores a distancia mínima - se resolverá en ETAPA 2`);
   return rawSegments;
 }
 
 /**
- * ETAPA 2: Fusión Inteligente basada en Distancia Mínima (MEJORADA)
- * Ahora la distancia mínima entra en juego y evalúa las distancias de los segmentos
- * para fusionar los adyacentes que generen menor pérdida de R²
+ * ETAPA 2: Fusión Inteligente basada en Distancia Mínima
+ * Fusiona segmentos adyacentes que sean menores a la distancia mínima
+ * Prioriza fusiones que mantengan mejor R²
  */
 export function simplifySegments(
   rawSegments: AdvancedSegment[],
@@ -325,7 +336,7 @@ export function simplifySegments(
     return [];
   }
 
-  console.log('🔧 ETAPA 2: Fusión Inteligente por Distancia Mínima (MEJORADA)...');
+  console.log('🔧 ETAPA 2: Fusión Inteligente por Distancia Mínima...');
   console.log(`📏 Distancia mínima: ${minDistanceKm}km (${minDistanceKm * 1000}m)`);
   
   const frames: AnimationFrames = [];
@@ -337,7 +348,7 @@ export function simplifySegments(
   let iteration = 0;
   let fusionsMade = true;
   
-  while (fusionsMade && iteration < 25) { // Increased iteration limit
+  while (fusionsMade && iteration < 20) {
     fusionsMade = false;
     iteration++;
     
@@ -372,19 +383,13 @@ export function simplifySegments(
         const prevSegment = currentSegments[segmentIndex - 1];
         const fusedSegment = createSegment(elevationData, prevSegment.startIndex, segment.endIndex);
         
-        // Prioritize fusion that maintains better overall R²
-        const avgR2 = (prevSegment.rSquared + segment.rSquared) / 2;
-        const r2Loss = avgR2 - fusedSegment.rSquared;
-        const r2Score = fusedSegment.rSquared - (r2Loss * 0.1); // Penalize R² loss slightly
-        
-        if (r2Score > bestR2) {
-          bestR2 = r2Score;
+        if (fusedSegment.rSquared > bestR2) {
+          bestR2 = fusedSegment.rSquared;
           bestFusionOption = {
             type: 'previous',
             fusedSegment,
             removeIndices: [segmentIndex - 1, segmentIndex],
-            insertIndex: segmentIndex - 1,
-            r2Loss
+            insertIndex: segmentIndex - 1
           };
         }
       }
@@ -394,26 +399,20 @@ export function simplifySegments(
         const nextSegment = currentSegments[segmentIndex + 1];
         const fusedSegment = createSegment(elevationData, segment.startIndex, nextSegment.endIndex);
         
-        // Prioritize fusion that maintains better overall R²
-        const avgR2 = (segment.rSquared + nextSegment.rSquared) / 2;
-        const r2Loss = avgR2 - fusedSegment.rSquared;
-        const r2Score = fusedSegment.rSquared - (r2Loss * 0.1); // Penalize R² loss slightly
-        
-        if (r2Score > bestR2) {
-          bestR2 = r2Score;
+        if (fusedSegment.rSquared > bestR2) {
+          bestR2 = fusedSegment.rSquared;
           bestFusionOption = {
             type: 'next',
             fusedSegment,
             removeIndices: [segmentIndex, segmentIndex + 1],
-            insertIndex: segmentIndex,
-            r2Loss
+            insertIndex: segmentIndex
           };
         }
       }
       
-      // Perform fusion if we found a reasonable option
-      if (bestFusionOption && bestFusionOption.fusedSegment.rSquared > 0.75) { // More lenient R² threshold for fusion
-        console.log(`🔗 Fusionando segmento ${segmentIndex} con ${bestFusionOption.type} (R²: ${bestFusionOption.fusedSegment.rSquared.toFixed(3)}, Nueva distancia: ${bestFusionOption.fusedSegment.distance.toFixed(3)}km, Pérdida R²: ${bestFusionOption.r2Loss.toFixed(3)})`);
+      // Perform fusion if we found a good option
+      if (bestFusionOption && bestR2 > 0.80) { // Minimum R² for fusion
+        console.log(`🔗 Fusionando segmento ${segmentIndex} con ${bestFusionOption.type} (R²: ${bestR2.toFixed(3)}, Nueva distancia: ${bestFusionOption.fusedSegment.distance.toFixed(3)}km)`);
         
         // Remove the two segments and insert the fused one
         currentSegments.splice(bestFusionOption.removeIndices[0], 2, bestFusionOption.fusedSegment);
@@ -433,9 +432,6 @@ export function simplifySegments(
   const finalShortSegments = currentSegments.filter(seg => seg.distance < minDistanceKm);
   if (finalShortSegments.length > 0) {
     console.log(`⚠️ ADVERTENCIA: ${finalShortSegments.length} segmentos aún por debajo de distancia mínima después de ${iteration} iteraciones`);
-    finalShortSegments.forEach((seg, i) => {
-      console.log(`   - Segmento ${i + 1}: ${seg.distance.toFixed(3)}km (R²: ${seg.rSquared.toFixed(3)})`);
-    });
   }
   
   console.log(`🎯 ETAPA 2 COMPLETADA: ${frames.length} frames generados, ${currentSegments.length} segmentos finales`);
@@ -452,31 +448,30 @@ export async function segmentProfileGradientV2(
   onRawSegmentDetected?: OnRawSegmentDetectedCallback
 ): Promise<{ segments: AdvancedSegment[], frames: AnimationFrames, macroBoundaries: number[] }> {
   
-  console.log('🚀 Iniciando Análisis Híbrido R²-Gradiente V2 (CORREGIDO)...');
+  console.log('🚀 Iniciando Análisis Híbrido R²-Gradiente V2...');
   
-  // ETAPA 1: Detección Híbrida R²-Gradiente (sin validación de distancia)
+  // ETAPA 1: Detección Híbrida R²-Gradiente
   const rawSegments = await detectRawSegments(
     elevationData, 
     params, 
     onRawSegmentDetected
   );
   
-  // ETAPA 2: Fusión Inteligente por Distancia (aquí entra la distancia mínima)
+  // ETAPA 2: Fusión Inteligente por Distancia
   const frames = simplifySegments(rawSegments, elevationData, params.distanciaMinima);
   
   // Get final segments from last frame
   const finalSegments = frames.length > 0 ? frames[frames.length - 1] : rawSegments;
   
-  // Get macro boundaries for visualization (FIXED: now returning them properly)
+  // Get macro boundaries for visualization
   const macroBoundaries = findSignificantExtrema(elevationData, params.prominenciaMinima);
   
-  console.log('✨ Análisis Híbrido R²-Gradiente V2 COMPLETADO (CORREGIDO)');
+  console.log('✨ Análisis Híbrido R²-Gradiente V2 COMPLETADO');
   console.log(`📊 Segmentos finales: ${finalSegments.length}, R² promedio: ${(finalSegments.reduce((sum, s) => sum + s.rSquared, 0) / finalSegments.length * 100).toFixed(1)}%`);
-  console.log(`📍 Prominencias detectadas: ${macroBoundaries.length} puntos macro`);
   
   return {
     segments: finalSegments,
     frames,
-    macroBoundaries // FIXED: Now properly returned for visualization
+    macroBoundaries
   };
 }

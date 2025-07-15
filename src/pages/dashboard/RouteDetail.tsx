@@ -34,7 +34,7 @@ const RouteDetail = () => {
   const [experimentalAnalysisMode, setExperimentalAnalysisMode] = useState(false);
   const [experimentalParams, setExperimentalParams] = useState<AdvancedSegmentationV2Params>(DEFAULT_V2_PARAMS);
   
-  // Gradient analysis state (V3) - FIXED
+  // Gradient analysis state (V3) - REFACTORED
   const [gradientAnalysisMode, setGradientAnalysisMode] = useState(false);
   const [gradientParams, setGradientParams] = useState<GradientSegmentationV2Params>(DEFAULT_GRADIENT_V2_PARAMS);
   
@@ -42,7 +42,6 @@ const RouteDetail = () => {
   const [rawSegments, setRawSegments] = useState<AdvancedSegment[]>([]);
   const [animatedFrames, setAnimatedFrames] = useState<AnimationFrames>([]);
   const [finalSegments, setFinalSegments] = useState<AdvancedSegment[]>([]);
-  const [gradientMacroBoundaries, setGradientMacroBoundaries] = useState<number[]>([]);  // FIXED: Add state for gradient macro boundaries
   const [isAnimating, setIsAnimating] = useState(false);
   const [animationPhase, setAnimationPhase] = useState<'detection' | 'fusion' | 'complete'>('complete');
   const [detectedSegmentsCount, setDetectedSegmentsCount] = useState(0);
@@ -118,7 +117,6 @@ const RouteDetail = () => {
     setRawSegments([]);
     setAnimatedFrames([]);
     setFinalSegments([]);
-    setGradientMacroBoundaries([]);  // FIXED: Reset macro boundaries
     setDetectedSegmentsCount(0);
 
     try {
@@ -131,7 +129,6 @@ const RouteDetail = () => {
 
       console.log('✅ Detección completada, iniciando fusión...');
       setRawSegments(result.segments); // Store raw segments for later use
-      setGradientMacroBoundaries(result.macroBoundaries);  // FIXED: Store macro boundaries
       setAnimationPhase('fusion');
       setAnimatedFrames(result.frames);
 
@@ -244,8 +241,7 @@ const RouteDetail = () => {
     experimentalAnalysisMode ? experimentalSegments : 
     advancedSegments;
   
-  // FIXED: Use proper macro boundaries for each analysis mode
-  const currentMacroBoundaries = gradientAnalysisMode ? gradientMacroBoundaries :
+  const currentMacroBoundaries = gradientAnalysisMode ? [] : // We'll implement this later if needed
                                 experimentalAnalysisMode ? experimentalMacroBoundaries :
                                 macroBoundaries;
 
@@ -621,7 +617,7 @@ const RouteDetail = () => {
                 backgroundColor: 'transparent'
               }}
               advancedSegments={currentSegments}
-              macroBoundaries={currentMacroBoundaries}  // FIXED: Now properly uses the right boundaries
+              macroBoundaries={currentMacroBoundaries}
             />
           </div>
 
