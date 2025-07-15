@@ -34,7 +34,7 @@ const RouteDetail = () => {
   const [experimentalAnalysisMode, setExperimentalAnalysisMode] = useState(false);
   const [experimentalParams, setExperimentalParams] = useState<AdvancedSegmentationV2Params>(DEFAULT_V2_PARAMS);
   
-  // Gradient analysis state (V3) - UPDATED with R² quality parameter
+  // Gradient analysis state (V3) - REFACTORED
   const [gradientAnalysisMode, setGradientAnalysisMode] = useState(false);
   const [gradientParams, setGradientParams] = useState<GradientSegmentationV2Params>(DEFAULT_GRADIENT_V2_PARAMS);
   
@@ -49,7 +49,7 @@ const RouteDetail = () => {
   // Debounce refs for intelligent slider handling
   const detectionDebounceRef = useRef<NodeJS.Timeout>();
   const fusionDebounceRef = useRef<NodeJS.Timeout>();
-
+  
   console.log('RouteDetail mounted with routeId:', routeId);
   
   // Verificar que tenemos un routeId válido antes de proceder
@@ -107,11 +107,11 @@ const RouteDetail = () => {
     setRawSegments(prev => [...prev, segment]);
   }, []);
 
-  // ETAPA 1: Full Calculation with Animation (Prominence, Gradient Change, and R² Quality)
+  // ETAPA 1: Full Calculation with Animation (Prominence or Gradient Change)
   const runFullCalculationWithAnimation = useCallback(async () => {
     if (!processedElevationData.length) return;
 
-    console.log('🎬 Iniciando Cálculo Híbrido Completo...');
+    console.log('🎬 Iniciando Cálculo Completo con Animación...');
     setIsAnimating(true);
     setAnimationPhase('detection');
     setRawSegments([]);
@@ -120,15 +120,15 @@ const RouteDetail = () => {
     setDetectedSegmentsCount(0);
 
     try {
-      // ETAPA 1: Detección Híbrida con validación R²
+      // ETAPA 1: Detección Global con animación
       const result = await segmentProfileGradientV2(
         processedElevationData,
         gradientParams,
         onRawSegmentDetected
       );
 
-      console.log('✅ Detección híbrida completada, iniciando fusión...');
-      setRawSegments(result.segments);
+      console.log('✅ Detección completada, iniciando fusión...');
+      setRawSegments(result.segments); // Store raw segments for later use
       setAnimationPhase('fusion');
       setAnimatedFrames(result.frames);
 
@@ -143,9 +143,9 @@ const RouteDetail = () => {
             clearInterval(animationInterval);
             setAnimationPhase('complete');
             setIsAnimating(false);
-            console.log('🎯 Animación híbrida completada');
+            console.log('🎯 Animación completada');
           }
-        }, 100); // Slightly slower for better visualization
+        }, 50); // Faster fusion animation - 50ms between frames
       } else {
         setFinalSegments(result.segments);
         setAnimationPhase('complete');
@@ -153,21 +153,22 @@ const RouteDetail = () => {
       }
 
     } catch (error) {
-      console.error('Error en cálculo híbrido:', error);
+      console.error('Error en cálculo con animación:', error);
       setIsAnimating(false);
       setAnimationPhase('complete');
     }
   }, [processedElevationData, gradientParams, onRawSegmentDetected]);
 
-  // ETAPA 2: Fast Fusion Calculation (Distance and R² quality)
+  // ETAPA 2: Fast Fusion Calculation (Distance only) - FIXED
   const runFastFusionCalculation = useCallback(() => {
     if (!rawSegments.length || !processedElevationData.length) return;
 
-    console.log('⚡ Iniciando Fusión Rápida (solo distancia)...');
+    console.log('⚡ Iniciando Cálculo de Fusión Rápido...');
     setIsAnimating(true);
     setAnimationPhase('fusion');
 
     try {
+      // Use the corrected simplifySegments function with elevation data
       const frames = simplifySegments(rawSegments, processedElevationData, gradientParams.distanciaMinima);
       setAnimatedFrames(frames);
 
@@ -183,7 +184,7 @@ const RouteDetail = () => {
             setIsAnimating(false);
             console.log('⚡ Fusión rápida completada');
           }
-        }, 80); // Balanced animation speed
+        }, 50); // Faster animation
       } else {
         setFinalSegments(rawSegments);
         setAnimationPhase('complete');
@@ -197,12 +198,11 @@ const RouteDetail = () => {
     }
   }, [rawSegments, processedElevationData, gradientParams.distanciaMinima]);
 
-  // UPDATED: Intelligent slider handling with R² quality detection
+  // Intelligent slider handling with debounce - CORRECTED LOGIC
   const handleGradientParamsChange = useCallback((newParams: GradientSegmentationV2Params) => {
     const paramsChanged = {
       prominence: newParams.prominenciaMinima !== gradientParams.prominenciaMinima,
       gradient: newParams.cambioGradiente !== gradientParams.cambioGradiente,
-      r2Quality: newParams.calidadR2Minima !== gradientParams.calidadR2Minima,
       distance: newParams.distanciaMinima !== gradientParams.distanciaMinima
     };
 
@@ -212,18 +212,18 @@ const RouteDetail = () => {
     if (detectionDebounceRef.current) clearTimeout(detectionDebounceRef.current);
     if (fusionDebounceRef.current) clearTimeout(fusionDebounceRef.current);
 
-    if (paramsChanged.prominence || paramsChanged.gradient || paramsChanged.r2Quality) {
+    if (paramsChanged.prominence || paramsChanged.gradient) {
       // Full recalculation needed (ETAPA 1 + ETAPA 2)
-      console.log('🔄 Cambio en parámetros de detección/calidad - recálculo completo');
+      console.log('🔄 Cambio en parámetros de detección - recálculo completo');
       detectionDebounceRef.current = setTimeout(() => {
         runFullCalculationWithAnimation();
-      }, 300); // Slightly longer debounce for complex calculations
+      }, 200);
     } else if (paramsChanged.distance && rawSegments.length > 0) {
       // Only fusion recalculation needed (ETAPA 2 solamente)
       console.log('🔄 Cambio solo en distancia - fusión rápida');
       fusionDebounceRef.current = setTimeout(() => {
         runFastFusionCalculation();
-      }, 150); // Faster response for distance-only changes
+      }, 100); // Faster response for distance changes
     }
   }, [gradientParams, rawSegments.length, runFullCalculationWithAnimation, runFastFusionCalculation]);
 
@@ -560,7 +560,7 @@ const RouteDetail = () => {
             />
           )}
 
-          {/* Gradient V3 Controls Bar with updated R² quality parameter */}
+          {/* Gradient V3 Controls Bar with new animation status */}
           {gradientAnalysisMode && (
             <div className="space-y-4">
               <GradientControlsBar
@@ -574,7 +574,7 @@ const RouteDetail = () => {
                 onClose={() => setGradientAnalysisMode(false)}
               />
               
-              {/* Enhanced Animation Status Indicator */}
+              {/* Animation Status Indicator */}
               {isAnimating && (
                 <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
                   <div className="flex items-center gap-3">
@@ -583,19 +583,19 @@ const RouteDetail = () => {
                       {animationPhase === 'detection' && (
                         <div>
                           <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                            🔍 Detección Híbrida... ({detectedSegmentsCount} segmentos de calidad encontrados)
+                            🔍 Detectando segmentos... ({detectedSegmentsCount} encontrados)
                           </p>
                           <div className="w-full bg-yellow-200 dark:bg-yellow-800 rounded-full h-2 mt-2">
                             <div 
                               className="bg-yellow-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${Math.min(detectedSegmentsCount * 5, 100)}%` }}
+                              style={{ width: `${Math.min(detectedSegmentsCount * 10, 100)}%` }}
                             ></div>
                           </div>
                         </div>
                       )}
                       {animationPhase === 'fusion' && (
                         <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
-                          🔧 Optimizando por distancia... (Fusión inteligente en progreso)
+                          🔧 Optimizando segmentos... (Fusión inteligente en progreso)
                         </p>
                       )}
                     </div>

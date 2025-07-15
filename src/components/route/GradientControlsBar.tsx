@@ -1,159 +1,189 @@
+
 import React from 'react';
-import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
+import { Button } from '../ui/button';
 import { RotateCcw, X, Zap } from 'lucide-react';
-import { GradientSegmentationV2Params } from '../../utils/gradientSegmentationV2';
+import { GradientSegmentationV2Params, DEFAULT_GRADIENT_V2_PARAMS } from '../../utils/gradientSegmentationV2';
 
 interface GradientControlsBarProps {
   params: GradientSegmentationV2Params;
   setParams: (params: GradientSegmentationV2Params) => void;
-  stats: {
+  onReset: () => void;
+  onClose: () => void;
+  stats?: {
     totalSegments: number;
     ascentSegments: number;
     descentSegments: number;
     horizontalSegments: number;
-    avgRSquared: string;
-    avgSegmentDistance: string;
   } | null;
-  onReset: () => void;
-  onClose: () => void;
 }
 
 export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
   params,
   setParams,
-  stats,
   onReset,
-  onClose
+  onClose,
+  stats
 }) => {
-  const handleParamChange = (key: keyof GradientSegmentationV2Params, value: number) => {
-    setParams({
-      ...params,
-      [key]: value
-    });
+  const handleProminenciaChange = (value: number[]) => {
+    setParams({ ...params, prominenciaMinima: value[0] });
+  };
+
+  const handleDistanciaChange = (value: number[]) => {
+    setParams({ ...params, distanciaMinima: value[0] });
+  };
+
+  const handleGradienteChange = (value: number[]) => {
+    setParams({ ...params, cambioGradiente: value[0] });
   };
 
   return (
-    <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Zap className="w-5 h-5 text-yellow-500" />
-          <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200">
-            Análisis Híbrido por Gradiente + R²
-          </h3>
+    <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg p-4 mb-4 shadow-sm">
+      {/* Header with Stats */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
+              Análisis por Gradiente V2
+            </h3>
+            <span className="text-xs bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-2 py-1 rounded-full">
+              Nueva Generación
+            </span>
+          </div>
+          
+          {/* Inline Stats */}
+          {stats && (
+            <div className="flex items-center gap-4 text-xs text-mountain-600 dark:text-mountain-400">
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-mountain-800 dark:text-mountain-200">{stats.totalSegments}</span>
+                <span>Total</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-green-600">{stats.ascentSegments}</span>
+                <span>Ascensos</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-blue-600">{stats.descentSegments}</span>
+                <span>Descensos</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-gray-600">{stats.horizontalSegments}</span>
+                <span>Planos</span>
+              </div>
+            </div>
+          )}
         </div>
+        
         <div className="flex items-center gap-2">
           <Button
             onClick={onReset}
             variant="outline"
             size="sm"
-            className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
+            className="text-xs"
           >
-            <RotateCcw className="w-4 h-4 mr-2" />
+            <RotateCcw className="w-3 h-3 mr-1" />
             Reset
           </Button>
           <Button
             onClick={onClose}
             variant="ghost"
             size="sm"
-            className="text-yellow-700 hover:bg-yellow-100"
+            className="text-xs"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3 h-3" />
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Prominence Control */}
+      {/* Sliders Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Slider 1: Prominencia Mínima (ETAPA 1 - Detección) */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-            Prominencia (m): {params.prominenciaMinima}
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+              Prominencia Mínima
+              <span className="ml-1 text-xs text-blue-600">🔍</span>
+            </label>
+            <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
+              {params.prominenciaMinima}m
+            </span>
+          </div>
           <Slider
             value={[params.prominenciaMinima]}
-            onValueChange={(value) => handleParamChange('prominenciaMinima', value[0])}
-            min={5}
+            onValueChange={handleProminenciaChange}
+            min={10}
             max={100}
             step={5}
             className="w-full"
           />
+          <p className="text-xs text-mountain-500 dark:text-mountain-400">
+            🔍 Macro: Define picos y valles principales
+          </p>
         </div>
 
-        {/* Gradient Change Control */}
+        {/* Slider 2: Cambio de Gradiente (ETAPA 1 - Detección) */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-            Cambio Gradiente (%): {params.cambioGradiente}
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+              Cambio de Gradiente
+              <span className="ml-1 text-xs text-blue-600">🔍</span>
+            </label>
+            <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
+              {params.cambioGradiente.toFixed(1)}%
+            </span>
+          </div>
           <Slider
             value={[params.cambioGradiente]}
-            onValueChange={(value) => handleParamChange('cambioGradiente', value[0])}
+            onValueChange={handleGradienteChange}
             min={1}
-            max={10}
+            max={15}
             step={0.5}
             className="w-full"
           />
+          <p className="text-xs text-mountain-500 dark:text-mountain-400">
+            🔍 Sensibilidad: Cambio mínimo para dividir
+          </p>
         </div>
 
-        {/* NEW: R² Quality Control */}
+        {/* Slider 3: Distancia Mínima (ETAPA 2 - Fusión) */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-            Calidad R² Mín: {(params.calidadR2Minima * 100).toFixed(0)}%
-          </label>
-          <Slider
-            value={[params.calidadR2Minima]}
-            onValueChange={(value) => handleParamChange('calidadR2Minima', value[0])}
-            min={0.70}
-            max={0.98}
-            step={0.01}
-            className="w-full"
-          />
-        </div>
-
-        {/* Distance Control */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-            Distancia Mín (m): {Math.round(params.distanciaMinima * 1000)}
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+              Distancia Mínima
+              <span className="ml-1 text-xs text-orange-600">🔧</span>
+            </label>
+            <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
+              {params.distanciaMinima.toFixed(2)}km
+            </span>
+          </div>
           <Slider
             value={[params.distanciaMinima]}
-            onValueChange={(value) => handleParamChange('distanciaMinima', value[0])}
+            onValueChange={handleDistanciaChange}
             min={0.05}
             max={1.0}
             step={0.05}
             className="w-full"
           />
+          <p className="text-xs text-mountain-500 dark:text-mountain-400">
+            🔧 Fusión: Longitud mínima de segmentos
+          </p>
         </div>
       </div>
 
-      {/* Enhanced Stats Display */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 pt-4 border-t border-yellow-200 dark:border-yellow-700">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">{stats.totalSegments}</div>
-            <div className="text-xs text-yellow-700 dark:text-yellow-300">Segmentos</div>
+      {/* Legend */}
+      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-6 text-xs text-mountain-600 dark:text-mountain-400">
+          <div className="flex items-center gap-2">
+            <span className="text-blue-600">🔍</span>
+            <span>Etapa 1: Detección Global</span>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{stats.ascentSegments}</div>
-            <div className="text-xs text-yellow-700 dark:text-yellow-300">Ascenso</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{stats.descentSegments}</div>
-            <div className="text-xs text-yellow-700 dark:text-yellow-300">Descenso</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-600">{stats.horizontalSegments}</div>
-            <div className="text-xs text-yellow-700 dark:text-yellow-300">Horizontal</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">{stats.avgRSquared}</div>
-            <div className="text-xs text-yellow-700 dark:text-yellow-300">R² Promedio</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{stats.avgSegmentDistance}km</div>
-            <div className="text-xs text-yellow-700 dark:text-yellow-300">Dist. Promedio</div>
+          <div className="flex items-center gap-2">
+            <span className="text-orange-600">🔧</span>
+            <span>Etapa 2: Fusión Inteligente</span>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
