@@ -1,4 +1,3 @@
-
 import { ElevationPoint, AdvancedSegment, RegressionResult } from './types';
 
 const SEGMENT_COLORS = {
@@ -10,14 +9,14 @@ const SEGMENT_COLORS = {
 export interface GradientSegmentationV2Params {
   prominenciaMinima: number;     // For macro-segmentation (meters)
   distanciaMinima: number;       // Minimum segment distance (km)
-  cambioGradiente: number;       // Gradient change threshold (degrees) - now more restrictive
+  cambioGradiente: number;       // Gradient change threshold (degrees)
   calidadR2Minima: number;       // R² quality threshold (0-100%)
 }
 
 export const DEFAULT_GRADIENT_V2_PARAMS: GradientSegmentationV2Params = {
   prominenciaMinima: 30,         // meters
   distanciaMinima: 0.20,         // km (200 meters)
-  cambioGradiente: 5,            // 5 degrees gradient change (more restrictive)
+  cambioGradiente: 5,            // 5 degrees gradient change
   calidadR2Minima: 98            // 98% R² quality
 };
 
@@ -174,8 +173,9 @@ function findSignificantExtrema(
 }
 
 /**
- * ETAPA 1: Detección Híbrida R²-Gradiente
+ * ETAPA 1: Detección Híbrida R²-Gradiente con Control de Distancia Mínima
  * Utiliza R² como criterio principal y detecta cambios de gradiente significativos
+ * Respeta la distancia mínima durante la detección
  */
 export async function detectRawSegments(
   elevationData: ElevationPoint[],
@@ -186,9 +186,10 @@ export async function detectRawSegments(
     return [];
   }
 
-  console.log('🔍 ETAPA 1: Detección Híbrida R²-Gradiente...');
+  console.log('🔍 ETAPA 1: Detección Híbrida R²-Gradiente con Control de Distancia...');
   console.log(`📊 R² mínimo: ${params.calidadR2Minima}%`);
   console.log(`📐 Cambio gradiente: ${params.cambioGradiente}°`);
+  console.log(`📏 Distancia mínima: ${params.distanciaMinima}km`);
   
   // Macro-segmentation: Find significant extrema
   const macroBoundaries = findSignificantExtrema(elevationData, params.prominenciaMinima);
@@ -198,6 +199,7 @@ export async function detectRawSegments(
   let totalSegmentsFound = 0;
   const r2Threshold = params.calidadR2Minima / 100; // Convert percentage to decimal
   const gradientThresholdDegrees = params.cambioGradiente;
+  const minDistanceKm = params.distanciaMinima;
 
   // Process each macro segment
   for (let macroIdx = 0; macroIdx < macroBoundaries.length - 1; macroIdx++) {
@@ -222,15 +224,30 @@ export async function detectRawSegments(
         // Calculate R² for current segment
         const currentSegment = createSegment(elevationData, macroStart + currentStart, macroStart + currentEnd);
         
-        // Check R² quality
+        // FIRST: Check if segment meets minimum distance requirement
+        if (currentSegment.distance < minDistanceKm) {
+          currentEnd++;
+          bestEndpoint = currentEnd;
+          continue; // Keep growing until we meet minimum distance
+        }
+        
+        // SECOND: Check R² quality
         if (currentSegment.rSquared < r2Threshold) {
           console.log(`📊 R² cayó a ${(currentSegment.rSquared * 100).toFixed(1)}% - Punto de corte por calidad`);
           bestEndpoint = currentEnd - 1; // Use previous endpoint with good R²
+          
+          // Ensure we still meet minimum distance
+          const testSegment = createSegment(elevationData, macroStart + currentStart, macroStart + bestEndpoint);
+          if (testSegment.distance < minDistanceKm && bestEndpoint < macroSegmentData.length - 1) {
+            // If we don't meet minimum distance, keep the current endpoint
+            bestEndpoint = currentEnd;
+          }
+          
           foundCutPoint = true;
           break;
         }
         
-        // Check gradient change if we have enough future points
+        // THIRD: Check gradient change if we have enough future points
         if (currentEnd + 10 < macroSegmentData.length) {
           // Current segment slope
           const currentSlope = currentSegment.slope;
@@ -260,9 +277,29 @@ export async function detectRawSegments(
         bestEndpoint = currentEnd;
       }
       
-      // Create segment
+      // Create segment and ensure it meets minimum distance
       const segment = createSegment(elevationData, macroStart + currentStart, macroStart + bestEndpoint);
-      rawSegments.push(segment);
+      
+      // Final check: if segment is still too short and we can extend it, do so
+      if (segment.distance < minDistanceKm && bestEndpoint < macroSegmentData.length - 1) {
+        // Try to extend to meet minimum distance
+        let extendedEnd = bestEndpoint;
+        while (extendedEnd < macroSegmentData.length - 1) {
+          const extendedSegment = createSegment(elevationData, macroStart + currentStart, macroStart + extendedEnd);
+          if (extendedSegment.distance >= minDistanceKm) {
+            bestEndpoint = extendedEnd;
+            break;
+          }
+          extendedEnd++;
+        }
+        
+        // Recreate segment with extended endpoint
+        const finalSegment = createSegment(elevationData, macroStart + currentStart, macroStart + bestEndpoint);
+        rawSegments.push(finalSegment);
+      } else {
+        rawSegments.push(segment);
+      }
+      
       totalSegmentsFound++;
       
       console.log(`✅ Segmento detectado: ${totalSegmentsFound} (R²: ${(segment.rSquared * 100).toFixed(1)}%, Distancia: ${segment.distance.toFixed(3)}km)`);
@@ -273,7 +310,7 @@ export async function detectRawSegments(
           setTimeout(() => {
             onRawSegmentDetected(segment, totalSegmentsFound);
             resolve(undefined);
-          }, 20); // Slightly faster animation
+          }, 20);
         });
       }
       
@@ -311,65 +348,90 @@ export function simplifySegments(
   let iteration = 0;
   let fusionsMade = true;
   
-  while (fusionsMade && iteration < 15) { // Reduced iterations for efficiency
+  while (fusionsMade && iteration < 20) {
     fusionsMade = false;
     iteration++;
     
     console.log(`🔄 Iteración ${iteration} de fusión...`);
     
-    // Find segments that are shorter than minimum distance
-    let bestFusionIndex = -1;
-    let bestFusionRSquared = -1;
+    // Find ALL segments that are shorter than minimum distance
+    const shortSegments = currentSegments
+      .map((segment, index) => ({ segment, index, distance: segment.distance }))
+      .filter(item => item.distance < minDistanceKm)
+      .sort((a, b) => a.distance - b.distance); // Start with shortest segments
     
-    for (let i = 0; i < currentSegments.length; i++) {
-      const segment = currentSegments[i];
+    if (shortSegments.length === 0) {
+      console.log(`✅ No hay más segmentos cortos - fusión completada`);
+      break;
+    }
+    
+    console.log(`📐 Encontrados ${shortSegments.length} segmentos cortos para fusionar`);
+    
+    // Process each short segment
+    for (const { index: segmentIndex } of shortSegments) {
+      // Re-check index validity after previous fusions
+      if (segmentIndex >= currentSegments.length) continue;
       
-      // Check if this segment is shorter than minimum distance
-      if (segment.distance < minDistanceKm) {
-        console.log(`📐 Segmento ${i} es corto: ${segment.distance.toFixed(3)}km < ${minDistanceKm}km`);
+      const segment = currentSegments[segmentIndex];
+      if (!segment || segment.distance >= minDistanceKm) continue;
+      
+      let bestFusionOption = null;
+      let bestR2 = -1;
+      
+      // Try fusion with previous segment
+      if (segmentIndex > 0) {
+        const prevSegment = currentSegments[segmentIndex - 1];
+        const fusedSegment = createSegment(elevationData, prevSegment.startIndex, segment.endIndex);
         
-        // Try to fuse with previous segment
-        if (i > 0) {
-          const prevSegment = currentSegments[i - 1];
-          const fusedSegment = createSegment(elevationData, prevSegment.startIndex, segment.endIndex);
-          
-          if (fusedSegment.rSquared > bestFusionRSquared) {
-            bestFusionRSquared = fusedSegment.rSquared;
-            bestFusionIndex = i - 1; // Fuse with previous
-          }
+        if (fusedSegment.rSquared > bestR2) {
+          bestR2 = fusedSegment.rSquared;
+          bestFusionOption = {
+            type: 'previous',
+            fusedSegment,
+            removeIndices: [segmentIndex - 1, segmentIndex],
+            insertIndex: segmentIndex - 1
+          };
         }
+      }
+      
+      // Try fusion with next segment
+      if (segmentIndex < currentSegments.length - 1) {
+        const nextSegment = currentSegments[segmentIndex + 1];
+        const fusedSegment = createSegment(elevationData, segment.startIndex, nextSegment.endIndex);
         
-        // Try to fuse with next segment
-        if (i < currentSegments.length - 1) {
-          const nextSegment = currentSegments[i + 1];
-          const fusedSegment = createSegment(elevationData, segment.startIndex, nextSegment.endIndex);
-          
-          if (fusedSegment.rSquared > bestFusionRSquared) {
-            bestFusionRSquared = fusedSegment.rSquared;
-            bestFusionIndex = i; // Fuse with next
-          }
+        if (fusedSegment.rSquared > bestR2) {
+          bestR2 = fusedSegment.rSquared;
+          bestFusionOption = {
+            type: 'next',
+            fusedSegment,
+            removeIndices: [segmentIndex, segmentIndex + 1],
+            insertIndex: segmentIndex
+          };
         }
+      }
+      
+      // Perform fusion if we found a good option
+      if (bestFusionOption && bestR2 > 0.80) { // Minimum R² for fusion
+        console.log(`🔗 Fusionando segmento ${segmentIndex} con ${bestFusionOption.type} (R²: ${bestR2.toFixed(3)}, Nueva distancia: ${bestFusionOption.fusedSegment.distance.toFixed(3)}km)`);
+        
+        // Remove the two segments and insert the fused one
+        currentSegments.splice(bestFusionOption.removeIndices[0], 2, bestFusionOption.fusedSegment);
+        
+        fusionsMade = true;
+        break; // Start over with new segment list
       }
     }
     
-    // Perform the best fusion if found
-    if (bestFusionIndex >= 0 && bestFusionRSquared > 0.8) { // Slightly lower threshold for fusion
-      const seg1 = currentSegments[bestFusionIndex];
-      const seg2 = currentSegments[bestFusionIndex + 1];
-      
-      console.log(`🔗 Fusionando segmentos ${bestFusionIndex} y ${bestFusionIndex + 1} (R²: ${bestFusionRSquared.toFixed(3)})`);
-      
-      // Create fused segment
-      const fusedSegment = createSegment(elevationData, seg1.startIndex, seg2.endIndex);
-      
-      // Replace the two segments with the fused one
-      currentSegments.splice(bestFusionIndex, 2, fusedSegment);
-      
-      // Add frame after fusion
+    // Add frame after fusion iteration
+    if (fusionsMade) {
       frames.push([...currentSegments]);
-      
-      fusionsMade = true;
     }
+  }
+  
+  // Final verification: log any remaining short segments
+  const finalShortSegments = currentSegments.filter(seg => seg.distance < minDistanceKm);
+  if (finalShortSegments.length > 0) {
+    console.log(`⚠️ ADVERTENCIA: ${finalShortSegments.length} segmentos aún por debajo de distancia mínima después de ${iteration} iteraciones`);
   }
   
   console.log(`🎯 ETAPA 2 COMPLETADA: ${frames.length} frames generados, ${currentSegments.length} segmentos finales`);
