@@ -15,6 +15,7 @@ interface GradientControlsBarProps {
     ascentSegments: number;
     descentSegments: number;
     horizontalSegments: number;
+    avgRSquared: string;
   } | null;
 }
 
@@ -37,6 +38,10 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
     setParams({ ...params, cambioGradiente: value[0] });
   };
 
+  const handleCalidadR2Change = (value: number[]) => {
+    setParams({ ...params, calidadR2Minima: value[0] });
+  };
+
   return (
     <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg p-4 mb-4 shadow-sm">
       {/* Header with Stats */}
@@ -45,10 +50,10 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-yellow-500" />
             <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-              Análisis por Gradiente V2
+              Análisis Híbrido R²-Gradiente
             </h3>
             <span className="text-xs bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-2 py-1 rounded-full">
-              Nueva Generación
+              Optimizado
             </span>
           </div>
           
@@ -70,6 +75,10 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
               <div className="flex items-center gap-1">
                 <span className="font-semibold text-gray-600">{stats.horizontalSegments}</span>
                 <span>Planos</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-purple-600">{stats.avgRSquared}</span>
+                <span>R² Prom.</span>
               </div>
             </div>
           )}
@@ -97,8 +106,8 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
       </div>
 
       {/* Sliders Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Slider 1: Prominencia Mínima (ETAPA 1 - Detección) */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Slider 1: Prominencia Mínima (ETAPA 1 - Macro) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
@@ -122,36 +131,60 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
           </p>
         </div>
 
-        {/* Slider 2: Cambio de Gradiente (ETAPA 1 - Detección) */}
+        {/* Slider 2: Calidad R² Mínima (ETAPA 1 - Principal) */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+              Calidad R² Mínima
+              <span className="ml-1 text-xs text-red-600">📊</span>
+            </label>
+            <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
+              {params.calidadR2Minima}%
+            </span>
+          </div>
+          <Slider
+            value={[params.calidadR2Minima]}
+            onValueChange={handleCalidadR2Change}
+            min={85}
+            max={99}
+            step={1}
+            className="w-full"
+          />
+          <p className="text-xs text-mountain-500 dark:text-mountain-400">
+            📊 Principal: Calidad de ajuste lineal
+          </p>
+        </div>
+
+        {/* Slider 3: Cambio de Gradiente (ETAPA 1 - Complementario) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
               Cambio de Gradiente
-              <span className="ml-1 text-xs text-blue-600">🔍</span>
+              <span className="ml-1 text-xs text-orange-600">📐</span>
             </label>
             <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
-              {params.cambioGradiente.toFixed(1)}%
+              {params.cambioGradiente.toFixed(1)}°
             </span>
           </div>
           <Slider
             value={[params.cambioGradiente]}
             onValueChange={handleGradienteChange}
-            min={1}
+            min={2}
             max={15}
             step={0.5}
             className="w-full"
           />
           <p className="text-xs text-mountain-500 dark:text-mountain-400">
-            🔍 Sensibilidad: Cambio mínimo para dividir
+            📐 Complementario: Cambio mínimo en grados
           </p>
         </div>
 
-        {/* Slider 3: Distancia Mínima (ETAPA 2 - Fusión) */}
+        {/* Slider 4: Distancia Mínima (ETAPA 2 - Fusión) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
               Distancia Mínima
-              <span className="ml-1 text-xs text-orange-600">🔧</span>
+              <span className="ml-1 text-xs text-green-600">🔧</span>
             </label>
             <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
               {params.distanciaMinima.toFixed(2)}km
@@ -175,12 +208,16 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
       <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-6 text-xs text-mountain-600 dark:text-mountain-400">
           <div className="flex items-center gap-2">
-            <span className="text-blue-600">🔍</span>
-            <span>Etapa 1: Detección Global</span>
+            <span className="text-red-600">📊</span>
+            <span>Principal: R² de Alta Calidad</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-orange-600">🔧</span>
-            <span>Etapa 2: Fusión Inteligente</span>
+            <span className="text-orange-600">📐</span>
+            <span>Complementario: Cambios de Gradiente</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-green-600">🔧</span>
+            <span>Fusión: Distancia Mínima</span>
           </div>
         </div>
       </div>

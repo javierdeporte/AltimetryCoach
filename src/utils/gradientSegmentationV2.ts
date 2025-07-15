@@ -10,13 +10,15 @@ const SEGMENT_COLORS = {
 export interface GradientSegmentationV2Params {
   prominenciaMinima: number;     // For macro-segmentation (meters)
   distanciaMinima: number;       // Minimum segment distance (km)
-  cambioGradiente: number;       // Gradient change threshold (percentage)
+  cambioGradiente: number;       // Gradient change threshold (degrees) - now more restrictive
+  calidadR2Minima: number;       // R² quality threshold (0-100%)
 }
 
 export const DEFAULT_GRADIENT_V2_PARAMS: GradientSegmentationV2Params = {
   prominenciaMinima: 30,         // meters
   distanciaMinima: 0.20,         // km (200 meters)
-  cambioGradiente: 3             // 3% gradient change
+  cambioGradiente: 5,            // 5 degrees gradient change (more restrictive)
+  calidadR2Minima: 98            // 98% R² quality
 };
 
 // Animation callback types
@@ -77,6 +79,13 @@ function getSegmentType(slope: number): 'asc' | 'desc' | 'hor' {
 }
 
 /**
+ * Convert slope to degrees
+ */
+function slopeToDegrees(slope: number): number {
+  return Math.atan(slope) * (180 / Math.PI);
+}
+
+/**
  * Creates a segment object from elevation data points
  */
 function createSegment(
@@ -107,17 +116,6 @@ function createSegment(
     type: segmentType,
     color: SEGMENT_COLORS[segmentType]
   };
-}
-
-/**
- * Calculate gradient between two points
- */
-function calculateGradient(point1: ElevationPoint, point2: ElevationPoint): number {
-  const elevationDiff = point2.displayElevation - point1.displayElevation;
-  const distanceDiff = (point2.displayDistance - point1.displayDistance) * 1000; // Convert km to meters
-  
-  if (distanceDiff === 0) return 0;
-  return (elevationDiff / distanceDiff) * 100; // Return as percentage
 }
 
 /**
@@ -176,9 +174,8 @@ function findSignificantExtrema(
 }
 
 /**
- * ETAPA 1: Detección Global de Puntos de Corte
- * Detecta TODOS los puntos de corte basados en cambio de gradiente
- * Los segmentos resultantes pueden ser menores a la distancia mínima
+ * ETAPA 1: Detección Híbrida R²-Gradiente
+ * Utiliza R² como criterio principal y detecta cambios de gradiente significativos
  */
 export async function detectRawSegments(
   elevationData: ElevationPoint[],
@@ -189,7 +186,9 @@ export async function detectRawSegments(
     return [];
   }
 
-  console.log('🔍 ETAPA 1: Detección Global de Puntos de Corte...');
+  console.log('🔍 ETAPA 1: Detección Híbrida R²-Gradiente...');
+  console.log(`📊 R² mínimo: ${params.calidadR2Minima}%`);
+  console.log(`📐 Cambio gradiente: ${params.cambioGradiente}°`);
   
   // Macro-segmentation: Find significant extrema
   const macroBoundaries = findSignificantExtrema(elevationData, params.prominenciaMinima);
@@ -197,6 +196,8 @@ export async function detectRawSegments(
   
   const rawSegments: AdvancedSegment[] = [];
   let totalSegmentsFound = 0;
+  const r2Threshold = params.calidadR2Minima / 100; // Convert percentage to decimal
+  const gradientThresholdDegrees = params.cambioGradiente;
 
   // Process each macro segment
   for (let macroIdx = 0; macroIdx < macroBoundaries.length - 1; macroIdx++) {
@@ -210,41 +211,61 @@ export async function detectRawSegments(
     
     let currentStart = 0;
     
-    // Detect cut points within this macro segment
+    // Hybrid R²-Gradient detection within this macro segment
     while (currentStart < macroSegmentData.length - 1) {
-      let currentEnd = currentStart + 1;
-      let bestEndpoint = currentEnd;
+      let currentEnd = currentStart + 5; // Start with minimum points for regression
+      let bestEndpoint = Math.min(currentEnd, macroSegmentData.length - 1);
+      let foundCutPoint = false;
       
-      // Grow segment until we find a significant gradient change
-      while (currentEnd < macroSegmentData.length - 1) {
-        // Calculate current segment gradient
-        const currentSegmentStart = macroSegmentData[currentStart];
-        const currentSegmentEnd = macroSegmentData[currentEnd];
-        const currentGradient = calculateGradient(currentSegmentStart, currentSegmentEnd);
+      // Grow segment while maintaining high R² and checking for gradient changes
+      while (currentEnd < macroSegmentData.length - 1 && !foundCutPoint) {
+        // Calculate R² for current segment
+        const currentSegment = createSegment(elevationData, macroStart + currentStart, macroStart + currentEnd);
         
-        // Look ahead for next segment gradient
-        const nextSegmentStart = macroSegmentData[currentEnd];
-        const nextSegmentEnd = macroSegmentData[Math.min(currentEnd + 5, macroSegmentData.length - 1)];
-        const nextGradient = calculateGradient(nextSegmentStart, nextSegmentEnd);
-        
-        const gradientChange = Math.abs(currentGradient - nextGradient);
-        
-        // Check if we should cut here based on gradient change
-        if (gradientChange >= params.cambioGradiente) {
-          bestEndpoint = currentEnd;
+        // Check R² quality
+        if (currentSegment.rSquared < r2Threshold) {
+          console.log(`📊 R² cayó a ${(currentSegment.rSquared * 100).toFixed(1)}% - Punto de corte por calidad`);
+          bestEndpoint = currentEnd - 1; // Use previous endpoint with good R²
+          foundCutPoint = true;
           break;
+        }
+        
+        // Check gradient change if we have enough future points
+        if (currentEnd + 10 < macroSegmentData.length) {
+          // Current segment slope
+          const currentSlope = currentSegment.slope;
+          const currentGradientDegrees = Math.abs(slopeToDegrees(currentSlope));
+          
+          // Look-ahead segment slope
+          const futureSegment = createSegment(
+            elevationData, 
+            macroStart + currentEnd, 
+            macroStart + Math.min(currentEnd + 10, macroSegmentData.length - 1)
+          );
+          const futureSlope = futureSegment.slope;
+          const futureGradientDegrees = Math.abs(slopeToDegrees(futureSlope));
+          
+          // Calculate gradient change in degrees
+          const gradientChangeDegrees = Math.abs(currentGradientDegrees - futureGradientDegrees);
+          
+          if (gradientChangeDegrees >= gradientThresholdDegrees) {
+            console.log(`📐 Cambio de gradiente detectado: ${gradientChangeDegrees.toFixed(1)}° - Punto de corte`);
+            bestEndpoint = currentEnd;
+            foundCutPoint = true;
+            break;
+          }
         }
         
         currentEnd++;
         bestEndpoint = currentEnd;
       }
       
-      // Create segment (regardless of distance - this is raw detection)
+      // Create segment
       const segment = createSegment(elevationData, macroStart + currentStart, macroStart + bestEndpoint);
       rawSegments.push(segment);
       totalSegmentsFound++;
       
-      console.log(`✅ Punto de corte detectado: ${totalSegmentsFound} (Distancia: ${segment.distance.toFixed(3)}km)`);
+      console.log(`✅ Segmento detectado: ${totalSegmentsFound} (R²: ${(segment.rSquared * 100).toFixed(1)}%, Distancia: ${segment.distance.toFixed(3)}km)`);
       
       // Call animation callback with minimal delay
       if (onRawSegmentDetected) {
@@ -252,7 +273,7 @@ export async function detectRawSegments(
           setTimeout(() => {
             onRawSegmentDetected(segment, totalSegmentsFound);
             resolve(undefined);
-          }, 10); // Reduced to 10ms for faster animation
+          }, 20); // Slightly faster animation
         });
       }
       
@@ -260,7 +281,7 @@ export async function detectRawSegments(
     }
   }
   
-  console.log(`🎯 ETAPA 1 COMPLETADA: ${totalSegmentsFound} puntos de corte detectados`);
+  console.log(`🎯 ETAPA 1 COMPLETADA: ${totalSegmentsFound} segmentos de alta calidad detectados`);
   return rawSegments;
 }
 
@@ -290,7 +311,7 @@ export function simplifySegments(
   let iteration = 0;
   let fusionsMade = true;
   
-  while (fusionsMade && iteration < 20) {
+  while (fusionsMade && iteration < 15) { // Reduced iterations for efficiency
     fusionsMade = false;
     iteration++;
     
@@ -332,7 +353,7 @@ export function simplifySegments(
     }
     
     // Perform the best fusion if found
-    if (bestFusionIndex >= 0 && bestFusionRSquared > 0.7) {
+    if (bestFusionIndex >= 0 && bestFusionRSquared > 0.8) { // Slightly lower threshold for fusion
       const seg1 = currentSegments[bestFusionIndex];
       const seg2 = currentSegments[bestFusionIndex + 1];
       
@@ -365,9 +386,9 @@ export async function segmentProfileGradientV2(
   onRawSegmentDetected?: OnRawSegmentDetectedCallback
 ): Promise<{ segments: AdvancedSegment[], frames: AnimationFrames, macroBoundaries: number[] }> {
   
-  console.log('🚀 Iniciando Análisis por Gradiente V2...');
+  console.log('🚀 Iniciando Análisis Híbrido R²-Gradiente V2...');
   
-  // ETAPA 1: Detección Global de Puntos de Corte
+  // ETAPA 1: Detección Híbrida R²-Gradiente
   const rawSegments = await detectRawSegments(
     elevationData, 
     params, 
@@ -383,7 +404,8 @@ export async function segmentProfileGradientV2(
   // Get macro boundaries for visualization
   const macroBoundaries = findSignificantExtrema(elevationData, params.prominenciaMinima);
   
-  console.log('✨ Análisis por Gradiente V2 COMPLETADO');
+  console.log('✨ Análisis Híbrido R²-Gradiente V2 COMPLETADO');
+  console.log(`📊 Segmentos finales: ${finalSegments.length}, R² promedio: ${(finalSegments.reduce((sum, s) => sum + s.rSquared, 0) / finalSegments.length * 100).toFixed(1)}%`);
   
   return {
     segments: finalSegments,

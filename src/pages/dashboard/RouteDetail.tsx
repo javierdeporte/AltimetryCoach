@@ -198,11 +198,12 @@ const RouteDetail = () => {
     }
   }, [rawSegments, processedElevationData, gradientParams.distanciaMinima]);
 
-  // Intelligent slider handling with debounce - CORRECTED LOGIC
+  // Intelligent slider handling with debounce - UPDATED LOGIC
   const handleGradientParamsChange = useCallback((newParams: GradientSegmentationV2Params) => {
     const paramsChanged = {
       prominence: newParams.prominenciaMinima !== gradientParams.prominenciaMinima,
       gradient: newParams.cambioGradiente !== gradientParams.cambioGradiente,
+      r2Quality: newParams.calidadR2Minima !== gradientParams.calidadR2Minima,
       distance: newParams.distanciaMinima !== gradientParams.distanciaMinima
     };
 
@@ -212,18 +213,18 @@ const RouteDetail = () => {
     if (detectionDebounceRef.current) clearTimeout(detectionDebounceRef.current);
     if (fusionDebounceRef.current) clearTimeout(fusionDebounceRef.current);
 
-    if (paramsChanged.prominence || paramsChanged.gradient) {
+    if (paramsChanged.prominence || paramsChanged.gradient || paramsChanged.r2Quality) {
       // Full recalculation needed (ETAPA 1 + ETAPA 2)
       console.log('🔄 Cambio en parámetros de detección - recálculo completo');
       detectionDebounceRef.current = setTimeout(() => {
         runFullCalculationWithAnimation();
-      }, 200);
+      }, 300); // Slightly longer debounce for full recalc
     } else if (paramsChanged.distance && rawSegments.length > 0) {
       // Only fusion recalculation needed (ETAPA 2 solamente)
       console.log('🔄 Cambio solo en distancia - fusión rápida');
       fusionDebounceRef.current = setTimeout(() => {
         runFastFusionCalculation();
-      }, 100); // Faster response for distance changes
+      }, 150); // Faster response for distance changes
     }
   }, [gradientParams, rawSegments.length, runFullCalculationWithAnimation, runFastFusionCalculation]);
 
