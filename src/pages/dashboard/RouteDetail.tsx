@@ -292,7 +292,7 @@ const RouteDetail = () => {
   };
 
   const resetGradientParams = () => {
-    setGradientParams(DEFAULT_GRADIENT_PARAMS);
+    setGradientParams(DEFAULT_GRADIENT_V2_PARAMS);
   };
 
   const handleAdvancedModeToggle = (enabled: boolean) => {
