@@ -17,7 +17,8 @@ import { segmentProfileGradient, DEFAULT_GRADIENT_PARAMS, GradientSegmentationPa
 import { AdvancedControlsPanel } from '../../components/route/advanced-controls-panel';
 import { AdvancedControlsBarV2 } from '../../components/route/AdvancedControlsBarV2';
 import { GradientControlsBar } from '../../components/route/GradientControlsBar';
-import { segmentProfileGradientV2, DEFAULT_GRADIENT_V2_PARAMS, GradientSegmentationV2Params, OnRawSegmentDetectedCallback, AnimationFrames } from '../../utils/gradientSegmentationV2';
+import { segmentProfileGradientV2, DEFAULT_GRADIENT_V2_PARAMS, GradientSegmentationV2Params, OnRawSegmentDetectedCallback, AnimationFrames, simplifySegments } from '../../utils/gradientSegmentationV2';
+import { AdvancedSegment } from '../../utils/types';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -166,7 +167,7 @@ const RouteDetail = () => {
     setAnimationPhase('fusion');
 
     try {
-      const frames = segmentProfileGradientV2.simplifySegments(rawSegments, gradientParams.distanciaMinima);
+      const frames = simplifySegments(rawSegments, gradientParams.distanciaMinima);
       setAnimatedFrames(frames);
 
       if (frames.length > 1) {
