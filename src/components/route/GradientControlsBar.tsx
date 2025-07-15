@@ -3,11 +3,11 @@ import React from 'react';
 import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
 import { RotateCcw, X, Zap } from 'lucide-react';
-import { GradientSegmentationV2Params, DEFAULT_GRADIENT_V2_PARAMS } from '../../utils/gradientSegmentationV2';
+import { GradientSegmentationParams, DEFAULT_GRADIENT_PARAMS } from '../../utils/gradientSegmentation';
 
 interface GradientControlsBarProps {
-  params: GradientSegmentationV2Params;
-  setParams: (params: GradientSegmentationV2Params) => void;
+  params: GradientSegmentationParams;
+  setParams: (params: GradientSegmentationParams) => void;
   onReset: () => void;
   onClose: () => void;
   stats?: {
@@ -15,7 +15,6 @@ interface GradientControlsBarProps {
     ascentSegments: number;
     descentSegments: number;
     horizontalSegments: number;
-    avgRSquared: string;
   } | null;
 }
 
@@ -38,10 +37,6 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
     setParams({ ...params, cambioGradiente: value[0] });
   };
 
-  const handleCalidadR2Change = (value: number[]) => {
-    setParams({ ...params, calidadR2Minima: value[0] });
-  };
-
   return (
     <div className="bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg p-4 mb-4 shadow-sm">
       {/* Header with Stats */}
@@ -50,11 +45,8 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-yellow-500" />
             <h3 className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
-              Análisis Híbrido R²-Gradiente
+              Análisis por Gradiente
             </h3>
-            <span className="text-xs bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-2 py-1 rounded-full">
-              Optimizado
-            </span>
           </div>
           
           {/* Inline Stats */}
@@ -75,10 +67,6 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
               <div className="flex items-center gap-1">
                 <span className="font-semibold text-gray-600">{stats.horizontalSegments}</span>
                 <span>Planos</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="font-semibold text-purple-600">{stats.avgRSquared}</span>
-                <span>R² Prom.</span>
               </div>
             </div>
           )}
@@ -106,13 +94,12 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
       </div>
 
       {/* Sliders Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Slider 1: Prominencia Mínima (ETAPA 1 - Macro) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Slider 1: Prominencia Mínima */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
               Prominencia Mínima
-              <span className="ml-1 text-xs text-blue-600">🔍</span>
             </label>
             <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
               {params.prominenciaMinima}m
@@ -127,64 +114,15 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
             className="w-full"
           />
           <p className="text-xs text-mountain-500 dark:text-mountain-400">
-            🔍 Macro: Define picos y valles principales
+            Estratégico: Define picos y valles principales
           </p>
         </div>
 
-        {/* Slider 2: Calidad R² Mínima (ETAPA 1 - Principal) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-              Calidad R² Mínima
-              <span className="ml-1 text-xs text-red-600">📊</span>
-            </label>
-            <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
-              {params.calidadR2Minima}%
-            </span>
-          </div>
-          <Slider
-            value={[params.calidadR2Minima]}
-            onValueChange={handleCalidadR2Change}
-            min={85}
-            max={99}
-            step={1}
-            className="w-full"
-          />
-          <p className="text-xs text-mountain-500 dark:text-mountain-400">
-            📊 Principal: Calidad de ajuste lineal
-          </p>
-        </div>
-
-        {/* Slider 3: Cambio de Gradiente (ETAPA 1 - Complementario) */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
-              Cambio de Gradiente
-              <span className="ml-1 text-xs text-orange-600">📐</span>
-            </label>
-            <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
-              {params.cambioGradiente.toFixed(1)}°
-            </span>
-          </div>
-          <Slider
-            value={[params.cambioGradiente]}
-            onValueChange={handleGradienteChange}
-            min={2}
-            max={15}
-            step={0.5}
-            className="w-full"
-          />
-          <p className="text-xs text-mountain-500 dark:text-mountain-400">
-            📐 Complementario: Cambio mínimo en grados
-          </p>
-        </div>
-
-        {/* Slider 4: Distancia Mínima (ETAPA 2 - Fusión) */}
+        {/* Slider 2: Distancia Mínima */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
               Distancia Mínima
-              <span className="ml-1 text-xs text-green-600">🔧</span>
             </label>
             <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
               {params.distanciaMinima.toFixed(2)}km
@@ -199,26 +137,31 @@ export const GradientControlsBar: React.FC<GradientControlsBarProps> = ({
             className="w-full"
           />
           <p className="text-xs text-mountain-500 dark:text-mountain-400">
-            🔧 Fusión: Longitud mínima de segmentos
+            Filtro: Longitud mínima de segmentos
           </p>
         </div>
-      </div>
 
-      {/* Legend */}
-      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-6 text-xs text-mountain-600 dark:text-mountain-400">
-          <div className="flex items-center gap-2">
-            <span className="text-red-600">📊</span>
-            <span>Principal: R² de Alta Calidad</span>
+        {/* Slider 3: Cambio de Gradiente */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-mountain-700 dark:text-mountain-300">
+              Cambio de Gradiente
+            </label>
+            <span className="text-xs text-mountain-500 dark:text-mountain-400 bg-mountain-100 dark:bg-mountain-700 px-2 py-1 rounded">
+              {params.cambioGradiente.toFixed(1)}%
+            </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-orange-600">📐</span>
-            <span>Complementario: Cambios de Gradiente</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-green-600">🔧</span>
-            <span>Fusión: Distancia Mínima</span>
-          </div>
+          <Slider
+            value={[params.cambioGradiente]}
+            onValueChange={handleGradienteChange}
+            min={1}
+            max={15}
+            step={0.5}
+            className="w-full"
+          />
+          <p className="text-xs text-mountain-500 dark:text-mountain-400">
+            Sensibilidad: Cambio mínimo para dividir
+          </p>
         </div>
       </div>
     </div>

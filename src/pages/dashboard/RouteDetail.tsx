@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
 import { ElevationChartD3 } from '../../components/route/elevation-chart-d3';
@@ -17,8 +17,6 @@ import { segmentProfileGradient, DEFAULT_GRADIENT_PARAMS, GradientSegmentationPa
 import { AdvancedControlsPanel } from '../../components/route/advanced-controls-panel';
 import { AdvancedControlsBarV2 } from '../../components/route/AdvancedControlsBarV2';
 import { GradientControlsBar } from '../../components/route/GradientControlsBar';
-import { segmentProfileGradientV2, DEFAULT_GRADIENT_V2_PARAMS, GradientSegmentationV2Params, OnRawSegmentDetectedCallback, AnimationFrames, simplifySegments } from '../../utils/gradientSegmentationV2';
-import { AdvancedSegment } from '../../utils/types';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -34,21 +32,9 @@ const RouteDetail = () => {
   const [experimentalAnalysisMode, setExperimentalAnalysisMode] = useState(false);
   const [experimentalParams, setExperimentalParams] = useState<AdvancedSegmentationV2Params>(DEFAULT_V2_PARAMS);
   
-  // Gradient analysis state (V3) - REFACTORED
+  // Gradient analysis state (V3)
   const [gradientAnalysisMode, setGradientAnalysisMode] = useState(false);
-  const [gradientParams, setGradientParams] = useState<GradientSegmentationV2Params>(DEFAULT_GRADIENT_V2_PARAMS);
-  
-  // New animation states for Gradient V2
-  const [rawSegments, setRawSegments] = useState<AdvancedSegment[]>([]);
-  const [animatedFrames, setAnimatedFrames] = useState<AnimationFrames>([]);
-  const [finalSegments, setFinalSegments] = useState<AdvancedSegment[]>([]);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [animationPhase, setAnimationPhase] = useState<'detection' | 'fusion' | 'complete'>('complete');
-  const [detectedSegmentsCount, setDetectedSegmentsCount] = useState(0);
-  
-  // Debounce refs for intelligent slider handling
-  const detectionDebounceRef = useRef<NodeJS.Timeout>();
-  const fusionDebounceRef = useRef<NodeJS.Timeout>();
+  const [gradientParams, setGradientParams] = useState<GradientSegmentationParams>(DEFAULT_GRADIENT_PARAMS);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -101,147 +87,22 @@ const RouteDetail = () => {
     return segmentProfileV2(processedElevationData, experimentalParams);
   }, [experimentalAnalysisMode, processedElevationData, experimentalParams]);
 
-  // Animation callback for ETAPA 1 (Detection)
-  const onRawSegmentDetected: OnRawSegmentDetectedCallback = useCallback((segment, totalFound) => {
-    setDetectedSegmentsCount(totalFound);
-    setRawSegments(prev => [...prev, segment]);
-  }, []);
-
-  // ETAPA 1: Full Calculation with Animation (Prominence or Gradient Change)
-  const runFullCalculationWithAnimation = useCallback(async () => {
-    if (!processedElevationData.length) return;
-
-    console.log('🎬 Iniciando Cálculo Completo con Animación...');
-    setIsAnimating(true);
-    setAnimationPhase('detection');
-    setRawSegments([]);
-    setAnimatedFrames([]);
-    setFinalSegments([]);
-    setDetectedSegmentsCount(0);
-
-    try {
-      // ETAPA 1: Detección Global con animación
-      const result = await segmentProfileGradientV2(
-        processedElevationData,
-        gradientParams,
-        onRawSegmentDetected
-      );
-
-      console.log('✅ Detección completada, iniciando fusión...');
-      setRawSegments(result.segments); // Store raw segments for later use
-      setAnimationPhase('fusion');
-      setAnimatedFrames(result.frames);
-
-      // ETAPA 2: Animación de fusión
-      if (result.frames.length > 1) {
-        let frameIndex = 0;
-        const animationInterval = setInterval(() => {
-          if (frameIndex < result.frames.length) {
-            setFinalSegments(result.frames[frameIndex]);
-            frameIndex++;
-          } else {
-            clearInterval(animationInterval);
-            setAnimationPhase('complete');
-            setIsAnimating(false);
-            console.log('🎯 Animación completada');
-          }
-        }, 50); // Faster fusion animation - 50ms between frames
-      } else {
-        setFinalSegments(result.segments);
-        setAnimationPhase('complete');
-        setIsAnimating(false);
-      }
-
-    } catch (error) {
-      console.error('Error en cálculo con animación:', error);
-      setIsAnimating(false);
-      setAnimationPhase('complete');
+  // Calculate gradient V3 segments in real-time when V3 mode is active
+  const { segments: gradientSegments, macroBoundaries: gradientMacroBoundaries } = useMemo(() => {
+    if (!gradientAnalysisMode || processedElevationData.length === 0) {
+      return { segments: [], macroBoundaries: [] };
     }
-  }, [processedElevationData, gradientParams, onRawSegmentDetected]);
+    
+    console.log('Calculating V3 gradient segments with params:', gradientParams);
+    return segmentProfileGradient(processedElevationData, gradientParams);
+  }, [gradientAnalysisMode, processedElevationData, gradientParams]);
 
-  // ETAPA 2: Fast Fusion Calculation (Distance only) - FIXED
-  const runFastFusionCalculation = useCallback(() => {
-    if (!rawSegments.length || !processedElevationData.length) return;
-
-    console.log('⚡ Iniciando Cálculo de Fusión Rápido...');
-    setIsAnimating(true);
-    setAnimationPhase('fusion');
-
-    try {
-      // Use the corrected simplifySegments function with elevation data
-      const frames = simplifySegments(rawSegments, processedElevationData, gradientParams.distanciaMinima);
-      setAnimatedFrames(frames);
-
-      if (frames.length > 1) {
-        let frameIndex = 0;
-        const animationInterval = setInterval(() => {
-          if (frameIndex < frames.length) {
-            setFinalSegments(frames[frameIndex]);
-            frameIndex++;
-          } else {
-            clearInterval(animationInterval);
-            setAnimationPhase('complete');
-            setIsAnimating(false);
-            console.log('⚡ Fusión rápida completada');
-          }
-        }, 50); // Faster animation
-      } else {
-        setFinalSegments(rawSegments);
-        setAnimationPhase('complete');
-        setIsAnimating(false);
-      }
-
-    } catch (error) {
-      console.error('Error en fusión rápida:', error);
-      setIsAnimating(false);
-      setAnimationPhase('complete');
-    }
-  }, [rawSegments, processedElevationData, gradientParams.distanciaMinima]);
-
-  // Intelligent slider handling with debounce - UPDATED LOGIC
-  const handleGradientParamsChange = useCallback((newParams: GradientSegmentationV2Params) => {
-    const paramsChanged = {
-      prominence: newParams.prominenciaMinima !== gradientParams.prominenciaMinima,
-      gradient: newParams.cambioGradiente !== gradientParams.cambioGradiente,
-      r2Quality: newParams.calidadR2Minima !== gradientParams.calidadR2Minima,
-      distance: newParams.distanciaMinima !== gradientParams.distanciaMinima
-    };
-
-    setGradientParams(newParams);
-
-    // Clear existing timeouts
-    if (detectionDebounceRef.current) clearTimeout(detectionDebounceRef.current);
-    if (fusionDebounceRef.current) clearTimeout(fusionDebounceRef.current);
-
-    if (paramsChanged.prominence || paramsChanged.gradient || paramsChanged.r2Quality) {
-      // Full recalculation needed (ETAPA 1 + ETAPA 2)
-      console.log('🔄 Cambio en parámetros de detección - recálculo completo');
-      detectionDebounceRef.current = setTimeout(() => {
-        runFullCalculationWithAnimation();
-      }, 300); // Slightly longer debounce for full recalc
-    } else if (paramsChanged.distance && rawSegments.length > 0) {
-      // Only fusion recalculation needed (ETAPA 2 solamente)
-      console.log('🔄 Cambio solo en distancia - fusión rápida');
-      fusionDebounceRef.current = setTimeout(() => {
-        runFastFusionCalculation();
-      }, 150); // Faster response for distance changes
-    }
-  }, [gradientParams, rawSegments.length, runFullCalculationWithAnimation, runFastFusionCalculation]);
-
-  // Initial calculation when gradient mode is activated
-  useEffect(() => {
-    if (gradientAnalysisMode && processedElevationData.length > 0) {
-      runFullCalculationWithAnimation();
-    }
-  }, [gradientAnalysisMode, processedElevationData.length, runFullCalculationWithAnimation]);
-
-  // Get current segments for display (prioritize final segments when available)
-  const currentSegments = gradientAnalysisMode ? 
-    (finalSegments.length > 0 ? finalSegments : rawSegments) :
-    experimentalAnalysisMode ? experimentalSegments : 
-    advancedSegments;
+  // Calculate advanced segments statistics (works for V1, V2, and V3)
+  const currentSegments = gradientAnalysisMode ? gradientSegments : 
+                          experimentalAnalysisMode ? experimentalSegments : 
+                          advancedSegments;
   
-  const currentMacroBoundaries = gradientAnalysisMode ? [] : // We'll implement this later if needed
+  const currentMacroBoundaries = gradientAnalysisMode ? gradientMacroBoundaries :
                                 experimentalAnalysisMode ? experimentalMacroBoundaries :
                                 macroBoundaries;
 
@@ -292,7 +153,7 @@ const RouteDetail = () => {
   };
 
   const resetGradientParams = () => {
-    setGradientParams(DEFAULT_GRADIENT_V2_PARAMS);
+    setGradientParams(DEFAULT_GRADIENT_PARAMS);
   };
 
   const handleAdvancedModeToggle = (enabled: boolean) => {
@@ -561,49 +422,15 @@ const RouteDetail = () => {
             />
           )}
 
-          {/* Gradient V3 Controls Bar with new animation status */}
+          {/* Gradient V3 Controls Bar */}
           {gradientAnalysisMode && (
-            <div className="space-y-4">
-              <GradientControlsBar
-                params={gradientParams}
-                setParams={handleGradientParamsChange}
-                stats={advancedStats}
-                onReset={() => {
-                  setGradientParams(DEFAULT_GRADIENT_V2_PARAMS);
-                  runFullCalculationWithAnimation();
-                }}
-                onClose={() => setGradientAnalysisMode(false)}
-              />
-              
-              {/* Animation Status Indicator */}
-              {isAnimating && (
-                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-500"></div>
-                    <div className="flex-1">
-                      {animationPhase === 'detection' && (
-                        <div>
-                          <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                            🔍 Detectando segmentos... ({detectedSegmentsCount} encontrados)
-                          </p>
-                          <div className="w-full bg-yellow-200 dark:bg-yellow-800 rounded-full h-2 mt-2">
-                            <div 
-                              className="bg-yellow-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${Math.min(detectedSegmentsCount * 10, 100)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
-                      {animationPhase === 'fusion' && (
-                        <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
-                          🔧 Optimizando segmentos... (Fusión inteligente en progreso)
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            <GradientControlsBar
+              params={gradientParams}
+              setParams={setGradientParams}
+              stats={advancedStats}
+              onReset={resetGradientParams}
+              onClose={() => setGradientAnalysisMode(false)}
+            />
           )}
 
           {/* Advanced Elevation Chart */}
