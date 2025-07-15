@@ -128,6 +128,7 @@ const RouteDetail = () => {
       );
 
       console.log('✅ Detección completada, iniciando fusión...');
+      setRawSegments(result.segments); // Store raw segments for later use
       setAnimationPhase('fusion');
       setAnimatedFrames(result.frames);
 
@@ -144,7 +145,7 @@ const RouteDetail = () => {
             setIsAnimating(false);
             console.log('🎯 Animación completada');
           }
-        }, 75); // 75ms between frames
+        }, 50); // Faster fusion animation - 50ms between frames
       } else {
         setFinalSegments(result.segments);
         setAnimationPhase('complete');
@@ -158,16 +159,17 @@ const RouteDetail = () => {
     }
   }, [processedElevationData, gradientParams, onRawSegmentDetected]);
 
-  // ETAPA 2: Fast Fusion Calculation (Distance only)
+  // ETAPA 2: Fast Fusion Calculation (Distance only) - FIXED
   const runFastFusionCalculation = useCallback(() => {
-    if (!rawSegments.length) return;
+    if (!rawSegments.length || !processedElevationData.length) return;
 
     console.log('⚡ Iniciando Cálculo de Fusión Rápido...');
     setIsAnimating(true);
     setAnimationPhase('fusion');
 
     try {
-      const frames = simplifySegments(rawSegments, gradientParams.distanciaMinima);
+      // Use the corrected simplifySegments function with elevation data
+      const frames = simplifySegments(rawSegments, processedElevationData, gradientParams.distanciaMinima);
       setAnimatedFrames(frames);
 
       if (frames.length > 1) {
@@ -182,7 +184,7 @@ const RouteDetail = () => {
             setIsAnimating(false);
             console.log('⚡ Fusión rápida completada');
           }
-        }, 75);
+        }, 50); // Faster animation
       } else {
         setFinalSegments(rawSegments);
         setAnimationPhase('complete');
@@ -194,9 +196,9 @@ const RouteDetail = () => {
       setIsAnimating(false);
       setAnimationPhase('complete');
     }
-  }, [rawSegments, gradientParams.distanciaMinima]);
+  }, [rawSegments, processedElevationData, gradientParams.distanciaMinima]);
 
-  // Intelligent slider handling with debounce
+  // Intelligent slider handling with debounce - CORRECTED LOGIC
   const handleGradientParamsChange = useCallback((newParams: GradientSegmentationV2Params) => {
     const paramsChanged = {
       prominence: newParams.prominenciaMinima !== gradientParams.prominenciaMinima,
@@ -211,17 +213,19 @@ const RouteDetail = () => {
     if (fusionDebounceRef.current) clearTimeout(fusionDebounceRef.current);
 
     if (paramsChanged.prominence || paramsChanged.gradient) {
-      // Full recalculation needed
+      // Full recalculation needed (ETAPA 1 + ETAPA 2)
+      console.log('🔄 Cambio en parámetros de detección - recálculo completo');
       detectionDebounceRef.current = setTimeout(() => {
         runFullCalculationWithAnimation();
       }, 200);
-    } else if (paramsChanged.distance) {
-      // Only fusion recalculation needed
+    } else if (paramsChanged.distance && rawSegments.length > 0) {
+      // Only fusion recalculation needed (ETAPA 2 solamente)
+      console.log('🔄 Cambio solo en distancia - fusión rápida');
       fusionDebounceRef.current = setTimeout(() => {
         runFastFusionCalculation();
-      }, 200);
+      }, 100); // Faster response for distance changes
     }
-  }, [gradientParams, runFullCalculationWithAnimation, runFastFusionCalculation]);
+  }, [gradientParams, rawSegments.length, runFullCalculationWithAnimation, runFastFusionCalculation]);
 
   // Initial calculation when gradient mode is activated
   useEffect(() => {

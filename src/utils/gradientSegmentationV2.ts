@@ -15,7 +15,7 @@ export interface GradientSegmentationV2Params {
 
 export const DEFAULT_GRADIENT_V2_PARAMS: GradientSegmentationV2Params = {
   prominenciaMinima: 30,         // meters
-  distanciaMinima: 0.20,         // km  
+  distanciaMinima: 0.20,         // km (200 meters)
   cambioGradiente: 3             // 3% gradient change
 };
 
@@ -77,16 +77,19 @@ function getSegmentType(slope: number): 'asc' | 'desc' | 'hor' {
 }
 
 /**
- * Creates a segment object from a set of points and regression results
+ * Creates a segment object from elevation data points
  */
 function createSegment(
-  points: ElevationPoint[],
-  regression: RegressionResult,
+  elevationData: ElevationPoint[],
   startIndex: number,
   endIndex: number
 ): AdvancedSegment {
-  const startPoint = points[0];
-  const endPoint = points[points.length - 1];
+  const segmentPoints = elevationData.slice(startIndex, endIndex + 1);
+  const regressionPoints = segmentPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
+  const regression = calculateLinearRegression(regressionPoints);
+  
+  const startPoint = segmentPoints[0];
+  const endPoint = segmentPoints[segmentPoints.length - 1];
   const segmentType = getSegmentType(regression.slope);
   const elevationChange = endPoint.displayElevation - startPoint.displayElevation;
 
@@ -104,6 +107,17 @@ function createSegment(
     type: segmentType,
     color: SEGMENT_COLORS[segmentType]
   };
+}
+
+/**
+ * Calculate gradient between two points
+ */
+function calculateGradient(point1: ElevationPoint, point2: ElevationPoint): number {
+  const elevationDiff = point2.displayElevation - point1.displayElevation;
+  const distanceDiff = (point2.displayDistance - point1.displayDistance) * 1000; // Convert km to meters
+  
+  if (distanceDiff === 0) return 0;
+  return (elevationDiff / distanceDiff) * 100; // Return as percentage
 }
 
 /**
@@ -162,31 +176,20 @@ function findSignificantExtrema(
 }
 
 /**
- * Calculate gradient between two points
- */
-function calculateGradient(point1: ElevationPoint, point2: ElevationPoint): number {
-  const elevationDiff = point2.displayElevation - point1.displayElevation;
-  const distanceDiff = (point2.displayDistance - point1.displayDistance) * 1000; // Convert km to meters
-  
-  if (distanceDiff === 0) return 0;
-  return (elevationDiff / distanceDiff) * 100; // Return as percentage
-}
-
-/**
  * ETAPA 1: Detección Global de Puntos de Corte
- * Detecta todos los puntos de corte basados en cambio de gradiente
- * Llama al callback por cada segmento encontrado para animación en tiempo real
+ * Detecta TODOS los puntos de corte basados en cambio de gradiente
+ * Los segmentos resultantes pueden ser menores a la distancia mínima
  */
 export async function detectRawSegments(
   elevationData: ElevationPoint[],
   params: GradientSegmentationV2Params,
-  onRawSegmentDetected: OnRawSegmentDetectedCallback
+  onRawSegmentDetected?: OnRawSegmentDetectedCallback
 ): Promise<AdvancedSegment[]> {
   if (!elevationData || elevationData.length < 10) {
     return [];
   }
 
-  console.log('🔍 ETAPA 1: Iniciando Detección Global de Segmentos...');
+  console.log('🔍 ETAPA 1: Detección Global de Puntos de Corte...');
   
   // Macro-segmentation: Find significant extrema
   const macroBoundaries = findSignificantExtrema(elevationData, params.prominenciaMinima);
@@ -194,9 +197,6 @@ export async function detectRawSegments(
   
   const rawSegments: AdvancedSegment[] = [];
   let totalSegmentsFound = 0;
-
-  // Future window size: approximately 100m ahead
-  const FUTURE_WINDOW_DISTANCE = 0.1; // km
 
   // Process each macro segment
   for (let macroIdx = 0; macroIdx < macroBoundaries.length - 1; macroIdx++) {
@@ -206,88 +206,53 @@ export async function detectRawSegments(
     if (macroEnd <= macroStart) continue;
     
     const macroSegmentData = elevationData.slice(macroStart, macroEnd + 1);
-    console.log(`🔬 Procesando macro segmento ${macroIdx + 1}/${macroBoundaries.length - 1} (${macroSegmentData.length} puntos)`);
+    console.log(`🔬 Procesando macro segmento ${macroIdx + 1}/${macroBoundaries.length - 1}`);
     
     let currentStart = 0;
     
-    // Global detection within this macro segment
+    // Detect cut points within this macro segment
     while (currentStart < macroSegmentData.length - 1) {
       let currentEnd = currentStart + 1;
       let bestEndpoint = currentEnd;
-      let bestGradientStability = 0;
       
-      // Grow segment and find the best endpoint based on gradient stability
-      while (currentEnd < macroSegmentData.length) {
-        const candidatePoints = macroSegmentData.slice(currentStart, currentEnd + 1);
+      // Grow segment until we find a significant gradient change
+      while (currentEnd < macroSegmentData.length - 1) {
+        // Calculate current segment gradient
+        const currentSegmentStart = macroSegmentData[currentStart];
+        const currentSegmentEnd = macroSegmentData[currentEnd];
+        const currentGradient = calculateGradient(currentSegmentStart, currentSegmentEnd);
         
-        if (candidatePoints.length >= 2) {
-          // Calculate current segment gradient
-          const startPoint = candidatePoints[0];
-          const endPoint = candidatePoints[candidatePoints.length - 1];
-          const currentGradient = calculateGradient(startPoint, endPoint);
-          
-          // Look ahead for future gradient
-          let futureWindowEnd = currentEnd;
-          let futureDistance = 0;
-          
-          while (futureWindowEnd < macroSegmentData.length - 1 && futureDistance < FUTURE_WINDOW_DISTANCE) {
-            futureWindowEnd++;
-            futureDistance = macroSegmentData[futureWindowEnd].displayDistance - macroSegmentData[currentEnd].displayDistance;
-          }
-          
-          if (futureWindowEnd > currentEnd) {
-            const futureStartPoint = macroSegmentData[currentEnd];
-            const futureEndPoint = macroSegmentData[futureWindowEnd];
-            const futureGradient = calculateGradient(futureStartPoint, futureEndPoint);
-            const gradientChange = Math.abs(currentGradient - futureGradient);
-            
-            // Calculate stability score (inverse of gradient change)
-            const stabilityScore = Math.max(0, params.cambioGradiente - gradientChange);
-            
-            if (stabilityScore > bestGradientStability) {
-              bestGradientStability = stabilityScore;
-              bestEndpoint = currentEnd;
-            }
-            
-            // Check if we should cut here
-            if (gradientChange >= params.cambioGradiente) {
-              const segmentDistance = endPoint.displayDistance - startPoint.displayDistance;
-              
-              if (segmentDistance >= params.distanciaMinima) {
-                break;
-              }
-            }
-          }
+        // Look ahead for next segment gradient
+        const nextSegmentStart = macroSegmentData[currentEnd];
+        const nextSegmentEnd = macroSegmentData[Math.min(currentEnd + 5, macroSegmentData.length - 1)];
+        const nextGradient = calculateGradient(nextSegmentStart, nextSegmentEnd);
+        
+        const gradientChange = Math.abs(currentGradient - nextGradient);
+        
+        // Check if we should cut here based on gradient change
+        if (gradientChange >= params.cambioGradiente) {
+          bestEndpoint = currentEnd;
+          break;
         }
         
         currentEnd++;
+        bestEndpoint = currentEnd;
       }
       
-      // Create segment with the best endpoint found
-      const finalSegmentPoints = macroSegmentData.slice(currentStart, bestEndpoint + 1);
+      // Create segment (regardless of distance - this is raw detection)
+      const segment = createSegment(elevationData, macroStart + currentStart, macroStart + bestEndpoint);
+      rawSegments.push(segment);
+      totalSegmentsFound++;
       
-      if (finalSegmentPoints.length >= 2) {
-        const regressionPoints = finalSegmentPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-        const regression = calculateLinearRegression(regressionPoints);
-        
-        const segment = createSegment(
-          finalSegmentPoints,
-          regression,
-          macroStart + currentStart,
-          macroStart + bestEndpoint
-        );
-        
-        rawSegments.push(segment);
-        totalSegmentsFound++;
-        
-        console.log(`✅ Segmento detectado: ${totalSegmentsFound} (R²: ${regression.rSquared.toFixed(3)})`);
-        
-        // Llamar al callback para animación
+      console.log(`✅ Punto de corte detectado: ${totalSegmentsFound} (Distancia: ${segment.distance.toFixed(3)}km)`);
+      
+      // Call animation callback with minimal delay
+      if (onRawSegmentDetected) {
         await new Promise(resolve => {
           setTimeout(() => {
             onRawSegmentDetected(segment, totalSegmentsFound);
             resolve(undefined);
-          }, 50); // 50ms delay between detections for animation
+          }, 10); // Reduced to 10ms for faster animation
         });
       }
       
@@ -295,28 +260,29 @@ export async function detectRawSegments(
     }
   }
   
-  console.log(`🎯 ETAPA 1 COMPLETADA: ${totalSegmentsFound} segmentos crudos detectados`);
+  console.log(`🎯 ETAPA 1 COMPLETADA: ${totalSegmentsFound} puntos de corte detectados`);
   return rawSegments;
 }
 
 /**
- * ETAPA 2: Fusión Inteligente Iterativa
- * Fusiona segmentos adyacentes basándose en distancia mínima y mejor R²
- * Retorna frames de animación mostrando cada paso de fusión
+ * ETAPA 2: Fusión Inteligente basada en Distancia Mínima
+ * Fusiona segmentos adyacentes que sean menores a la distancia mínima
+ * Prioriza fusiones que mantengan mejor R²
  */
 export function simplifySegments(
   rawSegments: AdvancedSegment[],
-  minDistance: number
+  elevationData: ElevationPoint[],
+  minDistanceKm: number
 ): AnimationFrames {
   if (!rawSegments || rawSegments.length === 0) {
     return [];
   }
 
-  console.log('🔧 ETAPA 2: Iniciando Fusión Inteligente Iterativa...');
-  console.log(`📏 Distancia mínima: ${minDistance}km`);
+  console.log('🔧 ETAPA 2: Fusión Inteligente por Distancia Mínima...');
+  console.log(`📏 Distancia mínima: ${minDistanceKm}km (${minDistanceKm * 1000}m)`);
   
   const frames: AnimationFrames = [];
-  let currentSegments = [...rawSegments]; // Deep copy
+  let currentSegments = [...rawSegments];
   
   // Add initial frame
   frames.push([...currentSegments]);
@@ -324,62 +290,56 @@ export function simplifySegments(
   let iteration = 0;
   let fusionsMade = true;
   
-  while (fusionsMade && iteration < 10) { // Safety limit of 10 iterations
+  while (fusionsMade && iteration < 20) {
     fusionsMade = false;
     iteration++;
     
     console.log(`🔄 Iteración ${iteration} de fusión...`);
     
-    // Find the best fusion candidate
+    // Find segments that are shorter than minimum distance
     let bestFusionIndex = -1;
     let bestFusionRSquared = -1;
     
-    for (let i = 0; i < currentSegments.length - 1; i++) {
-      const seg1 = currentSegments[i];
-      const seg2 = currentSegments[i + 1];
+    for (let i = 0; i < currentSegments.length; i++) {
+      const segment = currentSegments[i];
       
-      // Check if fusion would meet distance requirement
-      const combinedDistance = seg1.distance + seg2.distance;
-      
-      if (combinedDistance < minDistance) {
-        // Calculate potential R² of fused segment
-        const allPoints: ElevationPoint[] = [];
+      // Check if this segment is shorter than minimum distance
+      if (segment.distance < minDistanceKm) {
+        console.log(`📐 Segmento ${i} es corto: ${segment.distance.toFixed(3)}km < ${minDistanceKm}km`);
         
-        // Collect all points from both segments
-        // Note: This is a simplified approach - in a real implementation,
-        // we'd need access to the original elevation data points
-        const startPoint = seg1.startPoint;
-        const endPoint = seg2.endPoint;
-        allPoints.push(startPoint, endPoint);
+        // Try to fuse with previous segment
+        if (i > 0) {
+          const prevSegment = currentSegments[i - 1];
+          const fusedSegment = createSegment(elevationData, prevSegment.startIndex, segment.endIndex);
+          
+          if (fusedSegment.rSquared > bestFusionRSquared) {
+            bestFusionRSquared = fusedSegment.rSquared;
+            bestFusionIndex = i - 1; // Fuse with previous
+          }
+        }
         
-        const regressionPoints = allPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-        const potentialRegression = calculateLinearRegression(regressionPoints);
-        
-        if (potentialRegression.rSquared > bestFusionRSquared) {
-          bestFusionRSquared = potentialRegression.rSquared;
-          bestFusionIndex = i;
+        // Try to fuse with next segment
+        if (i < currentSegments.length - 1) {
+          const nextSegment = currentSegments[i + 1];
+          const fusedSegment = createSegment(elevationData, segment.startIndex, nextSegment.endIndex);
+          
+          if (fusedSegment.rSquared > bestFusionRSquared) {
+            bestFusionRSquared = fusedSegment.rSquared;
+            bestFusionIndex = i; // Fuse with next
+          }
         }
       }
     }
     
     // Perform the best fusion if found
-    if (bestFusionIndex >= 0 && bestFusionRSquared > 0.85) {
+    if (bestFusionIndex >= 0 && bestFusionRSquared > 0.7) {
       const seg1 = currentSegments[bestFusionIndex];
       const seg2 = currentSegments[bestFusionIndex + 1];
       
       console.log(`🔗 Fusionando segmentos ${bestFusionIndex} y ${bestFusionIndex + 1} (R²: ${bestFusionRSquared.toFixed(3)})`);
       
       // Create fused segment
-      const fusedPoints = [seg1.startPoint, seg2.endPoint];
-      const regressionPoints = fusedPoints.map(p => ({ x: p.displayDistance, y: p.displayElevation }));
-      const regression = calculateLinearRegression(regressionPoints);
-      
-      const fusedSegment = createSegment(
-        fusedPoints,
-        regression,
-        seg1.startIndex,
-        seg2.endIndex
-      );
+      const fusedSegment = createSegment(elevationData, seg1.startIndex, seg2.endIndex);
       
       // Replace the two segments with the fused one
       currentSegments.splice(bestFusionIndex, 2, fusedSegment);
@@ -407,15 +367,15 @@ export async function segmentProfileGradientV2(
   
   console.log('🚀 Iniciando Análisis por Gradiente V2...');
   
-  // ETAPA 1: Detección Global
+  // ETAPA 1: Detección Global de Puntos de Corte
   const rawSegments = await detectRawSegments(
     elevationData, 
     params, 
-    onRawSegmentDetected || (() => {})
+    onRawSegmentDetected
   );
   
-  // ETAPA 2: Fusión Inteligente
-  const frames = simplifySegments(rawSegments, params.distanciaMinima);
+  // ETAPA 2: Fusión Inteligente por Distancia
+  const frames = simplifySegments(rawSegments, elevationData, params.distanciaMinima);
   
   // Get final segments from last frame
   const finalSegments = frames.length > 0 ? frames[frames.length - 1] : rawSegments;
