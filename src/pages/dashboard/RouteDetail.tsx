@@ -42,7 +42,7 @@ const RouteDetail = () => {
   const [animatedFrames, setAnimatedFrames] = useState<AnimationFrames>([]);
   const [finalSegments, setFinalSegments] = useState<AdvancedSegment[]>([]);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [animationPhase, setAnimationPhase<'detection' | 'fusion' | 'complete'>> = useState<'detection' | 'fusion' | 'complete'>('complete');
+  const [animationPhase, setAnimationPhase] = useState<'detection' | 'fusion' | 'complete'>('complete');
   const [detectedSegmentsCount, setDetectedSegmentsCount] = useState(0);
   
   // Debounce refs for intelligent slider handling
