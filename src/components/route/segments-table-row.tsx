@@ -3,7 +3,7 @@ import React from 'react';
 import { TableCell, TableRow } from '../ui/table';
 import { getSegmentName } from './segment-name-generator';
 import { getGradeColor, getQualityIndicator } from './segment-styling-utils';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowUp, ArrowDown } from 'lucide-react';
 
 interface DisplaySegment {
   id: string;
@@ -46,11 +46,11 @@ export const SegmentsTableRow: React.FC<SegmentsTableRowProps> = ({
       <TableCell className="font-medium text-mountain-800 dark:text-mountain-200">
         <div className="flex items-center gap-2">
           {getSegmentName({ index: segment.segment_index, type: segment.type, isAdvancedMode })}
-          {/* Reemplazar círculos con flechas diagonales */}
+          {/* Usar las mismas flechas que en las estadísticas */}
           {isAscent ? (
-            <ChevronUp className="w-4 h-4 text-green-600 transform rotate-45" />
+            <ArrowUp className="w-4 h-4 text-green-600" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-red-600 transform -rotate-45" />
+            <ArrowDown className="w-4 h-4 text-blue-600" />
           )}
         </div>
       </TableCell>

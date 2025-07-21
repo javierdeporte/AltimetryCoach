@@ -203,10 +203,10 @@ const RouteDetail = () => {
   const totalTime = `${hours}h ${minutes}m`;
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-mountain-900 min-w-[1200px]">
+    <div className="flex h-screen bg-gray-50 dark:bg-mountain-900">
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 max-w-full">
           {/* Enhanced Header - Row 1: Route Info */}
           <div className="space-y-3">
             <div className="flex items-start gap-4">
@@ -219,7 +219,7 @@ const RouteDetail = () => {
                 <ArrowLeft className="w-4 h-4" />
               </Button>
               
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2">
                   <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200">
                     {route.name}
@@ -236,8 +236,8 @@ const RouteDetail = () => {
                   )}
                 </div>
                 
-                {/* Route type and date info */}
-                <div className="flex items-center gap-4 mb-2">
+                {/* Route type, date info and statistics in same row */}
+                <div className="flex flex-wrap items-center gap-4 mb-2">
                   <Badge className={`${getRouteTypeColor(route.route_type)} text-sm`}>
                     {getRouteTypeLabel(route.route_type)}
                   </Badge>
@@ -247,73 +247,52 @@ const RouteDetail = () => {
                   <span className="text-sm text-mountain-600 dark:text-mountain-400">
                     Dificultad: {route.difficulty_level}
                   </span>
-                </div>
-                
-                {/* Estadísticas reducidas a la mitad */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-xs text-mountain-600 dark:text-mountain-400">
-                  <div className="flex items-center gap-1.5">
-                    <svg className="w-3 h-3 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <div>
-                      <div className="font-medium text-primary-600">{route.distance_km.toFixed(1)} km</div>
-                      <div className="text-xs">Distancia</div>
-                    </div>
-                  </div>
                   
-                  <div className="flex items-center gap-1.5">
-                    <ArrowUp className="w-3 h-3 text-green-600" />
-                    <div>
-                      <div className="font-medium text-green-600">+{route.elevation_gain_m}m</div>
-                      <div className="text-xs">Ascenso</div>
+                  {/* Statistics moved here - compact version */}
+                  <div className="flex flex-wrap gap-3 text-xs text-mountain-600 dark:text-mountain-400">
+                    <div className="flex items-center gap-1">
+                      <svg className="w-3 h-3 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      <span className="font-medium text-primary-600">{route.distance_km.toFixed(1)} km</span>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5">
-                    <ArrowDown className="w-3 h-3 text-blue-600" />
-                    <div>
-                      <div className="font-medium text-blue-600">-{Math.round(totalElevationLoss)}m</div>
-                      <div className="text-xs">Descenso</div>
+                    
+                    <div className="flex items-center gap-1">
+                      <ArrowUp className="w-3 h-3 text-green-600" />
+                      <span className="font-medium text-green-600">+{route.elevation_gain_m}m</span>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5">
-                    <svg className="w-3 h-3 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div>
-                      <div className="font-medium text-purple-600">{totalTime}</div>
-                      <div className="text-xs">Tiempo Est.</div>
+                    
+                    <div className="flex items-center gap-1">
+                      <ArrowDown className="w-3 h-3 text-blue-600" />
+                      <span className="font-medium text-blue-600">-{Math.round(totalElevationLoss)}m</span>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5">
-                    <svg className="w-3 h-3 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                    </svg>
-                    <div>
-                      <div className="font-medium text-orange-600">{Math.round(maxElevation)}m</div>
-                      <div className="text-xs">Máx. Elev.</div>
+                    
+                    <div className="flex items-center gap-1">
+                      <svg className="w-3 h-3 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="font-medium text-purple-600">{totalTime}</span>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5">
-                    <svg className="w-3 h-3 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
-                    <div>
-                      <div className="font-medium text-teal-600">{Math.round(minElevation)}m</div>
-                      <div className="text-xs">Mín. Elev.</div>
+                    
+                    <div className="flex items-center gap-1">
+                      <svg className="w-3 h-3 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                      </svg>
+                      <span className="font-medium text-orange-600">{Math.round(maxElevation)}m</span>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5">
-                    <svg className="w-3 h-3 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                    <div>
-                      <div className="font-medium text-rose-600">{Math.min(maxGrade, 50).toFixed(1)}%</div>
-                      <div className="text-xs">Pend. Máx.</div>
+                    
+                    <div className="flex items-center gap-1">
+                      <svg className="w-3 h-3 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                      <span className="font-medium text-teal-600">{Math.round(minElevation)}m</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-1">
+                      <svg className="w-3 h-3 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
+                      <span className="font-medium text-rose-600">{Math.min(maxGrade, 50).toFixed(1)}%</span>
                     </div>
                   </div>
                 </div>
