@@ -93,6 +93,10 @@ export default {
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
 			},
+			// Establecer ancho mínimo para evitar responsividad móvil
+			minWidth: {
+				'desktop': '1200px',
+			},
 			keyframes: {
 				'accordion-down': {
 					from: {
@@ -153,6 +157,15 @@ export default {
 				'trail-gradient': 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
 				'mountain-gradient': 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
 			}
+		},
+		// Configuración de breakpoints personalizada para forzar vista de escritorio
+		screens: {
+			'xs': '0px',
+			'sm': '0px',
+			'md': '0px',
+			'lg': '0px',
+			'xl': '0px',
+			'2xl': '0px',
 		}
 	},
 	plugins: [require("tailwindcss-animate")],

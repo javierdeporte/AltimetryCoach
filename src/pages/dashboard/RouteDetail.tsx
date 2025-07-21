@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { InteractiveMap } from '../../components/route/interactive-map';
@@ -13,10 +14,8 @@ import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
 import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS } from '../../utils/advancedSegmentation';
 import { segmentProfileV2, DEFAULT_V2_PARAMS, AdvancedSegmentationV2Params } from '../../utils/advancedSegmentationV2';
-import { segmentProfileGradient, DEFAULT_GRADIENT_PARAMS, GradientSegmentationParams } from '../../utils/gradientSegmentation';
 import { AdvancedControlsPanel } from '../../components/route/advanced-controls-panel';
 import { AdvancedControlsBarV2 } from '../../components/route/AdvancedControlsBarV2';
-import { GradientControlsBar } from '../../components/route/GradientControlsBar';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -31,10 +30,6 @@ const RouteDetail = () => {
   // Experimental analysis state (V2)
   const [experimentalAnalysisMode, setExperimentalAnalysisMode] = useState(false);
   const [experimentalParams, setExperimentalParams] = useState<AdvancedSegmentationV2Params>(DEFAULT_V2_PARAMS);
-  
-  // Gradient analysis state (V3)
-  const [gradientAnalysisMode, setGradientAnalysisMode] = useState(false);
-  const [gradientParams, setGradientParams] = useState<GradientSegmentationParams>(DEFAULT_GRADIENT_PARAMS);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -87,24 +82,9 @@ const RouteDetail = () => {
     return segmentProfileV2(processedElevationData, experimentalParams);
   }, [experimentalAnalysisMode, processedElevationData, experimentalParams]);
 
-  // Calculate gradient V3 segments in real-time when V3 mode is active
-  const { segments: gradientSegments, macroBoundaries: gradientMacroBoundaries } = useMemo(() => {
-    if (!gradientAnalysisMode || processedElevationData.length === 0) {
-      return { segments: [], macroBoundaries: [] };
-    }
-    
-    console.log('Calculating V3 gradient segments with params:', gradientParams);
-    return segmentProfileGradient(processedElevationData, gradientParams);
-  }, [gradientAnalysisMode, processedElevationData, gradientParams]);
-
-  // Calculate advanced segments statistics (works for V1, V2, and V3)
-  const currentSegments = gradientAnalysisMode ? gradientSegments : 
-                          experimentalAnalysisMode ? experimentalSegments : 
-                          advancedSegments;
-  
-  const currentMacroBoundaries = gradientAnalysisMode ? gradientMacroBoundaries :
-                                experimentalAnalysisMode ? experimentalMacroBoundaries :
-                                macroBoundaries;
+  // Calculate advanced segments statistics (works for V1 and V2)
+  const currentSegments = experimentalAnalysisMode ? experimentalSegments : advancedSegments;
+  const currentMacroBoundaries = experimentalAnalysisMode ? experimentalMacroBoundaries : macroBoundaries;
 
   const advancedStats = useMemo(() => {
     if (!currentSegments || currentSegments.length === 0) return null;
@@ -152,15 +132,10 @@ const RouteDetail = () => {
     setExperimentalParams(DEFAULT_V2_PARAMS);
   };
 
-  const resetGradientParams = () => {
-    setGradientParams(DEFAULT_GRADIENT_PARAMS);
-  };
-
   const handleAdvancedModeToggle = (enabled: boolean) => {
     setAdvancedAnalysisMode(enabled);
     if (enabled) {
       setExperimentalAnalysisMode(false);
-      setGradientAnalysisMode(false);
     }
   };
 
@@ -168,15 +143,6 @@ const RouteDetail = () => {
     setExperimentalAnalysisMode(enabled);
     if (enabled) {
       setAdvancedAnalysisMode(false);
-      setGradientAnalysisMode(false);
-    }
-  };
-
-  const handleGradientModeToggle = (enabled: boolean) => {
-    setGradientAnalysisMode(enabled);
-    if (enabled) {
-      setAdvancedAnalysisMode(false);
-      setExperimentalAnalysisMode(false);
     }
   };
 
@@ -237,12 +203,12 @@ const RouteDetail = () => {
   const totalTime = `${hours}h ${minutes}m`;
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-mountain-900">
+    <div className="flex h-screen bg-gray-50 dark:bg-mountain-900 min-w-[1200px]">
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-4">
           {/* Enhanced Header - Row 1: Route Info */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-start gap-4">
               <Button 
                 onClick={handleBackToRoutes} 
@@ -268,15 +234,10 @@ const RouteDetail = () => {
                       Análisis Experimental V2 Activo
                     </Badge>
                   )}
-                  {gradientAnalysisMode && (
-                    <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
-                      Análisis por Gradiente Activo
-                    </Badge>
-                  )}
                 </div>
                 
                 {/* Route type and date info */}
-                <div className="flex items-center gap-4 mb-3">
+                <div className="flex items-center gap-4 mb-2">
                   <Badge className={`${getRouteTypeColor(route.route_type)} text-sm`}>
                     {getRouteTypeLabel(route.route_type)}
                   </Badge>
@@ -288,71 +249,70 @@ const RouteDetail = () => {
                   </span>
                 </div>
                 
-                {/* Complete route statistics in a single comprehensive row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 text-sm text-mountain-600 dark:text-mountain-400">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {/* Estadísticas reducidas a la mitad */}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-xs text-mountain-600 dark:text-mountain-400">
+                  <div className="flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                     <div>
-                      <div className="font-semibold text-primary-600">{route.distance_km.toFixed(1)} km</div>
+                      <div className="font-medium text-primary-600">{route.distance_km.toFixed(1)} km</div>
                       <div className="text-xs">Distancia</div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <ArrowUp className="w-4 h-4 text-green-600" />
+                  <div className="flex items-center gap-1.5">
+                    <ArrowUp className="w-3 h-3 text-green-600" />
                     <div>
-                      <div className="font-semibold text-green-600">+{route.elevation_gain_m}m</div>
+                      <div className="font-medium text-green-600">+{route.elevation_gain_m}m</div>
                       <div className="text-xs">Ascenso</div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <ArrowDown className="w-4 h-4 text-blue-600" />
+                  <div className="flex items-center gap-1.5">
+                    <ArrowDown className="w-3 h-3 text-blue-600" />
                     <div>
-                      <div className="font-semibold text-blue-600">-{Math.round(totalElevationLoss)}m</div>
+                      <div className="font-medium text-blue-600">-{Math.round(totalElevationLoss)}m</div>
                       <div className="text-xs">Descenso</div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div>
-                      <div className="font-semibold text-purple-600">{totalTime}</div>
+                      <div className="font-medium text-purple-600">{totalTime}</div>
                       <div className="text-xs">Tiempo Est.</div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
                     </svg>
                     <div>
-                      <div className="font-semibold text-orange-600">{Math.round(maxElevation)}m</div>
+                      <div className="font-medium text-orange-600">{Math.round(maxElevation)}m</div>
                       <div className="text-xs">Máx. Elev.</div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                     </svg>
                     <div>
-                      <div className="font-semibold text-teal-600">{Math.round(minElevation)}m</div>
+                      <div className="font-medium text-teal-600">{Math.round(minElevation)}m</div>
                       <div className="text-xs">Mín. Elev.</div>
                     </div>
                   </div>
                   
-                  
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                     </svg>
                     <div>
-                      <div className="font-semibold text-rose-600">{Math.min(maxGrade, 50).toFixed(1)}%</div>
+                      <div className="font-medium text-rose-600">{Math.min(maxGrade, 50).toFixed(1)}%</div>
                       <div className="text-xs">Pend. Máx.</div>
                     </div>
                   </div>
@@ -360,12 +320,12 @@ const RouteDetail = () => {
               </div>
             </div>
             
-            {/* Row 2: Action buttons */}
-            <div className="flex flex-wrap gap-3 justify-center lg:justify-end">
+            {/* Row 2: Botones de acción más pequeños */}
+            <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
               {/* Advanced Analysis Toggle V1 */}
-              <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg px-3 py-2">
-                <Brain className="w-4 h-4 text-primary-600" />
-                <span className="text-sm font-medium">Análisis Avanzado</span>
+              <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg px-2 py-1">
+                <Brain className="w-3 h-3 text-primary-600" />
+                <span className="text-xs font-medium">Análisis Avanzado</span>
                 <Switch
                   checked={advancedAnalysisMode}
                   onCheckedChange={handleAdvancedModeToggle}
@@ -373,39 +333,30 @@ const RouteDetail = () => {
               </div>
 
               {/* Experimental Analysis Toggle V2 */}
-              <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-blue-200 dark:border-blue-700 rounded-lg px-3 py-2">
-                <span className="w-4 h-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"></span>
-                <span className="text-sm font-medium">Análisis Experimental</span>
+              <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-blue-200 dark:border-blue-700 rounded-lg px-2 py-1">
+                <span className="w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"></span>
+                <span className="text-xs font-medium">Análisis Experimental</span>
                 <Switch
                   checked={experimentalAnalysisMode}
                   onCheckedChange={handleExperimentalModeToggle}
-                />
-              </div>
-
-              {/* Gradient Analysis Toggle V3 */}
-              <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-yellow-200 dark:border-yellow-700 rounded-lg px-3 py-2">
-                <Zap className="w-4 h-4 text-yellow-500" />
-                <span className="text-sm font-medium">Análisis por Gradiente</span>
-                <Switch
-                  checked={gradientAnalysisMode}
-                  onCheckedChange={handleGradientModeToggle}
                 />
               </div>
               
               <Button 
                 onClick={() => setShowMap(!showMap)}
                 variant="outline" 
-                className="border-primary-300 text-primary-600 hover:bg-primary-50"
+                size="sm"
+                className="border-primary-300 text-primary-600 hover:bg-primary-50 text-xs px-2 py-1"
               >
-                {showMap ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+                {showMap ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
                 {showMap ? 'Ocultar' : 'Ver'} Mapa
               </Button>
-              <Button variant="outline" className="border-primary-300 text-primary-600 hover:bg-primary-50">
-                <Settings className="w-4 h-4 mr-2" />
+              <Button variant="outline" size="sm" className="border-primary-300 text-primary-600 hover:bg-primary-50 text-xs px-2 py-1">
+                <Settings className="w-3 h-3 mr-1" />
                 Export Data
               </Button>
-              <Button className="bg-primary-600 hover:bg-primary-700 text-white">
-                <Map className="w-4 h-4 mr-2" />
+              <Button size="sm" className="bg-primary-600 hover:bg-primary-700 text-white text-xs px-2 py-1">
+                <Map className="w-3 h-3 mr-1" />
                 Share Route
               </Button>
             </div>
@@ -422,25 +373,14 @@ const RouteDetail = () => {
             />
           )}
 
-          {/* Gradient V3 Controls Bar */}
-          {gradientAnalysisMode && (
-            <GradientControlsBar
-              params={gradientParams}
-              setParams={setGradientParams}
-              stats={advancedStats}
-              onReset={resetGradientParams}
-              onClose={() => setGradientAnalysisMode(false)}
-            />
-          )}
-
-          {/* Advanced Elevation Chart */}
+          {/* Advanced Elevation Chart con altura reducida 20% */}
           <div className="w-full">
             <ElevationChartD3
               elevationData={processedElevationData}
               onPointHover={setHoveredSegment}
               hoveredSegment={hoveredSegment}
               options={{
-                height: 400,
+                height: 320, // Reducido de 400 a 320 (20% menos)
                 backgroundColor: 'transparent'
               }}
               advancedSegments={currentSegments}
@@ -452,7 +392,7 @@ const RouteDetail = () => {
           <SegmentsTable 
             segments={segments}
             advancedSegments={currentSegments}
-            isAdvancedMode={advancedAnalysisMode || experimentalAnalysisMode || gradientAnalysisMode}
+            isAdvancedMode={advancedAnalysisMode || experimentalAnalysisMode}
             onSegmentHover={setHoveredSegment}
             hoveredSegment={hoveredSegment}
           />

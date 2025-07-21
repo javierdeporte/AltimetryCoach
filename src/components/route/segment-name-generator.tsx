@@ -1,27 +1,27 @@
 
-interface SegmentNameGeneratorProps {
+import React from 'react';
+
+interface SegmentNameProps {
   index: number;
   type?: string | null;
-  isAdvancedMode: boolean;
+  isAdvancedMode?: boolean;
 }
 
-export const getSegmentName = ({ index, type, isAdvancedMode }: SegmentNameGeneratorProps): string => {
-  if (isAdvancedMode && type) {
-    const typeLabels = {
-      'asc': 'Ascenso',
-      'desc': 'Descenso',
-      'hor': 'Plano'
-    };
-    return `${typeLabels[type as keyof typeof typeLabels]} ${index + 1}`;
+export const getSegmentName = ({ index, type, isAdvancedMode }: SegmentNameProps) => {
+  // Para análisis básico, siempre usar "Segmento #" 
+  if (!isAdvancedMode) {
+    return `Segmento ${index + 1}`;
   }
   
-  const names = [
-    'Inicio del sendero',
-    'Ascenso principal',
-    'Tramo intermedio',
-    'Descenso técnico',
-    'Tramo final',
-    'Regreso'
-  ];
-  return names[index] || `Segmento ${index + 1}`;
+  // Para análisis avanzado, usar nomenclatura especializada
+  if (type === 'asc') {
+    return `Ascenso ${index + 1}`;
+  } else if (type === 'desc') {
+    return `Descenso ${index + 1}`;
+  } else if (type === 'hor') {
+    return `Plano ${index + 1}`;
+  }
+  
+  // Fallback para análisis avanzado
+  return `Segmento ${index + 1}`;
 };

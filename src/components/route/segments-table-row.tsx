@@ -3,6 +3,7 @@ import React from 'react';
 import { TableCell, TableRow } from '../ui/table';
 import { getSegmentName } from './segment-name-generator';
 import { getGradeColor, getQualityIndicator } from './segment-styling-utils';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 interface DisplaySegment {
   id: string;
@@ -28,6 +29,9 @@ export const SegmentsTableRow: React.FC<SegmentsTableRowProps> = ({
   hoveredSegment,
   onSegmentHover
 }) => {
+  // Determinar si es ascenso o descenso basado en la ganancia de elevación
+  const isAscent = segment.elevation_gain_m > segment.elevation_loss_m;
+  
   return (
     <TableRow 
       key={segment.id} 
@@ -42,14 +46,11 @@ export const SegmentsTableRow: React.FC<SegmentsTableRowProps> = ({
       <TableCell className="font-medium text-mountain-800 dark:text-mountain-200">
         <div className="flex items-center gap-2">
           {getSegmentName({ index: segment.segment_index, type: segment.type, isAdvancedMode })}
-          {isAdvancedMode && segment.type && (
-            <div 
-              className="w-3 h-3 rounded-full"
-              style={{ 
-                backgroundColor: segment.type === 'asc' ? '#22c55e' : 
-                               segment.type === 'desc' ? '#ef4444' : '#6b7280' 
-              }}
-            />
+          {/* Reemplazar círculos con flechas diagonales */}
+          {isAscent ? (
+            <ChevronUp className="w-4 h-4 text-green-600 transform rotate-45" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-red-600 transform -rotate-45" />
           )}
         </div>
       </TableCell>
