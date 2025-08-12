@@ -29,10 +29,10 @@ export const TopBar: React.FC = () => {
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase();
 
   return (
-    <header className="bg-white dark:bg-mountain-800 border-b border-primary-200 dark:border-mountain-700 px-6 py-4">
+    <header className="bg-white dark:bg-mountain-800 border-b border-primary-200 dark:border-mountain-700 px-6 py-2">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-mountain-800 dark:text-mountain-200">
+          <h1 className="text-xl font-bold text-mountain-800 dark:text-mountain-200">
             {t('dashboard_topbar.title')}
           </h1>
           <p className="text-sm text-mountain-600 dark:text-mountain-400">

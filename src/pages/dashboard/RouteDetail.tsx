@@ -239,7 +239,7 @@ const RouteDetail = () => {
     <div className="flex h-screen bg-gray-50 dark:bg-mountain-900">
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 space-y-4 max-w-full">
+        <div className="p-4 space-y-3 max-w-full">
           {/* Enhanced Header - Row 1: Route Info */}
           <div className="space-y-3">
             <div className="flex items-start gap-4">
@@ -253,20 +253,32 @@ const RouteDetail = () => {
               </Button>
               
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200">
-                    {route.name}
-                  </h1>
-                  {advancedAnalysisMode && (
-                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                      Análisis Avanzado V1 Activo
-                    </Badge>
-                  )}
-                  {experimentalAnalysisMode && (
-                    <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
-                      Análisis Experimental V2 Activo
-                    </Badge>
-                  )}
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200">
+                      {route.name}
+                    </h1>
+                    {advancedAnalysisMode && (
+                      <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                        Análisis Avanzado V1 Activo
+                      </Badge>
+                    )}
+                    {experimentalAnalysisMode && (
+                      <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                        Análisis Experimental V2 Activo
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button variant="outline" size="sm" className="border-primary-300 text-primary-600 hover:bg-primary-50 text-xs px-2 py-1">
+                      <Settings className="w-3 h-3 mr-1" />
+                      Export Data
+                    </Button>
+                    <Button size="sm" className="bg-primary-600 hover:bg-primary-700 text-white text-xs px-2 py-1">
+                      <Map className="w-3 h-3 mr-1" />
+                      Share Route
+                    </Button>
+                  </div>
                 </div>
                 
                 {/* Route type, date info and statistics in same row */}
@@ -333,7 +345,7 @@ const RouteDetail = () => {
             </div>
             
             {/* Row 2: Botones de acción más pequeños */}
-            <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
+            <div className="flex items-center gap-2 justify-between lg:justify-end overflow-x-auto whitespace-nowrap">
               {/* Advanced Analysis Toggle V1 */}
               <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-primary-200 dark:border-mountain-700 rounded-lg px-2 py-1">
                 <Brain className="w-3 h-3 text-primary-600" />
@@ -372,14 +384,6 @@ const RouteDetail = () => {
               >
                 {showMap ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
                 {showMap ? 'Ocultar' : 'Ver'} Mapa
-              </Button>
-              <Button variant="outline" size="sm" className="border-primary-300 text-primary-600 hover:bg-primary-50 text-xs px-2 py-1">
-                <Settings className="w-3 h-3 mr-1" />
-                Export Data
-              </Button>
-              <Button size="sm" className="bg-primary-600 hover:bg-primary-700 text-white text-xs px-2 py-1">
-                <Map className="w-3 h-3 mr-1" />
-                Share Route
               </Button>
             </div>
           </div>
