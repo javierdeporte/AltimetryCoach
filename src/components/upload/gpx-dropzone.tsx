@@ -76,6 +76,21 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
   };
 
   const handleFileUpload = async (file: File) => {
+    // Validate file size (max 20MB)
+    if (file.size > 20 * 1024 * 1024) {
+      setUploadStatus('error');
+      setUploadMessage('El archivo es muy grande. Máximo 20MB.');
+      return;
+    }
+
+    // Validate MIME type
+    const validTypes = ['application/gpx+xml', 'application/xml', 'text/xml'];
+    if (!validTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.gpx')) {
+      setUploadStatus('error');
+      setUploadMessage('Formato de archivo no válido. Solo archivos GPX.');
+      return;
+    }
+
     // Check for duplicates first
     const isDuplicate = await checkForDuplicates(file);
     if (isDuplicate) {
@@ -90,7 +105,7 @@ export const GPXDropzone: React.FC<GPXDropzoneProps> = ({ onFileUpload }) => {
       setUploadStatus('uploading');
       setUploadMessage('Procesando archivo GPX...');
       
-      console.log('Starting GPX upload and processing:', file.name);
+      // Upload and processing validation
       
       // Parsear el archivo GPX
       const gpxData = await parseGPX(file);

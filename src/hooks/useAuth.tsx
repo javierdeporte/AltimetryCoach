@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
+        // Log removed for security
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -41,8 +41,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, fullName?: string) => {
-    // Use the actual deployed URL for redirect
-    const redirectUrl = 'https://altimetry-trail-vision.lovable.app/dashboard';
+    // Use dynamic redirect URL for security
+    const redirectUrl = `${window.location.origin}/dashboard`;
     
     const { error } = await supabase.auth.signUp({
       email,

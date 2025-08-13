@@ -42,8 +42,7 @@ export const useRouteData = (routeId: string) => {
   const [error, setError] = useState<string | null>(null);
 
   const loadRouteData = useCallback(async () => {
-    console.log('useRouteData called with routeId:', routeId);
-    console.log('RouteId type:', typeof routeId, 'length:', routeId?.length);
+      // Route data validation
     
     if (!routeId || routeId.trim() === '' || routeId === 'undefined' || routeId === 'null') {
       console.error('No valid routeId provided:', routeId);
@@ -56,7 +55,7 @@ export const useRouteData = (routeId: string) => {
       setIsLoading(true);
       setError(null);
       
-      console.log('Loading route data for ID:', routeId);
+      // Loading route data...
       
       const { data: routeData, error: routeError } = await supabase
         .from('routes')
@@ -64,7 +63,7 @@ export const useRouteData = (routeId: string) => {
         .eq('id', routeId)
         .maybeSingle();
 
-      console.log('Supabase query result:', { routeData, routeError });
+      // Query completed
 
       if (routeError) {
         console.error('Route error:', routeError);
@@ -76,7 +75,7 @@ export const useRouteData = (routeId: string) => {
         throw new Error('Ruta no encontrada en la base de datos');
       }
 
-      console.log('Route data loaded successfully:', routeData.name);
+      // Route data loaded successfully
       setRoute(routeData);
 
       const { data: segmentsData, error: segmentsError } = await supabase
@@ -89,7 +88,7 @@ export const useRouteData = (routeId: string) => {
         console.error('Segments error:', segmentsError);
         setSegments([]);
       } else {
-        console.log('Segments loaded:', segmentsData?.length || 0, 'segments');
+        // Segments loaded
         setSegments(segmentsData || []);
       }
 

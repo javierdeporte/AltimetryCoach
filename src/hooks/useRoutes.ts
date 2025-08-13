@@ -28,7 +28,7 @@ export const useRoutes = () => {
         setIsLoading(true);
         const { data, error } = await supabase
           .from('routes')
-          .select('*')
+          .select('id, name, description, distance_km, elevation_gain_m, elevation_loss_m, difficulty_level, created_at, gpx_capture_date, route_type, date_source')
           .order('created_at', { ascending: false });
 
         if (error) {
@@ -50,7 +50,7 @@ export const useRoutes = () => {
   const refreshRoutes = async () => {
     const { data, error } = await supabase
       .from('routes')
-      .select('*')
+      .select('id, name, description, distance_km, elevation_gain_m, elevation_loss_m, difficulty_level, created_at, gpx_capture_date, route_type, date_source')
       .order('created_at', { ascending: false });
 
     if (!error && data) {
