@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -192,6 +192,53 @@ export type Database = {
           },
         ]
       }
+      shared_routes: {
+        Row: {
+          analysis_params: Json
+          analysis_type: string
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          route_id: string
+          share_slug: string
+          user_id: string
+          view_count: number | null
+        }
+        Insert: {
+          analysis_params?: Json
+          analysis_type: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          route_id: string
+          share_slug: string
+          user_id: string
+          view_count?: number | null
+        }
+        Update: {
+          analysis_params?: Json
+          analysis_type?: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          route_id?: string
+          share_slug?: string
+          user_id?: string
+          view_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_routes_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           created_at: string | null
@@ -236,7 +283,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_share_slug: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
