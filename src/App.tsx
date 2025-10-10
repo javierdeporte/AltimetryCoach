@@ -14,6 +14,7 @@ import RoutesList from './pages/dashboard/RoutesList';
 import RouteDetail from './pages/dashboard/RouteDetail';
 import Billing from './pages/dashboard/Billing';
 import NotFound from './pages/NotFound';
+import SharedRoute from './pages/SharedRoute';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ function App() {
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignUp />} />
+              <Route path="/share/:shareSlug" element={<SharedRoute />} />
               
               {/* Protected dashboard routes */}
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>

@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Slider } from '../../components/ui/slider';
 import { Switch } from '../../components/ui/switch';
-import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft, Zap } from 'lucide-react';
+import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft, Zap, Share2 } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
@@ -18,6 +18,8 @@ import { AdvancedControlsPanel } from '../../components/route/advanced-controls-
 import { AdvancedControlsBarV2 } from '../../components/route/AdvancedControlsBarV2';
 import { GradientControlsBar } from '../../components/route/GradientControlsBar';
 import { segmentProfileGradient, DEFAULT_GRADIENT_PARAMS, GradientSegmentationParams } from '../../utils/gradientSegmentation';
+import { useShareRoute } from '../../hooks/useShareRoute';
+import { ShareRouteDialog } from '../../components/route/share-route-dialog';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -36,6 +38,11 @@ const RouteDetail = () => {
   // Gradient analysis state
   const [gradientAnalysisMode, setGradientAnalysisMode] = useState(false);
   const [gradientParams, setGradientParams] = useState<GradientSegmentationParams>(DEFAULT_GRADIENT_PARAMS);
+  
+  // Share state
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
+  const { shareRoute, isSharing } = useShareRoute();
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -179,6 +186,38 @@ const RouteDetail = () => {
     }
   };
 
+  const handleShareRoute = async () => {
+    if (!routeId) return;
+    
+    const analysisType = experimentalAnalysisMode 
+      ? 'experimental' 
+      : advancedAnalysisMode 
+      ? 'advanced' 
+      : gradientAnalysisMode 
+      ? 'gradient' 
+      : 'none';
+    
+    const params = experimentalAnalysisMode 
+      ? experimentalParams 
+      : advancedAnalysisMode 
+      ? advancedParams 
+      : gradientAnalysisMode 
+      ? gradientParams 
+      : {};
+
+    const shareSlug = await shareRoute({
+      routeId,
+      analysisType,
+      analysisParams: params
+    });
+
+    if (shareSlug) {
+      const url = `${window.location.origin}/share/${shareSlug}`;
+      setShareUrl(url);
+      setShowShareDialog(true);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -274,9 +313,14 @@ const RouteDetail = () => {
                       <Settings className="w-3 h-3 mr-1" />
                       Export Data
                     </Button>
-                    <Button size="sm" className="bg-primary-600 hover:bg-primary-700 text-white text-xs px-2 py-1">
-                      <Map className="w-3 h-3 mr-1" />
-                      Share Route
+                    <Button 
+                      size="sm" 
+                      className="bg-primary-600 hover:bg-primary-700 text-white text-xs px-2 py-1"
+                      onClick={handleShareRoute}
+                      disabled={isSharing}
+                    >
+                      <Share2 className="w-3 h-3 mr-1" />
+                      {isSharing ? 'Generando...' : 'Compartir Ruta'}
                     </Button>
                   </div>
                 </div>
@@ -462,6 +506,13 @@ const RouteDetail = () => {
           onClose={() => setAdvancedAnalysisMode(false)}
         />
       )}
+
+      {/* Share Route Dialog */}
+      <ShareRouteDialog
+        isOpen={showShareDialog}
+        onClose={() => setShowShareDialog(false)}
+        shareUrl={shareUrl}
+      />
     </div>
   );
 };
