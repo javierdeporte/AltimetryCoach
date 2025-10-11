@@ -92,38 +92,17 @@ export const useShareRoute = () => {
 
   const getSharedRoute = async (shareSlug: string) => {
     try {
-      const { data, error } = await supabase
-        .from('shared_routes')
-        .select(`
-          *,
-          routes (
-            id,
-            name,
-            description,
-            distance_km,
-            elevation_gain_m,
-            elevation_loss_m,
-            difficulty_level,
-            created_at,
-            gpx_capture_date,
-            gpx_data,
-            route_type,
-            date_source
-          )
-        `)
-        .eq('share_slug', shareSlug)
-        .eq('is_active', true)
-        .single();
+      // Fetch shared route using RPC to bypass routes RLS safely
+      const { data: payload, error } = await supabase
+        .rpc('get_shared_route', { p_share_slug: shareSlug });
 
       if (error) throw error;
+      if (!payload) throw new Error('Ruta compartida no encontrada');
 
-      // Increment view count
-      await supabase
-        .from('shared_routes')
-        .update({ view_count: (data.view_count || 0) + 1 })
-        .eq('share_slug', shareSlug);
+      // Increment view count via RPC (best-effort)
+      await supabase.rpc('increment_share_view', { p_share_slug: shareSlug });
 
-      return data;
+      return payload;
     } catch (error) {
       console.error('Error fetching shared route:', error);
       return null;

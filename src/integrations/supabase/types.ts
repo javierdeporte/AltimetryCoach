@@ -287,6 +287,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_shared_route: {
+        Args: { p_share_slug: string }
+        Returns: Json
+      }
+      increment_share_view: {
+        Args: { p_share_slug: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
