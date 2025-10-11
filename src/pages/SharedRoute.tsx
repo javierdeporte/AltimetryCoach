@@ -4,7 +4,6 @@ import { ElevationChartD3 } from '@/components/route/elevation-chart-d3';
 import { SegmentsTable } from '@/components/route/segments-table';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUp, ArrowDown } from 'lucide-react';
-import { useShareRoute } from '@/hooks/useShareRoute';
 import { usePublicRouteData } from '@/hooks/usePublicRouteData';
 import { segmentProfileAdvanced } from '@/utils/advancedSegmentation';
 import { segmentProfileV2 } from '@/utils/advancedSegmentationV2';
@@ -13,10 +12,9 @@ import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate } from '@/utils/ro
 
 const SharedRoute = () => {
   const { shareSlug } = useParams<{ shareSlug: string }>();
-  const { getSharedRoute } = useShareRoute();
   
   const { route, elevationData, analysisType, analysisParams, isLoading, error } = 
-    usePublicRouteData(shareSlug || '', getSharedRoute);
+    usePublicRouteData(shareSlug || '');
 
   // Calculate segments based on analysis type
   const { segments: calculatedSegments, macroBoundaries } = useMemo(() => {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { ElevationPoint } from '@/utils/types';
 
 interface PublicRouteData {
@@ -10,10 +11,7 @@ interface PublicRouteData {
   error: string | null;
 }
 
-export const usePublicRouteData = (
-  shareSlug: string, 
-  getSharedRoute: (slug: string) => Promise<any>
-): PublicRouteData => {
+export const usePublicRouteData = (shareSlug: string): PublicRouteData => {
   const [data, setData] = useState<PublicRouteData>({
     route: null,
     elevationData: [],
@@ -24,31 +22,75 @@ export const usePublicRouteData = (
   });
 
   useEffect(() => {
+    let mounted = true;
+    
     const loadData = async () => {
+      if (!shareSlug) {
+        console.log('[usePublicRouteData] No shareSlug provided');
+        return;
+      }
+
+      console.log('[usePublicRouteData] Loading route with slug:', shareSlug);
+      
       try {
         setData(prev => ({ ...prev, isLoading: true, error: null }));
         
-        const sharedRouteData = await getSharedRoute(shareSlug);
-        
-        if (!sharedRouteData || !sharedRouteData.routes) {
+        // Fetch shared route using RPC to bypass routes RLS safely
+        const { data: payload, error } = await supabase
+          .rpc('get_shared_route', { p_share_slug: shareSlug });
+
+        if (!mounted) return;
+
+        if (error) {
+          console.error('[usePublicRouteData] RPC error:', error);
+          throw error;
+        }
+
+        if (!payload) {
+          console.error('[usePublicRouteData] No data returned');
           throw new Error('Ruta compartida no encontrada');
         }
 
-        const route = sharedRouteData.routes;
+        console.log('[usePublicRouteData] Data received:', payload);
+
+        // Type assertion for RPC return value
+        const payloadData = payload as any;
+
+        if (!payloadData.routes) {
+          console.error('[usePublicRouteData] No routes in payload');
+          throw new Error('Ruta compartida no encontrada');
+        }
+
+        const route = payloadData.routes;
         
         // Parse GPX data for elevation profile
         const elevationData = parseGPXForElevation(route.gpx_data || '');
+        console.log('[usePublicRouteData] Parsed elevation points:', elevationData.length);
+
+        // Increment view count via RPC (best-effort, non-blocking)
+        try {
+          await supabase.rpc('increment_share_view', { p_share_slug: shareSlug });
+        } catch (viewErr) {
+          console.warn('[usePublicRouteData] Failed to increment view:', viewErr);
+        }
+
+        if (!mounted) return;
 
         setData({
           route,
           elevationData,
-          analysisType: sharedRouteData.analysis_type,
-          analysisParams: sharedRouteData.analysis_params || {},
+          analysisType: payloadData.analysis_type,
+          analysisParams: payloadData.analysis_params || {},
           isLoading: false,
           error: null
         });
+
+        console.log('[usePublicRouteData] Data loaded successfully');
       } catch (err) {
-        console.error('Error loading public route:', err);
+        console.error('[usePublicRouteData] Error loading route:', err);
+        
+        if (!mounted) return;
+        
         setData(prev => ({
           ...prev,
           isLoading: false,
@@ -57,10 +99,12 @@ export const usePublicRouteData = (
       }
     };
 
-    if (shareSlug) {
-      loadData();
-    }
-  }, [shareSlug, getSharedRoute]);
+    loadData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [shareSlug]);
 
   return data;
 };
