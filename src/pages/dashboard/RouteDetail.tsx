@@ -212,7 +212,8 @@ const RouteDetail = () => {
     });
 
     if (shareSlug) {
-      const url = `${window.location.origin}/share/${shareSlug}`;
+      // Use relative URL so it works on any domain
+      const url = `/share/${shareSlug}`;
       setShareUrl(url);
       setShowShareDialog(true);
     }

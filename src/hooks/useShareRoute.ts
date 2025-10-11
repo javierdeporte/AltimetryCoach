@@ -16,14 +16,6 @@ export const useShareRoute = () => {
     setIsSharing(true);
     
     try {
-      // Generate a unique slug
-      const { data: slugData, error: slugError } = await supabase
-        .rpc('generate_share_slug');
-
-      if (slugError) throw slugError;
-      
-      const shareSlug = slugData as string;
-
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -31,7 +23,39 @@ export const useShareRoute = () => {
         throw new Error('Usuario no autenticado');
       }
 
-      // Insert shared route
+      // Check if a share already exists with same parameters
+      const { data: existingShare, error: searchError } = await supabase
+        .from('shared_routes')
+        .select('share_slug, analysis_params, analysis_type')
+        .eq('route_id', params.routeId)
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+
+      if (searchError) throw searchError;
+
+      // Find if there's a share with identical parameters
+      const matchingShare = existingShare?.find(share => 
+        share.analysis_type === params.analysisType &&
+        JSON.stringify(share.analysis_params) === JSON.stringify(params.analysisParams)
+      );
+
+      if (matchingShare) {
+        toast({
+          title: '¡Enlace reutilizado!',
+          description: 'Ya existe un enlace con esta configuración',
+        });
+        return matchingShare.share_slug;
+      }
+
+      // Generate a unique slug for new share
+      const { data: slugData, error: slugError } = await supabase
+        .rpc('generate_share_slug');
+
+      if (slugError) throw slugError;
+      
+      const shareSlug = slugData as string;
+
+      // Insert new shared route
       const { data, error } = await supabase
         .from('shared_routes')
         .insert({

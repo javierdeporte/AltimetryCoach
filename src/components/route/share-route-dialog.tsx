@@ -21,7 +21,12 @@ export const ShareRouteDialog: React.FC<ShareRouteDialogProps> = ({
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      // Convert relative URL to absolute for clipboard
+      const absoluteUrl = shareUrl.startsWith('http') 
+        ? shareUrl 
+        : `${window.location.origin}${shareUrl}`;
+      
+      await navigator.clipboard.writeText(absoluteUrl);
       setCopied(true);
       toast({
         title: '¡Copiado!',
@@ -38,7 +43,11 @@ export const ShareRouteDialog: React.FC<ShareRouteDialogProps> = ({
   };
 
   const handleOpenInNewTab = () => {
-    window.open(shareUrl, '_blank');
+    // Convert relative URL to absolute for window.open
+    const absoluteUrl = shareUrl.startsWith('http') 
+      ? shareUrl 
+      : `${window.location.origin}${shareUrl}`;
+    window.open(absoluteUrl, '_blank');
   };
 
   return (
@@ -58,7 +67,7 @@ export const ShareRouteDialog: React.FC<ShareRouteDialogProps> = ({
           <div className="flex items-center space-x-2">
             <Input
               readOnly
-              value={shareUrl}
+              value={shareUrl.startsWith('http') ? shareUrl : `${window.location.origin}${shareUrl}`}
               className="flex-1"
             />
             <Button
