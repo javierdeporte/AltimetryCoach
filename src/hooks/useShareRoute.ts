@@ -6,6 +6,7 @@ export interface ShareRouteParams {
   routeId: string;
   analysisType: 'experimental' | 'advanced' | 'gradient' | 'none';
   analysisParams: any;
+  versionId?: string; // Optional: link to a saved version
 }
 
 export const useShareRoute = () => {
@@ -64,7 +65,8 @@ export const useShareRoute = () => {
           user_id: user.id,
           analysis_type: params.analysisType,
           analysis_params: params.analysisParams,
-          is_active: true
+          is_active: true,
+          version_id: params.versionId || null
         })
         .select()
         .single();
@@ -92,9 +94,9 @@ export const useShareRoute = () => {
 
   const getSharedRoute = async (shareSlug: string) => {
     try {
-      // Fetch shared route using RPC to bypass routes RLS safely
+      // Use the new RPC function that supports versions
       const { data: payload, error } = await supabase
-        .rpc('get_shared_route', { p_share_slug: shareSlug });
+        .rpc('get_shared_route_with_version', { p_share_slug: shareSlug });
 
       if (error) throw error;
       if (!payload) throw new Error('Ruta compartida no encontrada');

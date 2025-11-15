@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Slider } from '../../components/ui/slider';
 import { Switch } from '../../components/ui/switch';
-import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft, Zap, Share2 } from 'lucide-react';
+import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft, Zap, Share2, Save, FolderOpen } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
@@ -20,6 +20,10 @@ import { GradientControlsBar } from '../../components/route/GradientControlsBar'
 import { segmentProfileGradient, DEFAULT_GRADIENT_PARAMS, GradientSegmentationParams } from '../../utils/gradientSegmentation';
 import { useShareRoute } from '../../hooks/useShareRoute';
 import { ShareRouteDialog } from '../../components/route/share-route-dialog';
+import { useAnalysisVersions, AnalysisVersion } from '../../hooks/useAnalysisVersions';
+import { SaveVersionDialog } from '../../components/route/save-version-dialog';
+import { VersionsList } from '../../components/route/versions-list';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../components/ui/collapsible';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -46,6 +50,12 @@ const RouteDetail = () => {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const { shareRoute, isSharing } = useShareRoute();
+  
+  // Versions state
+  const [showSaveVersionDialog, setShowSaveVersionDialog] = useState(false);
+  const [showVersionsPanel, setShowVersionsPanel] = useState(false);
+  const [versionsRefreshTrigger, setVersionsRefreshTrigger] = useState(0);
+  const { saveVersion, isLoading: isSavingVersion } = useAnalysisVersions();
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -215,7 +225,86 @@ const RouteDetail = () => {
     });
 
     if (shareSlug) {
-      // Use relative URL so it works on any domain
+      const url = `/share/${shareSlug}`;
+      setShareUrl(url);
+      setShowShareDialog(true);
+    }
+  };
+
+  const handleSaveVersion = async (versionName: string) => {
+    if (!routeId) return;
+    
+    const analysisType = experimentalAnalysisMode 
+      ? 'experimental' 
+      : advancedAnalysisMode 
+      ? 'advanced' 
+      : gradientAnalysisMode 
+      ? 'gradient' 
+      : 'none';
+    
+    const params = experimentalAnalysisMode 
+      ? experimentalParams 
+      : advancedAnalysisMode 
+      ? advancedParams 
+      : gradientAnalysisMode 
+      ? gradientParams 
+      : {};
+
+    const versionId = await saveVersion({
+      routeId,
+      versionName,
+      analysisType,
+      analysisParams: params,
+      showGradeLabels,
+      segmentsSnapshot: currentSegments
+    });
+
+    if (versionId) {
+      setShowSaveVersionDialog(false);
+      setVersionsRefreshTrigger(prev => prev + 1);
+    }
+  };
+
+  const handleLoadVersion = (version: AnalysisVersion) => {
+    // Load the version's analysis parameters
+    switch (version.analysis_type) {
+      case 'experimental':
+        setExperimentalAnalysisMode(true);
+        setAdvancedAnalysisMode(false);
+        setGradientAnalysisMode(false);
+        setExperimentalParams(version.analysis_params);
+        break;
+      case 'advanced':
+        setAdvancedAnalysisMode(true);
+        setExperimentalAnalysisMode(false);
+        setGradientAnalysisMode(false);
+        setAdvancedParams(version.analysis_params);
+        break;
+      case 'gradient':
+        setGradientAnalysisMode(true);
+        setAdvancedAnalysisMode(false);
+        setExperimentalAnalysisMode(false);
+        setGradientParams(version.analysis_params);
+        break;
+      default:
+        setAdvancedAnalysisMode(false);
+        setExperimentalAnalysisMode(false);
+        setGradientAnalysisMode(false);
+    }
+    setShowGradeLabels(version.show_grade_labels);
+  };
+
+  const handleShareVersion = async (version: AnalysisVersion) => {
+    if (!routeId) return;
+
+    const shareSlug = await shareRoute({
+      routeId,
+      analysisType: version.analysis_type,
+      analysisParams: version.analysis_params,
+      versionId: version.id
+    });
+
+    if (shareSlug) {
       const url = `/share/${shareSlug}`;
       setShareUrl(url);
       setShowShareDialog(true);
@@ -313,6 +402,26 @@ const RouteDetail = () => {
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-xs px-2 py-1"
+                      onClick={() => setShowVersionsPanel(!showVersionsPanel)}
+                      title="Ver versiones guardadas"
+                    >
+                      <FolderOpen className="w-3 h-3 mr-1" />
+                      Versiones
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-xs px-2 py-1"
+                      onClick={() => setShowSaveVersionDialog(true)}
+                      title="Guardar configuración actual"
+                    >
+                      <Save className="w-3 h-3 mr-1" />
+                      Guardar
+                    </Button>
                     <Button variant="outline" size="sm" className="border-primary-300 text-primary-600 hover:bg-primary-50 text-xs px-2 py-1">
                       <Settings className="w-3 h-3 mr-1" />
                       Export Data
@@ -391,6 +500,19 @@ const RouteDetail = () => {
                 </div>
               </div>
             </div>
+            
+            {/* Versions Panel - Collapsible */}
+            {showVersionsPanel && routeId && (
+              <div className="bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 p-6">
+                <h3 className="text-lg font-semibold mb-4">Versiones Guardadas</h3>
+                <VersionsList
+                  routeId={routeId}
+                  onLoadVersion={handleLoadVersion}
+                  onShareVersion={handleShareVersion}
+                  refreshTrigger={versionsRefreshTrigger}
+                />
+              </div>
+            )}
             
             {/* Row 2: Botones de acción más pequeños */}
             <div className="flex items-center gap-2 justify-between lg:justify-end overflow-x-auto whitespace-nowrap">
@@ -528,6 +650,14 @@ const RouteDetail = () => {
         isOpen={showShareDialog}
         onClose={() => setShowShareDialog(false)}
         shareUrl={shareUrl}
+      />
+
+      {/* Save Version Dialog */}
+      <SaveVersionDialog
+        open={showSaveVersionDialog}
+        onOpenChange={setShowSaveVersionDialog}
+        onSave={handleSaveVersion}
+        isLoading={isSavingVersion}
       />
     </div>
   );

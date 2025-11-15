@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ElevationChartD3 } from '@/components/route/elevation-chart-d3';
 import { SegmentsTable } from '@/components/route/segments-table';
@@ -12,6 +12,7 @@ import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate } from '@/utils/ro
 
 const SharedRoute = () => {
   const { shareSlug } = useParams<{ shareSlug: string }>();
+  const [showGradeLabels, setShowGradeLabels] = useState(false);
   
   const { route, elevationData, analysisType, analysisParams, isLoading, error } = 
     usePublicRouteData(shareSlug || '');

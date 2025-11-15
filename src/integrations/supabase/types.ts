@@ -91,6 +91,53 @@ export type Database = {
         }
         Relationships: []
       }
+      route_analysis_versions: {
+        Row: {
+          analysis_params: Json
+          analysis_type: string
+          created_at: string
+          id: string
+          is_favorite: boolean | null
+          route_id: string
+          segments_snapshot: Json | null
+          show_grade_labels: boolean
+          user_id: string
+          version_name: string
+        }
+        Insert: {
+          analysis_params?: Json
+          analysis_type: string
+          created_at?: string
+          id?: string
+          is_favorite?: boolean | null
+          route_id: string
+          segments_snapshot?: Json | null
+          show_grade_labels?: boolean
+          user_id: string
+          version_name: string
+        }
+        Update: {
+          analysis_params?: Json
+          analysis_type?: string
+          created_at?: string
+          id?: string
+          is_favorite?: boolean | null
+          route_id?: string
+          segments_snapshot?: Json | null
+          show_grade_labels?: boolean
+          user_id?: string
+          version_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_analysis_versions_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       routes: {
         Row: {
           created_at: string | null
@@ -203,6 +250,7 @@ export type Database = {
           route_id: string
           share_slug: string
           user_id: string
+          version_id: string | null
           view_count: number | null
         }
         Insert: {
@@ -215,6 +263,7 @@ export type Database = {
           route_id: string
           share_slug: string
           user_id: string
+          version_id?: string | null
           view_count?: number | null
         }
         Update: {
@@ -227,6 +276,7 @@ export type Database = {
           route_id?: string
           share_slug?: string
           user_id?: string
+          version_id?: string | null
           view_count?: number | null
         }
         Relationships: [
@@ -235,6 +285,13 @@ export type Database = {
             columns: ["route_id"]
             isOneToOne: false
             referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_routes_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "route_analysis_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -285,6 +342,10 @@ export type Database = {
     Functions: {
       generate_share_slug: { Args: never; Returns: string }
       get_shared_route: { Args: { p_share_slug: string }; Returns: Json }
+      get_shared_route_with_version: {
+        Args: { p_share_slug: string }
+        Returns: Json
+      }
       increment_share_view: {
         Args: { p_share_slug: string }
         Returns: undefined
