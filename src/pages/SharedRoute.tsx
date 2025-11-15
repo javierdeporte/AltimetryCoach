@@ -3,8 +3,12 @@ import { useParams } from 'react-router-dom';
 import { ElevationChartD3 } from '@/components/route/elevation-chart-d3';
 import { SegmentsTable } from '@/components/route/segments-table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUp, ArrowDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ArrowUp, ArrowDown, Download, Printer, FileDown } from 'lucide-react';
 import { usePublicRouteData } from '@/hooks/usePublicRouteData';
+import { useToast } from '@/hooks/use-toast';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { segmentProfileAdvanced } from '@/utils/advancedSegmentation';
 import { segmentProfileV2 } from '@/utils/advancedSegmentationV2';
 import { segmentProfileGradient } from '@/utils/gradientSegmentation';
@@ -12,9 +16,77 @@ import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate } from '@/utils/ro
 
 const SharedRoute = () => {
   const { shareSlug } = useParams<{ shareSlug: string }>();
+  const { toast } = useToast();
   
   const { route, elevationData, analysisType, analysisParams, isLoading, error } = 
     usePublicRouteData(shareSlug || '');
+
+  const downloadChart = async () => {
+    try {
+      const element = document.getElementById('elevation-chart-container');
+      if (!element) return;
+      toast({ title: 'Generando imagen...', description: 'Por favor espera' });
+      const canvas = await html2canvas(element, { backgroundColor: '#ffffff', scale: 2, logging: false });
+      const link = document.createElement('a');
+      link.download = `${route?.name}_grafica.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      toast({ title: '¡Descarga exitosa!', description: 'La gráfica se ha descargado correctamente' });
+    } catch (error) {
+      console.error('Error downloading chart:', error);
+      toast({ title: 'Error al descargar', description: 'No se pudo descargar la gráfica', variant: 'destructive' });
+    }
+  };
+
+  const downloadTable = async () => {
+    try {
+      const element = document.getElementById('segments-table-container');
+      if (!element) return;
+      toast({ title: 'Generando PDF...', description: 'Por favor espera' });
+      const canvas = await html2canvas(element, { backgroundColor: '#ffffff', scale: 2, logging: false });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height],
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`${route?.name}_tabla.pdf`);
+      toast({ title: '¡Descarga exitosa!', description: 'La tabla se ha descargado correctamente' });
+    } catch (error) {
+      console.error('Error downloading table:', error);
+      toast({ title: 'Error al descargar', description: 'No se pudo descargar la tabla', variant: 'destructive' });
+    }
+  };
+
+  const downloadFullAnalysis = async () => {
+    try {
+      toast({ title: 'Generando análisis completo...', description: 'Por favor espera, esto puede tomar unos segundos' });
+      const chartElement = document.getElementById('elevation-chart-container');
+      const tableElement = document.getElementById('segments-table-container');
+      if (!chartElement || !tableElement) return;
+      const chartCanvas = await html2canvas(chartElement, { backgroundColor: '#ffffff', scale: 2, logging: false });
+      const tableCanvas = await html2canvas(tableElement, { backgroundColor: '#ffffff', scale: 2, logging: false });
+      const pdf = new jsPDF('portrait', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const chartImgData = chartCanvas.toDataURL('image/png');
+      const chartWidth = pageWidth - (2 * margin);
+      const chartHeight = (chartCanvas.height * chartWidth) / chartCanvas.width;
+      pdf.addImage(chartImgData, 'PNG', margin, margin, chartWidth, Math.min(chartHeight, pageHeight - 2 * margin));
+      pdf.addPage();
+      const tableImgData = tableCanvas.toDataURL('image/png');
+      const tableWidth = pageWidth - (2 * margin);
+      const tableHeight = (tableCanvas.height * tableWidth) / tableCanvas.width;
+      pdf.addImage(tableImgData, 'PNG', margin, margin, tableWidth, Math.min(tableHeight, pageHeight - 2 * margin));
+      pdf.save(`${route?.name}_analisis_completo.pdf`);
+      toast({ title: '¡Descarga exitosa!', description: 'El análisis completo se ha descargado correctamente' });
+    } catch (error) {
+      console.error('Error downloading full analysis:', error);
+      toast({ title: 'Error al descargar', description: 'No se pudo descargar el análisis completo', variant: 'destructive' });
+    }
+  };
 
   // Calculate segments based on analysis type
   const { segments: calculatedSegments, macroBoundaries } = useMemo(() => {
@@ -94,7 +166,7 @@ const SharedRoute = () => {
         {/* Header */}
         <div className="bg-white dark:bg-mountain-800 rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200 mb-2">
                 {route.name}
               </h1>
