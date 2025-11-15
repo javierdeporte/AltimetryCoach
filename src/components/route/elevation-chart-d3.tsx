@@ -53,6 +53,7 @@ interface ElevationChartD3Props {
   advancedSegments?: AdvancedSegment[];
   macroBoundaries?: number[];
   showGradientVisualization?: boolean;
+  showGradeLabels?: boolean;
 }
 
 const MIN_CHART_WIDTH = 200;
@@ -66,7 +67,8 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   intelligentSegments = [],
   advancedSegments = [],
   macroBoundaries = [],
-  showGradientVisualization = false
+  showGradientVisualization = false,
+  showGradeLabels = false
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -347,6 +349,64 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       });
     }
 
+    // Draw grade labels on segments if enabled
+    if (showGradeLabels && advancedSegments.length > 0) {
+      advancedSegments.forEach((segment, index) => {
+        // Calculate midpoint of segment
+        const midIndex = Math.floor((segment.startIndex + segment.endIndex) / 2);
+        const midPoint = processedData[midIndex];
+        
+        if (!midPoint) return;
+        
+        // Calculate grade percentage
+        const elevationChange = segment.endPoint.displayElevation - segment.startPoint.displayElevation;
+        const distanceChange = (segment.endPoint.displayDistance - segment.startPoint.displayDistance) * 1000; // Convert to meters
+        const gradePercent = distanceChange > 0 ? (elevationChange / distanceChange) * 100 : 0;
+        
+        // Determine color based on grade
+        const absGrade = Math.abs(gradePercent);
+        let textColor = '#059669'; // green for flat
+        let bgColor = '#d1fae5'; // light green
+        
+        if (absGrade > 8) {
+          textColor = '#dc2626'; // red
+          bgColor = '#fee2e2'; // light red
+        } else if (absGrade > 4) {
+          textColor = '#ea580c'; // orange
+          bgColor = '#fed7aa'; // light orange
+        } else if (absGrade > 2) {
+          textColor = '#ca8a04'; // yellow
+          bgColor = '#fef3c7'; // light yellow
+        }
+        
+        const xPos = xScale(midPoint.displayDistance);
+        const yPos = yScale(midPoint.displayElevation) - 20;
+        
+        // Add background rectangle
+        const label = `${gradePercent >= 0 ? '+' : ''}${gradePercent.toFixed(1)}%`;
+        const labelWidth = label.length * 7 + 8;
+        
+        chartContent.append("rect")
+          .attr("x", xPos - labelWidth / 2)
+          .attr("y", yPos - 8)
+          .attr("width", labelWidth)
+          .attr("height", 18)
+          .attr("fill", bgColor)
+          .attr("rx", 4)
+          .attr("opacity", 0.95);
+        
+        // Add text label
+        chartContent.append("text")
+          .attr("x", xPos)
+          .attr("y", yPos + 4)
+          .attr("text-anchor", "middle")
+          .attr("fill", textColor)
+          .attr("font-size", "11px")
+          .attr("font-weight", "600")
+          .text(label);
+      });
+    }
+
     // X-axis
     const numXTicks = opts.xAxisTicks || Math.max(2, Math.floor(width / 80));
     chartContent.append("g")
@@ -467,7 +527,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         }
       });
 
-  }, [processedData, opts, intelligentSegments, advancedSegments, onPointHover, showGradientVisualization, gradientColorScale, macroBoundaries, containerWidth]);
+  }, [processedData, opts, intelligentSegments, advancedSegments, onPointHover, showGradientVisualization, gradientColorScale, macroBoundaries, containerWidth, showGradeLabels]);
 
   return (
     <div 
