@@ -7,6 +7,7 @@ interface PublicRouteData {
   elevationData: ElevationPoint[];
   analysisType: 'experimental' | 'advanced' | 'gradient' | 'none';
   analysisParams: any;
+  showGradeLabels: boolean;
   isLoading: boolean;
   error: string | null;
 }
@@ -17,6 +18,7 @@ export const usePublicRouteData = (shareSlug: string): PublicRouteData => {
     elevationData: [],
     analysisType: 'none',
     analysisParams: {},
+    showGradeLabels: false,
     isLoading: true,
     error: null
   });
@@ -81,6 +83,7 @@ export const usePublicRouteData = (shareSlug: string): PublicRouteData => {
           elevationData,
           analysisType: payloadData.analysis_type,
           analysisParams: payloadData.analysis_params || {},
+          showGradeLabels: payloadData.show_grade_labels || false,
           isLoading: false,
           error: null
         });
