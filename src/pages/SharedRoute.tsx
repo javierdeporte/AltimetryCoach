@@ -119,47 +119,51 @@ const SharedRoute = () => {
             </p>
           )}
 
-          {/* Statistics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mt-4">
-            <div className="bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/20 rounded-lg p-4">
-              <div className="text-sm text-mountain-600 dark:text-mountain-400 mb-1">Distancia</div>
-              <div className="text-2xl font-bold text-primary-600">{route.distance_km.toFixed(1)} km</div>
+          {/* Statistics - Compact version */}
+          <div className="flex flex-wrap gap-3 text-sm text-mountain-600 dark:text-mountain-400 mt-4">
+            <div className="flex items-center gap-1">
+              <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span className="font-medium text-primary-600">{route.distance_km.toFixed(1)} km</span>
             </div>
             
-            <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg p-4">
-              <div className="text-sm text-mountain-600 dark:text-mountain-400 mb-1 flex items-center gap-1">
-                <ArrowUp className="w-3 h-3" />
-                Desnivel +
-              </div>
-              <div className="text-2xl font-bold text-green-600">+{route.elevation_gain_m}m</div>
+            <div className="flex items-center gap-1">
+              <ArrowUp className="w-4 h-4 text-green-600" />
+              <span className="font-medium text-green-600">+{route.elevation_gain_m}m</span>
             </div>
             
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg p-4">
-              <div className="text-sm text-mountain-600 dark:text-mountain-400 mb-1 flex items-center gap-1">
-                <ArrowDown className="w-3 h-3" />
-                Desnivel -
-              </div>
-              <div className="text-2xl font-bold text-blue-600">-{Math.round(totalElevationLoss)}m</div>
+            <div className="flex items-center gap-1">
+              <ArrowDown className="w-4 h-4 text-blue-600" />
+              <span className="font-medium text-blue-600">-{Math.round(totalElevationLoss)}m</span>
             </div>
             
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg p-4">
-              <div className="text-sm text-mountain-600 dark:text-mountain-400 mb-1">Tiempo est.</div>
-              <div className="text-2xl font-bold text-purple-600">{totalTime}</div>
+            <div className="flex items-center gap-1">
+              <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="font-medium text-purple-600">{totalTime}</span>
             </div>
             
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-lg p-4">
-              <div className="text-sm text-mountain-600 dark:text-mountain-400 mb-1">Altitud máx</div>
-              <div className="text-2xl font-bold text-orange-600">{Math.round(maxElevation)}m</div>
+            <div className="flex items-center gap-1">
+              <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+              </svg>
+              <span className="font-medium text-orange-600">{Math.round(maxElevation)}m</span>
             </div>
             
-            <div className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900/20 dark:to-teal-800/20 rounded-lg p-4">
-              <div className="text-sm text-mountain-600 dark:text-mountain-400 mb-1">Altitud mín</div>
-              <div className="text-2xl font-bold text-teal-600">{Math.round(minElevation)}m</div>
+            <div className="flex items-center gap-1">
+              <svg className="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
+              <span className="font-medium text-teal-600">{Math.round(minElevation)}m</span>
             </div>
             
-            <div className="bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20 rounded-lg p-4">
-              <div className="text-sm text-mountain-600 dark:text-mountain-400 mb-1">Dificultad</div>
-              <div className="text-2xl font-bold text-rose-600">{route.difficulty_level}</div>
+            <div className="flex items-center gap-1">
+              <svg className="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              <span className="font-medium text-rose-600">{route.difficulty_level}</span>
             </div>
           </div>
         </div>
