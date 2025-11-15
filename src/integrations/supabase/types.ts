@@ -283,14 +283,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      generate_share_slug: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_shared_route: {
-        Args: { p_share_slug: string }
-        Returns: Json
-      }
+      generate_share_slug: { Args: never; Returns: string }
+      get_shared_route: { Args: { p_share_slug: string }; Returns: Json }
       increment_share_view: {
         Args: { p_share_slug: string }
         Returns: undefined

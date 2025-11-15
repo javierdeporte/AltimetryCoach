@@ -39,6 +39,9 @@ const RouteDetail = () => {
   const [gradientAnalysisMode, setGradientAnalysisMode] = useState(false);
   const [gradientParams, setGradientParams] = useState<GradientSegmentationParams>(DEFAULT_GRADIENT_PARAMS);
   
+  // Show grade percentages on chart
+  const [showGradeLabels, setShowGradeLabels] = useState(false);
+  
   // Share state
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -420,6 +423,17 @@ const RouteDetail = () => {
                   onCheckedChange={handleGradientModeToggle}
                 />
               </div>
+
+              {/* Show Grade Labels Toggle */}
+              {(advancedAnalysisMode || experimentalAnalysisMode || gradientAnalysisMode) && (
+                <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-purple-200 dark:border-purple-700 rounded-lg px-2 py-1">
+                  <span className="text-xs font-medium">% Inclinación</span>
+                  <Switch
+                    checked={showGradeLabels}
+                    onCheckedChange={setShowGradeLabels}
+                  />
+                </div>
+              )}
               
               <Button 
                 onClick={() => setShowMap(!showMap)}
@@ -467,6 +481,7 @@ const RouteDetail = () => {
               }}
               advancedSegments={currentSegments}
               macroBoundaries={currentMacroBoundaries}
+              showGradeLabels={showGradeLabels}
             />
           </div>
 
