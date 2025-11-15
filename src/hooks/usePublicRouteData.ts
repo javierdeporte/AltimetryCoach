@@ -37,7 +37,7 @@ export const usePublicRouteData = (shareSlug: string): PublicRouteData => {
         
         // Fetch shared route using RPC to bypass routes RLS safely
         const { data: payload, error } = await supabase
-          .rpc('get_shared_route', { p_share_slug: shareSlug });
+          .rpc('get_shared_route_with_version', { p_share_slug: shareSlug });
 
         if (!mounted) return;
 

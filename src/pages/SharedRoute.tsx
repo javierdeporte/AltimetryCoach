@@ -175,6 +175,7 @@ const SharedRoute = () => {
             macroBoundaries={macroBoundaries}
             hoveredSegment={null}
             onPointHover={() => {}}
+            showGradeLabels={showGradeLabels}
           />
         </div>
 
@@ -187,6 +188,7 @@ const SharedRoute = () => {
             <SegmentsTable
               segments={[]}
               advancedSegments={calculatedSegments}
+              isAdvancedMode={true}
               onSegmentHover={() => {}}
             />
           </div>
