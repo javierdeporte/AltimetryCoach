@@ -422,22 +422,12 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         };
       }).filter(Boolean); // Remove null entries
 
-      // ===== NUEVO SISTEMA DE ANTICOLISIÓN SECUENCIAL =====
-      
-      // Constantes ajustables
-      const gapTopLine = 28;
-      const gapBottomLine = 24;
-      const minVerticalGap = showSegmentDistance ? 32 : 24;
-      const samples = 9;
-      const autoThinLabels = true;
-      
-      // Helper: estimar ancho de texto
+      // Helpers para anticolisión
       const estimateTextWidth = (text: string | undefined, fontSize: number) => {
         if (!text) return 0;
-        return Math.max(0, text.length) * fontSize * 0.6 + 6;
+        return Math.max(0, text.length) * fontSize * 0.6 + 6; // padding
       };
 
-      // Helper: interpolar elevación a una distancia
       const bisect = d3.bisector<ElevationPoint, number>((d) => d.displayDistance).left;
       const elevationYAtDistance = (dist: number) => {
         const i = Math.min(Math.max(bisect(processedData, dist), 1), processedData.length - 1);
@@ -449,179 +439,141 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         return yScale(elev);
       };
 
-      // Helper: caja de la etiqueta
-      interface LabelBox {
-        left: number;
-        right: number;
-        top: number;
-        bottom: number;
-      }
-      
-      const getLabelBox = (ld: any): LabelBox => {
-        const percentWidth = estimateTextWidth(ld.label, 11);
-        const distWidth = showSegmentDistance ? estimateTextWidth(ld.distanceLabel, 9) : 0;
-        const width = Math.max(percentWidth, distWidth);
-        const height = showSegmentDistance ? 27 : 16;
-        
-        return {
-          left: ld.xPos - width / 2,
-          right: ld.xPos + width / 2,
-          top: ld.yPos - 7,
-          bottom: ld.yPos - 7 + height
-        };
-      };
-
-      // Helper: comprobar intersección entre cajas
-      const intersects = (boxA: LabelBox, boxB: LabelBox): boolean => {
-        return !(boxA.right < boxB.left || boxA.left > boxB.right || 
-                 boxA.bottom < boxB.top || boxA.top > boxB.bottom);
-      };
-
-      // Helper: muestrear envelope Y (altimetría + regresión) para una etiqueta
-      const sampleEnvelopeY = (ld: any, idx: number): { minY: number; maxY: number } => {
+      // PASO 1: Anti-colisión con la línea de altimetría
+      labelData.forEach(ld => {
+        // Ancho dinámico según los textos
         const percentWidth = estimateTextWidth(ld.label, 11);
         const distWidth = showSegmentDistance ? estimateTextWidth(ld.distanceLabel, 9) : 0;
         const labelWidth = Math.max(percentWidth, distWidth);
         const labelLeftX = ld.xPos - labelWidth / 2;
         const labelRightX = ld.xPos + labelWidth / 2;
         
-        // Muestrear altimetría
-        const xs: number[] = Array.from({ length: samples }, (_, i) => 
-          labelLeftX + (i / (samples - 1)) * (labelRightX - labelLeftX)
-        );
+        // Muestrear la línea de altimetría a lo largo del ancho de la etiqueta
+        const samples = 9;
+        const xs: number[] = Array.from({ length: samples }, (_, i) => labelLeftX + (i / (samples - 1)) * (labelRightX - labelLeftX));
         const elevationYValues = xs.map(x => elevationYAtDistance(xScale.invert(x)));
-        let minY = Math.min(...elevationYValues);
-        let maxY = Math.max(...elevationYValues);
+        const minElevationY = Math.min(...elevationYValues);
+        const maxElevationY = Math.max(...elevationYValues);
         
-        // Muestrear regresión si existe
-        if (advancedSegments.length > 0 && advancedSegments[idx]) {
+        // Bordes del texto (sin fondo)
+        const labelTopY = ld.yPos - 7;
+        const labelBottomY = showSegmentDistance ? ld.yPos + 20 : ld.yPos + 9;
+        
+        const minGapFromLine = 26;
+        const hasOverlap = !((labelBottomY + minGapFromLine) < Math.min(minElevationY, maxElevationY) || (labelTopY - minGapFromLine) > Math.max(minElevationY, maxElevationY));
+        
+        if (hasOverlap) {
+          const lineMidY = (minElevationY + maxElevationY) / 2;
+          const spaceAbove = lineMidY - opts.marginTop;
+          const spaceBelow = (opts.height - opts.marginBottom) - lineMidY;
+          if (spaceAbove > spaceBelow) {
+            ld.yPos = minElevationY - minGapFromLine - (showSegmentDistance ? 27 : 16);
+          } else {
+            ld.yPos = maxElevationY + minGapFromLine;
+          }
+        }
+      });
+
+      // PASO 2: Anti-colisión con líneas de regresión
+      if (advancedSegments.length > 0) {
+        labelData.forEach((ld, idx) => {
           const segment = advancedSegments[idx];
+          if (!segment) return;
+          
+          const percentWidth = estimateTextWidth(ld.label, 11);
+          const distWidth = showSegmentDistance ? estimateTextWidth(ld.distanceLabel, 9) : 0;
+          const labelWidth = Math.max(percentWidth, distWidth);
+          const labelLeftX = ld.xPos - labelWidth / 2;
+          const labelRightX = ld.xPos + labelWidth / 2;
+          
+          // Muestrear Y de regresión a lo largo del ancho
+          const samples = 7;
+          const xs: number[] = Array.from({ length: samples }, (_, i) => labelLeftX + (i / (samples - 1)) * (labelRightX - labelLeftX));
           const regressionYValues = xs.map(x => {
             const dist = xScale.invert(x);
             return yScale(segment.slope * dist + segment.intercept);
           });
           const minRegressionY = Math.min(...regressionYValues);
           const maxRegressionY = Math.max(...regressionYValues);
-          minY = Math.min(minY, minRegressionY);
-          maxY = Math.max(maxY, maxRegressionY);
-        }
-        
-        return { minY, maxY };
-      };
-
-      // Pre-filtrado opcional por densidad
-      let filteredLabelData = [...labelData];
-      if (autoThinLabels && labelData.length > 0) {
-        // Definir espaciado mínimo según ancho del contenedor
-        const minLabelSpacingX = containerWidth < 600 ? 80 : 
-                                  containerWidth < 900 ? 60 : 
-                                  containerWidth < 1200 ? 45 : 35;
-        
-        // Priorizar por: |grade| y distancia del segmento
-        const candidates = labelData.map((ld, idx) => {
-          const segment = advancedSegments[idx];
-          const segDist = segment ? segment.endPoint.displayDistance - segment.startPoint.displayDistance : 0;
-          return {
-            ...ld,
-            originalIdx: idx,
-            priority: Math.abs(ld.gradePercent) * 10 + segDist * 5
-          };
-        }).sort((a, b) => b.priority - a.priority);
-        
-        const selected: typeof candidates = [];
-        const occupiedXRanges: Array<{ left: number; right: number }> = [];
-        
-        for (const cand of candidates) {
-          const percentWidth = estimateTextWidth(cand.label, 11);
-          const distWidth = showSegmentDistance ? estimateTextWidth(cand.distanceLabel, 9) : 0;
-          const width = Math.max(percentWidth, distWidth);
-          const left = cand.xPos - width / 2 - minLabelSpacingX / 2;
-          const right = cand.xPos + width / 2 + minLabelSpacingX / 2;
           
-          const overlaps = occupiedXRanges.some(range => 
-            !(right < range.left || left > range.right)
-          );
-          
-          if (!overlaps) {
-            selected.push(cand);
-            occupiedXRanges.push({ left, right });
+          const labelTopY = ld.yPos - 7;
+          const labelBottomY = showSegmentDistance ? ld.yPos + 20 : ld.yPos + 9;
+          const minGapFromRegression = 22;
+          const hasOverlap = !((labelBottomY + minGapFromRegression) < minRegressionY || (labelTopY - minGapFromRegression) > maxRegressionY);
+          if (hasOverlap) {
+            // Priorizar mover por encima de la regresión
+            ld.yPos = minRegressionY - minGapFromRegression - (showSegmentDistance ? 27 : 16);
           }
-        }
-        
-        // Reordenar por índice original
-        filteredLabelData = selected.sort((a, b) => a.originalIdx - b.originalIdx);
+        });
       }
 
-      // Ordenar por x para colocación secuencial
-      const sortedLabels = [...filteredLabelData].sort((a, b) => a.xPos - b.xPos);
-      const placedLabels: Array<typeof sortedLabels[0] & { box: LabelBox }> = [];
-
-      // Colocación secuencial
-      sortedLabels.forEach((ld) => {
-        const originalIdx = ('originalIdx' in ld ? ld.originalIdx : ld.index) as number;
-        const envelope = sampleEnvelopeY(ld, originalIdx);
-        const labelHeight = showSegmentDistance ? 27 : 16;
+      // PASO 3: Anti-colisión entre etiquetas
+      const minVerticalGap = showSegmentDistance ? 32 : 24;
+      const maxIterations = 10;
+      
+      for (let iteration = 0; iteration < maxIterations; iteration++) {
+        let hadCollision = false;
         
-        // Intentar colocar arriba primero
-        let candidateY = envelope.minY - gapTopLine - labelHeight + 7; // +7 porque top es yPos-7
-        ld.yPos = candidateY;
-        let candidateBox = getLabelBox(ld);
-        
-        // Comprobar colisiones con etiquetas ya colocadas
-        const step = minVerticalGap / 2;
-        const minY = opts.marginTop + 20;
-        const maxY = opts.height - opts.marginBottom - 20;
-        let attempts = 0;
-        const maxAttempts = 50;
-        
-        while (attempts < maxAttempts) {
-          const hasCollision = placedLabels.some(placed => {
-            // Solo comprobar si están cerca horizontalmente
-            if (Math.abs(placed.xPos - ld.xPos) > 150) return false;
-            return intersects(candidateBox, placed.box);
-          });
-          
-          if (!hasCollision && candidateBox.top >= minY && candidateBox.bottom <= maxY) {
-            break;
-          }
-          
-          // Subir más
-          candidateY -= step;
-          ld.yPos = candidateY;
-          candidateBox = getLabelBox(ld);
-          attempts++;
-          
-          // Si llegamos al límite superior, intentar abajo
-          if (candidateBox.top < minY && attempts < maxAttempts / 2) {
-            candidateY = envelope.maxY + gapBottomLine + 7;
-            ld.yPos = candidateY;
-            candidateBox = getLabelBox(ld);
+        for (let i = 0; i < labelData.length; i++) {
+          for (let j = i + 1; j < labelData.length; j++) {
+            const label1 = labelData[i];
+            const label2 = labelData[j];
+            
+            // Check if labels are close horizontally (within 100px)
+            const horizontalDistance = Math.abs(label1.xPos - label2.xPos);
+            if (horizontalDistance > 100) continue;
+            
+            // Check vertical overlap
+            const verticalDistance = Math.abs(label1.yPos - label2.yPos);
+            if (verticalDistance < minVerticalGap) {
+              hadCollision = true;
+              
+              // Push them apart vertically
+              const overlap = minVerticalGap - verticalDistance;
+              const adjustment = overlap / 2 + 2;
+              
+              if (label1.yPos < label2.yPos) {
+                label1.yPos -= adjustment;
+                label2.yPos += adjustment;
+              } else {
+                label1.yPos += adjustment;
+                label2.yPos -= adjustment;
+              }
+              
+              // Keep labels within bounds
+              const minY = opts.marginTop + 20;
+              const maxY = opts.height - opts.marginBottom - 20;
+              label1.yPos = Math.max(minY, Math.min(maxY, label1.yPos));
+              label2.yPos = Math.max(minY, Math.min(maxY, label2.yPos));
+            }
           }
         }
         
-        // Clampear a límites del gráfico
-        ld.yPos = Math.max(minY + 7, Math.min(maxY - labelHeight + 7, ld.yPos));
-        const finalBox = getLabelBox(ld);
-        placedLabels.push({ ...ld, box: finalBox });
-      });
+        if (!hadCollision) break;
+      }
 
-      // Actualizar labelData original con las posiciones finales
-      filteredLabelData.forEach(ld => {
-        const origIdx = 'originalIdx' in ld ? ld.originalIdx : ld.index;
-        const originalLabel = labelData.find(l => l.index === origIdx);
-        if (originalLabel) {
-          originalLabel.yPos = ld.yPos;
+      // Chequeo final rápido contra altimetría tras empujes entre etiquetas
+      labelData.forEach(ld => {
+        const percentWidth = estimateTextWidth(ld.label, 11);
+        const distWidth = showSegmentDistance ? estimateTextWidth(ld.distanceLabel, 9) : 0;
+        const labelWidth = Math.max(percentWidth, distWidth);
+        const labelLeftX = ld.xPos - labelWidth / 2;
+        const labelRightX = ld.xPos + labelWidth / 2;
+        const xs = [labelLeftX, (labelLeftX + labelRightX) / 2, labelRightX];
+        const elevationYValues = xs.map(x => elevationYAtDistance(xScale.invert(x)));
+        const minElevationY = Math.min(...elevationYValues);
+        const maxElevationY = Math.max(...elevationYValues);
+        const labelTopY = ld.yPos - 7;
+        const labelBottomY = showSegmentDistance ? ld.yPos + 20 : ld.yPos + 9;
+        const minGapFromLine = 22;
+        const hasOverlap = !((labelBottomY + minGapFromLine) < minElevationY || (labelTopY - minGapFromLine) > maxElevationY);
+        if (hasOverlap) {
+          ld.yPos = minElevationY - minGapFromLine - (showSegmentDistance ? 27 : 16);
         }
       });
-
-      // Crear un nuevo array con solo las etiquetas filtradas para renderizar
-      const labelsToRender = filteredLabelData.map(ld => {
-        const origIdx = 'originalIdx' in ld ? ld.originalIdx : ld.index;
-        return labelData.find(l => l.index === origIdx)!;
-      }).filter(Boolean);
 
       // Render labels con líneas conectoras
-      labelsToRender.forEach(({ index, xPos, baseYPos, yPos, label, distanceLabel, textColor, distanceColor }) => {
+      labelData.forEach(({ index, xPos, baseYPos, yPos, label, distanceLabel, textColor, distanceColor }) => {
         // Draw connector line from label to regression line
         chartContent.append("line")
           .attr("x1", xPos)
