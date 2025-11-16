@@ -54,6 +54,7 @@ interface ElevationChartD3Props {
   macroBoundaries?: number[];
   showGradientVisualization?: boolean;
   showGradeLabels?: boolean;
+  showSegmentDistance?: boolean;
 }
 
 const MIN_CHART_WIDTH = 200;
@@ -68,7 +69,8 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
   advancedSegments = [],
   macroBoundaries = [],
   showGradientVisualization = false,
-  showGradeLabels = false
+  showGradeLabels = false,
+  showSegmentDistance = false
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -383,12 +385,16 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         const xPos = xScale(midPoint.displayDistance);
         const baseYPos = yScale(midPoint.displayElevation);
         
+        // Calculate segment distance
+        const segmentDistance = segment.endPoint.displayDistance - segment.startPoint.displayDistance;
+        
         return {
           index,
           xPos,
           baseYPos,
           yPos: baseYPos - 45, // Initial offset
           label: `#${index + 1} ${gradePercent >= 0 ? '+' : ''}${gradePercent.toFixed(1)}%`,
+          distanceLabel: `${segmentDistance.toFixed(2)} km`,
           textColor,
           bgColor,
           gradePercent
@@ -435,7 +441,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       }
 
       // Render labels with connector lines
-      labelData.forEach(({ index, xPos, baseYPos, yPos, label, textColor }) => {
+      labelData.forEach(({ index, xPos, baseYPos, yPos, label, distanceLabel, textColor }) => {
         // Draw connector line from label to regression line
         chartContent.append("line")
           .attr("x1", xPos)
@@ -447,7 +453,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
           .attr("stroke-dasharray", "2,2")
           .attr("opacity", 0.5);
         
-        // Add text label
+        // Add percentage label
         chartContent.append("text")
           .attr("x", xPos)
           .attr("y", yPos + 4)
@@ -456,6 +462,19 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
           .attr("font-size", "11px")
           .attr("font-weight", "600")
           .text(label);
+        
+        // Add distance label below if enabled
+        if (showSegmentDistance) {
+          chartContent.append("text")
+            .attr("x", xPos)
+            .attr("y", yPos + 16)
+            .attr("text-anchor", "middle")
+            .attr("fill", textColor)
+            .attr("font-size", "9px")
+            .attr("font-weight", "500")
+            .attr("opacity", 0.8)
+            .text(distanceLabel);
+        }
       });
     }
 
