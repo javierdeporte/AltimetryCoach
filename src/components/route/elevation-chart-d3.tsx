@@ -435,9 +435,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       }
 
       // Render labels with connector lines
-      labelData.forEach(({ index, xPos, baseYPos, yPos, label, textColor, bgColor }) => {
-        const labelWidth = label.length * 7 + 8;
-        
+      labelData.forEach(({ index, xPos, baseYPos, yPos, label, textColor }) => {
         // Draw connector line from label to regression line
         chartContent.append("line")
           .attr("x1", xPos)
@@ -448,16 +446,6 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
           .attr("stroke-width", 1)
           .attr("stroke-dasharray", "2,2")
           .attr("opacity", 0.5);
-        
-        // Add background rectangle
-        chartContent.append("rect")
-          .attr("x", xPos - labelWidth / 2)
-          .attr("y", yPos - 8)
-          .attr("width", labelWidth)
-          .attr("height", 18)
-          .attr("fill", bgColor)
-          .attr("rx", 4)
-          .attr("opacity", 0.95);
         
         // Add text label
         chartContent.append("text")
