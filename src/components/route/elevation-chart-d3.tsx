@@ -424,34 +424,65 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
 
       // PASO 1: Anti-colisión con la línea de altimetría
       labelData.forEach(label => {
-        const closestPoint = processedData.reduce((closest, point) => {
-          const distToLabel = Math.abs(xScale(point.displayDistance) - label.xPos);
-          const distToClosest = Math.abs(xScale(closest.displayDistance) - label.xPos);
-          return distToLabel < distToClosest ? point : closest;
+        // Estimar ancho aproximado del texto de la etiqueta en píxeles
+        // "#XX +XX.X%" tiene aproximadamente 60-80px de ancho
+        const estimatedLabelWidth = 70;
+        const labelLeftX = label.xPos - estimatedLabelWidth / 2;
+        const labelRightX = label.xPos + estimatedLabelWidth / 2;
+        
+        // Encontrar TODOS los puntos de elevación en el rango horizontal de la etiqueta
+        const pointsInRange = processedData.filter(point => {
+          const pointX = xScale(point.displayDistance);
+          return pointX >= labelLeftX && pointX <= labelRightX;
         });
         
-        const elevationLineY = yScale(closestPoint.displayElevation);
+        // Si no hay puntos en el rango, buscar el más cercano
+        if (pointsInRange.length === 0) {
+          pointsInRange.push(processedData.reduce((closest, point) => {
+            const distToLabel = Math.abs(xScale(point.displayDistance) - label.xPos);
+            const distToClosest = Math.abs(xScale(closest.displayDistance) - label.xPos);
+            return distToLabel < distToClosest ? point : closest;
+          }));
+        }
+        
+        // Encontrar el rango Y de la línea de elevación en esta región
+        const elevationYValues = pointsInRange.map(p => yScale(p.displayElevation));
+        const maxElevationY = Math.max(...elevationYValues); // Y más bajo en pantalla (mayor elevación)
+        const minElevationY = Math.min(...elevationYValues); // Y más alto en pantalla (menor elevación)
         
         // Calcular bordes exactos del texto (sin fondo)
-        // Texto de porcentaje: yPos + 4, font-size 11px
-        // Texto de distancia: yPos + 16, font-size 9px (si está activo)
         const labelTopY = label.yPos - 7; // Top del texto de porcentaje
         const labelBottomY = showSegmentDistance ? label.yPos + 20 : label.yPos + 9; // Bottom del último texto
         
-        // Aumentar gap mínimo para evitar colisiones
-        const minGapFromLine = 22;
+        // Gap mínimo aumentado para mayor claridad
+        const minGapFromLine = 25;
         
-        // Verificar si algún borde del texto está cerca de la línea
-        if ((elevationLineY >= labelTopY - minGapFromLine && elevationLineY <= labelBottomY + minGapFromLine)) {
-          const spaceAbove = elevationLineY - opts.marginTop;
-          const spaceBelow = (opts.height - opts.marginBottom) - elevationLineY;
+        // Verificar si el rango de la etiqueta se solapa con el rango de la línea
+        const labelRangeWithGap = {
+          top: labelTopY - minGapFromLine,
+          bottom: labelBottomY + minGapFromLine
+        };
+        
+        const lineRange = {
+          top: minElevationY,
+          bottom: maxElevationY
+        };
+        
+        // Detectar solapamiento entre los dos rangos
+        const hasOverlap = !(labelRangeWithGap.bottom < lineRange.top || labelRangeWithGap.top > lineRange.bottom);
+        
+        if (hasOverlap) {
+          // Usar el punto medio de la línea en esta región para decidir dónde mover
+          const lineMidY = (minElevationY + maxElevationY) / 2;
+          const spaceAbove = lineMidY - opts.marginTop;
+          const spaceBelow = (opts.height - opts.marginBottom) - lineMidY;
           
           if (spaceAbove > spaceBelow) {
-            // Mover hacia arriba: elevationLineY debe estar debajo del bottom de la etiqueta
-            label.yPos = elevationLineY - minGapFromLine - (showSegmentDistance ? 27 : 16);
+            // Mover hacia arriba: la etiqueta debe estar completamente arriba de la línea
+            label.yPos = minElevationY - minGapFromLine - (showSegmentDistance ? 27 : 16);
           } else {
-            // Mover hacia abajo: elevationLineY debe estar arriba del top de la etiqueta
-            label.yPos = elevationLineY + minGapFromLine;
+            // Mover hacia abajo: la etiqueta debe estar completamente abajo de la línea
+            label.yPos = maxElevationY + minGapFromLine;
           }
         }
       });
@@ -462,27 +493,49 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
           const segment = advancedSegments[idx];
           if (!segment) return;
           
+          const estimatedLabelWidth = 70;
+          const labelLeftX = label.xPos - estimatedLabelWidth / 2;
+          const labelRightX = label.xPos + estimatedLabelWidth / 2;
+          
+          // Encontrar puntos del segmento en el rango horizontal de la etiqueta
           const segmentData = processedData.slice(segment.startIndex, segment.endIndex + 1);
-          const closestInSegment = segmentData.reduce((closest, point) => {
-            const distToLabel = Math.abs(xScale(point.displayDistance) - label.xPos);
-            const distToClosest = Math.abs(xScale(closest.displayDistance) - label.xPos);
-            return distToLabel < distToClosest ? point : closest;
+          const pointsInRange = segmentData.filter(point => {
+            const pointX = xScale(point.displayDistance);
+            return pointX >= labelLeftX && pointX <= labelRightX;
           });
           
-          const regressionY = yScale(
-            segment.slope * closestInSegment.displayDistance + segment.intercept
-          );
+          if (pointsInRange.length === 0) return;
+          
+          // Calcular Y de regresión para cada punto en el rango
+          const regressionYValues = pointsInRange.map(point => {
+            return yScale(segment.slope * point.displayDistance + segment.intercept);
+          });
+          
+          const maxRegressionY = Math.max(...regressionYValues);
+          const minRegressionY = Math.min(...regressionYValues);
           
           // Calcular bordes del texto
           const labelTopY = label.yPos - 7;
           const labelBottomY = showSegmentDistance ? label.yPos + 20 : label.yPos + 9;
           
-          const minGapFromRegression = 18;
+          const minGapFromRegression = 20;
           
-          // Verificar si la línea de regresión atraviesa el texto
-          if (regressionY >= labelTopY - minGapFromRegression && regressionY <= labelBottomY + minGapFromRegression) {
-            // Mover el texto hacia arriba
-            label.yPos = regressionY - minGapFromRegression - (showSegmentDistance ? 27 : 16);
+          // Verificar solapamiento
+          const labelRangeWithGap = {
+            top: labelTopY - minGapFromRegression,
+            bottom: labelBottomY + minGapFromRegression
+          };
+          
+          const regressionRange = {
+            top: minRegressionY,
+            bottom: maxRegressionY
+          };
+          
+          const hasOverlap = !(labelRangeWithGap.bottom < regressionRange.top || labelRangeWithGap.top > regressionRange.bottom);
+          
+          if (hasOverlap) {
+            // Mover el texto hacia arriba (sobre la línea de regresión)
+            label.yPos = minRegressionY - minGapFromRegression - (showSegmentDistance ? 27 : 16);
           }
         });
       }
