@@ -249,6 +249,7 @@ export type Database = {
           is_active: boolean | null
           route_id: string
           share_slug: string
+          show_grade_labels: boolean
           user_id: string
           version_id: string | null
           view_count: number | null
@@ -262,6 +263,7 @@ export type Database = {
           is_active?: boolean | null
           route_id: string
           share_slug: string
+          show_grade_labels?: boolean
           user_id: string
           version_id?: string | null
           view_count?: number | null
@@ -275,6 +277,7 @@ export type Database = {
           is_active?: boolean | null
           route_id?: string
           share_slug?: string
+          show_grade_labels?: boolean
           user_id?: string
           version_id?: string | null
           view_count?: number | null
