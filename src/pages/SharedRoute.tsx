@@ -16,7 +16,30 @@ const SharedRoute = () => {
 
   // Use custom hooks for calculations and analysis
   const { segments: calculatedSegments, macroBoundaries } = useSegmentAnalysis(elevationData, analysisType, analysisParams);
-  const calculations = useRouteCalculations(route, elevationData);
+  
+  // Calculate statistics exactly like RouteDetail.tsx
+  const totalElevationLoss = route?.elevation_loss_m || elevationData.reduce((acc, point, index) => {
+    if (index === 0) return 0;
+    const diff = point.elevation - elevationData[index - 1].elevation;
+    return acc + (diff < 0 ? Math.abs(diff) : 0);
+  }, 0);
+
+  const maxElevation = elevationData.length > 0 ? Math.max(...elevationData.map(p => p.elevation)) : 0;
+  const minElevation = elevationData.length > 0 ? Math.min(...elevationData.map(p => p.elevation)) : 0;
+  
+  const grades = elevationData.map((point, index) => {
+    if (index === 0) return 0;
+    const elevationDiff = point.elevation - elevationData[index - 1].elevation;
+    const distanceDiff = (point.distance - elevationData[index - 1].distance) * 1000;
+    return distanceDiff > 0 ? (elevationDiff / distanceDiff) * 100 : 0;
+  });
+
+  const maxGrade = grades.length > 0 ? Math.max(...grades.map(g => Math.abs(g))) : 0;
+
+  const estimatedTime = route ? (route.distance_km! / 5) * 60 : 0;
+  const hours = Math.floor(estimatedTime / 60);
+  const minutes = Math.round(estimatedTime % 60);
+  const totalTime = `${hours}h ${minutes}m`;
 
   if (isLoading) {
     return (
@@ -106,42 +129,35 @@ const SharedRoute = () => {
                 <svg className="w-3 h-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                 </svg>
-                <span className="font-medium text-blue-600">-{Math.round(calculations.totalElevationLoss)}m</span>
+                <span className="font-medium text-blue-600">-{Math.round(totalElevationLoss)}m</span>
               </div>
               
               <div className="flex items-center gap-1">
                 <svg className="w-3 h-3 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="font-medium text-purple-600">{calculations.estimatedTime}</span>
+                <span className="font-medium text-purple-600">{totalTime}</span>
               </div>
               
               <div className="flex items-center gap-1">
                 <svg className="w-3 h-3 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
                 </svg>
-                <span className="font-medium text-orange-600">{Math.round(calculations.maxElevation)}m</span>
+                <span className="font-medium text-orange-600">{Math.round(maxElevation)}m</span>
               </div>
               
               <div className="flex items-center gap-1">
                 <svg className="w-3 h-3 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                 </svg>
-                <span className="font-medium text-teal-600">{Math.round(calculations.minElevation)}m</span>
+                <span className="font-medium text-teal-600">{Math.round(minElevation)}m</span>
               </div>
               
               <div className="flex items-center gap-1">
                 <svg className="w-3 h-3 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                 </svg>
-                <span className="font-medium text-rose-600">
-                  {(elevationData.reduce((acc, point, index) => {
-                    if (index === 0) return 0;
-                    const elevationDiff = point.elevation - elevationData[index - 1].elevation;
-                    const distanceDiff = (point.distance - elevationData[index - 1].distance) * 1000;
-                    return acc + (distanceDiff > 0 ? (elevationDiff / distanceDiff) * 100 : 0);
-                  }, 0) / (elevationData.length - 1)).toFixed(1)}% prom.
-                </span>
+                <span className="font-medium text-rose-600">{Math.min(maxGrade, 50).toFixed(1)}%</span>
               </div>
             </div>
           </div>
