@@ -351,12 +351,13 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
 
     // Draw grade labels on segments if enabled
     if (showGradeLabels && advancedSegments.length > 0) {
-      advancedSegments.forEach((segment, index) => {
+      // First pass: collect all label data
+      const labelData = advancedSegments.map((segment, index) => {
         // Calculate midpoint of segment
         const midIndex = Math.floor((segment.startIndex + segment.endIndex) / 2);
         const midPoint = processedData[midIndex];
         
-        if (!midPoint) return;
+        if (!midPoint) return null;
         
         // Calculate grade percentage
         const elevationChange = segment.endPoint.displayElevation - segment.startPoint.displayElevation;
@@ -380,12 +381,75 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         }
         
         const xPos = xScale(midPoint.displayDistance);
-        const yPos = yScale(midPoint.displayElevation) - 20;
+        const baseYPos = yScale(midPoint.displayElevation);
         
-        // Add background rectangle
-        const label = `${gradePercent >= 0 ? '+' : ''}${gradePercent.toFixed(1)}%`;
+        return {
+          index,
+          xPos,
+          baseYPos,
+          yPos: baseYPos - 45, // Initial offset
+          label: `#${index + 1} ${gradePercent >= 0 ? '+' : ''}${gradePercent.toFixed(1)}%`,
+          textColor,
+          bgColor,
+          gradePercent
+        };
+      }).filter(Boolean); // Remove null entries
+
+      // Anti-collision system: adjust label positions to prevent overlap
+      const minVerticalGap = 22; // Minimum gap between labels (height + spacing)
+      const maxIterations = 10;
+      
+      for (let iteration = 0; iteration < maxIterations; iteration++) {
+        let hadCollision = false;
+        
+        for (let i = 0; i < labelData.length; i++) {
+          for (let j = i + 1; j < labelData.length; j++) {
+            const label1 = labelData[i];
+            const label2 = labelData[j];
+            
+            // Check if labels are close horizontally (within 100px)
+            const horizontalDistance = Math.abs(label1.xPos - label2.xPos);
+            if (horizontalDistance > 100) continue;
+            
+            // Check vertical overlap
+            const verticalDistance = Math.abs(label1.yPos - label2.yPos);
+            if (verticalDistance < minVerticalGap) {
+              hadCollision = true;
+              
+              // Push them apart vertically
+              const overlap = minVerticalGap - verticalDistance;
+              const adjustment = overlap / 2 + 2;
+              
+              if (label1.yPos < label2.yPos) {
+                label1.yPos -= adjustment;
+                label2.yPos += adjustment;
+              } else {
+                label1.yPos += adjustment;
+                label2.yPos -= adjustment;
+              }
+            }
+          }
+        }
+        
+        if (!hadCollision) break;
+      }
+
+      // Render labels with connector lines
+      labelData.forEach(({ index, xPos, baseYPos, yPos, label, textColor, bgColor }) => {
         const labelWidth = label.length * 7 + 8;
         
+        // Draw connector line from label to regression line
+        chartContent.append("line")
+          .attr("x1", xPos)
+          .attr("y1", yPos + 9)
+          .attr("x2", xPos)
+          .attr("y2", baseYPos)
+          .attr("stroke", textColor)
+          .attr("stroke-width", 1)
+          .attr("stroke-dasharray", "2,2")
+          .attr("opacity", 0.5);
+        
+        // Add background rectangle
         chartContent.append("rect")
           .attr("x", xPos - labelWidth / 2)
           .attr("y", yPos - 8)
