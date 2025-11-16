@@ -6,6 +6,7 @@ export interface ShareRouteParams {
   routeId: string;
   analysisType: 'experimental' | 'advanced' | 'gradient' | 'none';
   analysisParams: any;
+  showGradeLabels?: boolean;
   versionId?: string; // Optional: link to a saved version
 }
 
@@ -27,7 +28,7 @@ export const useShareRoute = () => {
       // Check if a share already exists with same parameters
       const { data: existingShare, error: searchError } = await supabase
         .from('shared_routes')
-        .select('share_slug, analysis_params, analysis_type')
+        .select('share_slug, analysis_params, analysis_type, show_grade_labels')
         .eq('route_id', params.routeId)
         .eq('user_id', user.id)
         .eq('is_active', true);
@@ -37,7 +38,8 @@ export const useShareRoute = () => {
       // Find if there's a share with identical parameters
       const matchingShare = existingShare?.find(share => 
         share.analysis_type === params.analysisType &&
-        JSON.stringify(share.analysis_params) === JSON.stringify(params.analysisParams)
+        JSON.stringify(share.analysis_params) === JSON.stringify(params.analysisParams) &&
+        share.show_grade_labels === (params.showGradeLabels || false)
       );
 
       if (matchingShare) {
@@ -65,6 +67,7 @@ export const useShareRoute = () => {
           user_id: user.id,
           analysis_type: params.analysisType,
           analysis_params: params.analysisParams,
+          show_grade_labels: params.showGradeLabels || false,
           is_active: true,
           version_id: params.versionId || null
         })

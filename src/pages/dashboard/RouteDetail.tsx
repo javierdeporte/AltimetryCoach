@@ -221,7 +221,8 @@ const RouteDetail = () => {
     const shareSlug = await shareRoute({
       routeId,
       analysisType,
-      analysisParams: params
+      analysisParams: params,
+      showGradeLabels
     });
 
     if (shareSlug) {
@@ -301,6 +302,7 @@ const RouteDetail = () => {
       routeId,
       analysisType: version.analysis_type,
       analysisParams: version.analysis_params,
+      showGradeLabels: version.show_grade_labels,
       versionId: version.id
     });
 
