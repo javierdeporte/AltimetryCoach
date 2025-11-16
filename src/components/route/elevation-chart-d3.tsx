@@ -366,20 +366,41 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         const distanceChange = (segment.endPoint.displayDistance - segment.startPoint.displayDistance) * 1000; // Convert to meters
         const gradePercent = distanceChange > 0 ? (elevationChange / distanceChange) * 100 : 0;
         
-        // Determine color based on grade
+        // Calculate colors based on direction and intensity
         const absGrade = Math.abs(gradePercent);
-        let textColor = '#059669'; // green for flat
-        let bgColor = '#d1fae5'; // light green
+        let textColor: string;
+        let distanceColor: string;
         
-        if (absGrade > 8) {
-          textColor = '#dc2626'; // red
-          bgColor = '#fee2e2'; // light red
-        } else if (absGrade > 4) {
-          textColor = '#ea580c'; // orange
-          bgColor = '#fed7aa'; // light orange
-        } else if (absGrade > 2) {
-          textColor = '#ca8a04'; // yellow
-          bgColor = '#fef3c7'; // light yellow
+        if (gradePercent >= 0) {
+          // ASCENSOS: Escala de verdes (más intenso = más empinado)
+          if (absGrade > 12) {
+            textColor = '#065f46'; // emerald-800
+            distanceColor = '#059669'; // emerald-600 (más claro)
+          } else if (absGrade > 8) {
+            textColor = '#059669'; // emerald-600
+            distanceColor = '#10b981'; // emerald-500 (más claro)
+          } else if (absGrade > 4) {
+            textColor = '#10b981'; // emerald-500
+            distanceColor = '#34d399'; // emerald-400 (más claro)
+          } else {
+            textColor = '#34d399'; // emerald-400
+            distanceColor = '#6ee7b7'; // emerald-300 (más claro)
+          }
+        } else {
+          // DESCENSOS: Escala de azules (más intenso = más empinado)
+          if (absGrade > 12) {
+            textColor = '#1e40af'; // blue-800
+            distanceColor = '#2563eb'; // blue-600 (más claro)
+          } else if (absGrade > 8) {
+            textColor = '#2563eb'; // blue-600
+            distanceColor = '#3b82f6'; // blue-500 (más claro)
+          } else if (absGrade > 4) {
+            textColor = '#3b82f6'; // blue-500
+            distanceColor = '#60a5fa'; // blue-400 (más claro)
+          } else {
+            textColor = '#60a5fa'; // blue-400
+            distanceColor = '#93c5fd'; // blue-300 (más claro)
+          }
         }
         
         const xPos = xScale(midPoint.displayDistance);
@@ -396,13 +417,65 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
           label: `#${index + 1} ${gradePercent >= 0 ? '+' : ''}${gradePercent.toFixed(1)}%`,
           distanceLabel: `${segmentDistance.toFixed(2)} km`,
           textColor,
-          bgColor,
+          distanceColor,
           gradePercent
         };
       }).filter(Boolean); // Remove null entries
 
-      // Anti-collision system: adjust label positions to prevent overlap
-      const minVerticalGap = 22; // Minimum gap between labels (height + spacing)
+      // PASO 1: Anti-colisión con la línea de altimetría
+      labelData.forEach(label => {
+        const closestPoint = processedData.reduce((closest, point) => {
+          const distToLabel = Math.abs(xScale(point.displayDistance) - label.xPos);
+          const distToClosest = Math.abs(xScale(closest.displayDistance) - label.xPos);
+          return distToLabel < distToClosest ? point : closest;
+        });
+        
+        const elevationLineY = yScale(closestPoint.displayElevation);
+        const labelHeight = showSegmentDistance ? 25 : 15;
+        const labelBottomY = label.yPos + labelHeight;
+        const labelTopY = label.yPos - 10;
+        
+        const minGapFromLine = 18;
+        
+        if (Math.abs(labelBottomY - elevationLineY) < minGapFromLine || 
+            Math.abs(labelTopY - elevationLineY) < minGapFromLine) {
+          const spaceAbove = elevationLineY - opts.marginTop;
+          const spaceBelow = (opts.height - opts.marginBottom) - elevationLineY;
+          
+          if (spaceAbove > spaceBelow) {
+            label.yPos = elevationLineY - minGapFromLine - labelHeight;
+          } else {
+            label.yPos = elevationLineY + minGapFromLine + 10;
+          }
+        }
+      });
+
+      // PASO 2: Anti-colisión con líneas de regresión
+      if (advancedSegments.length > 0) {
+        labelData.forEach((label, idx) => {
+          const segment = advancedSegments[idx];
+          if (!segment) return;
+          
+          const segmentData = processedData.slice(segment.startIndex, segment.endIndex + 1);
+          const closestInSegment = segmentData.reduce((closest, point) => {
+            const distToLabel = Math.abs(xScale(point.displayDistance) - label.xPos);
+            const distToClosest = Math.abs(xScale(closest.displayDistance) - label.xPos);
+            return distToLabel < distToClosest ? point : closest;
+          });
+          
+          const regressionY = yScale(
+            segment.slope * closestInSegment.displayDistance + segment.intercept
+          );
+          
+          const minGapFromRegression = 15;
+          if (Math.abs(label.yPos - regressionY) < minGapFromRegression) {
+            label.yPos = regressionY - minGapFromRegression - 15;
+          }
+        });
+      }
+
+      // PASO 3: Anti-colisión entre etiquetas
+      const minVerticalGap = showSegmentDistance ? 32 : 24;
       const maxIterations = 10;
       
       for (let iteration = 0; iteration < maxIterations; iteration++) {
@@ -433,6 +506,12 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
                 label1.yPos += adjustment;
                 label2.yPos -= adjustment;
               }
+              
+              // Keep labels within bounds
+              const minY = opts.marginTop + 20;
+              const maxY = opts.height - opts.marginBottom - 20;
+              label1.yPos = Math.max(minY, Math.min(maxY, label1.yPos));
+              label2.yPos = Math.max(minY, Math.min(maxY, label2.yPos));
             }
           }
         }
@@ -441,7 +520,7 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
       }
 
       // Render labels with connector lines
-      labelData.forEach(({ index, xPos, baseYPos, yPos, label, distanceLabel, textColor }) => {
+      labelData.forEach(({ index, xPos, baseYPos, yPos, label, distanceLabel, textColor, distanceColor }) => {
         // Draw connector line from label to regression line
         chartContent.append("line")
           .attr("x1", xPos)
@@ -469,10 +548,9 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
             .attr("x", xPos)
             .attr("y", yPos + 16)
             .attr("text-anchor", "middle")
-            .attr("fill", textColor)
+            .attr("fill", distanceColor)
             .attr("font-size", "9px")
             .attr("font-weight", "500")
-            .attr("opacity", 0.8)
             .text(distanceLabel);
         }
       });
