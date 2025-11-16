@@ -45,6 +45,7 @@ const RouteDetail = () => {
   
   // Show grade percentages on chart
   const [showGradeLabels, setShowGradeLabels] = useState(false);
+  const [showSegmentDistance, setShowSegmentDistance] = useState(false);
   
   // Share state
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -550,13 +551,25 @@ const RouteDetail = () => {
 
               {/* Show Grade Labels Toggle */}
               {(advancedAnalysisMode || experimentalAnalysisMode || gradientAnalysisMode) && (
-                <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-purple-200 dark:border-purple-700 rounded-lg px-2 py-1">
-                  <span className="text-xs font-medium">% Inclinación</span>
-                  <Switch
-                    checked={showGradeLabels}
-                    onCheckedChange={setShowGradeLabels}
-                  />
-                </div>
+                <>
+                  <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-purple-200 dark:border-purple-700 rounded-lg px-2 py-1">
+                    <span className="text-xs font-medium">% Inclinación</span>
+                    <Switch
+                      checked={showGradeLabels}
+                      onCheckedChange={setShowGradeLabels}
+                    />
+                  </div>
+                  
+                  {showGradeLabels && (
+                    <div className="flex items-center gap-2 bg-white dark:bg-mountain-800 border border-blue-200 dark:border-blue-700 rounded-lg px-2 py-1">
+                      <span className="text-xs font-medium">Distancia</span>
+                      <Switch
+                        checked={showSegmentDistance}
+                        onCheckedChange={setShowSegmentDistance}
+                      />
+                    </div>
+                  )}
+                </>
               )}
               
               <Button 
@@ -606,6 +619,7 @@ const RouteDetail = () => {
               advancedSegments={currentSegments}
               macroBoundaries={currentMacroBoundaries}
               showGradeLabels={showGradeLabels}
+              showSegmentDistance={showSegmentDistance}
             />
           </div>
 
