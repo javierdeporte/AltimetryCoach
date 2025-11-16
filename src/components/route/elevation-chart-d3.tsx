@@ -431,21 +431,27 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
         });
         
         const elevationLineY = yScale(closestPoint.displayElevation);
-        const labelHeight = showSegmentDistance ? 25 : 15;
-        const labelBottomY = label.yPos + labelHeight;
-        const labelTopY = label.yPos - 10;
         
-        const minGapFromLine = 18;
+        // Calcular bordes exactos del texto (sin fondo)
+        // Texto de porcentaje: yPos + 4, font-size 11px
+        // Texto de distancia: yPos + 16, font-size 9px (si está activo)
+        const labelTopY = label.yPos - 7; // Top del texto de porcentaje
+        const labelBottomY = showSegmentDistance ? label.yPos + 20 : label.yPos + 9; // Bottom del último texto
         
-        if (Math.abs(labelBottomY - elevationLineY) < minGapFromLine || 
-            Math.abs(labelTopY - elevationLineY) < minGapFromLine) {
+        // Aumentar gap mínimo para evitar colisiones
+        const minGapFromLine = 22;
+        
+        // Verificar si algún borde del texto está cerca de la línea
+        if ((elevationLineY >= labelTopY - minGapFromLine && elevationLineY <= labelBottomY + minGapFromLine)) {
           const spaceAbove = elevationLineY - opts.marginTop;
           const spaceBelow = (opts.height - opts.marginBottom) - elevationLineY;
           
           if (spaceAbove > spaceBelow) {
-            label.yPos = elevationLineY - minGapFromLine - labelHeight;
+            // Mover hacia arriba: elevationLineY debe estar debajo del bottom de la etiqueta
+            label.yPos = elevationLineY - minGapFromLine - (showSegmentDistance ? 27 : 16);
           } else {
-            label.yPos = elevationLineY + minGapFromLine + 10;
+            // Mover hacia abajo: elevationLineY debe estar arriba del top de la etiqueta
+            label.yPos = elevationLineY + minGapFromLine;
           }
         }
       });
@@ -467,9 +473,16 @@ export const ElevationChartD3: React.FC<ElevationChartD3Props> = ({
             segment.slope * closestInSegment.displayDistance + segment.intercept
           );
           
-          const minGapFromRegression = 15;
-          if (Math.abs(label.yPos - regressionY) < minGapFromRegression) {
-            label.yPos = regressionY - minGapFromRegression - 15;
+          // Calcular bordes del texto
+          const labelTopY = label.yPos - 7;
+          const labelBottomY = showSegmentDistance ? label.yPos + 20 : label.yPos + 9;
+          
+          const minGapFromRegression = 18;
+          
+          // Verificar si la línea de regresión atraviesa el texto
+          if (regressionY >= labelTopY - minGapFromRegression && regressionY <= labelBottomY + minGapFromRegression) {
+            // Mover el texto hacia arriba
+            label.yPos = regressionY - minGapFromRegression - (showSegmentDistance ? 27 : 16);
           }
         });
       }
