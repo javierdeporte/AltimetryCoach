@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Slider } from '../../components/ui/slider';
 import { Switch } from '../../components/ui/switch';
-import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft, Zap, Share2, Save, FolderOpen } from 'lucide-react';
+import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft, Zap, Share2, Save, FolderOpen, Pencil } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
@@ -24,6 +24,7 @@ import { useAnalysisVersions, AnalysisVersion } from '../../hooks/useAnalysisVer
 import { SaveVersionDialog } from '../../components/route/save-version-dialog';
 import { VersionsList } from '../../components/route/versions-list';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../components/ui/collapsible';
+import { EditRouteDialog } from '../../components/route/edit-route-dialog';
 
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
@@ -57,6 +58,9 @@ const RouteDetail = () => {
   const [showVersionsPanel, setShowVersionsPanel] = useState(false);
   const [versionsRefreshTrigger, setVersionsRefreshTrigger] = useState(0);
   const { saveVersion, isLoading: isSavingVersion } = useAnalysisVersions();
+  
+  // Edit route state
+  const [showEditDialog, setShowEditDialog] = useState(false);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -197,6 +201,13 @@ const RouteDetail = () => {
     if (enabled) {
       setAdvancedAnalysisMode(false);
       setExperimentalAnalysisMode(false);
+    }
+  };
+
+  const handleRouteUpdated = () => {
+    // Refetch route data after update
+    if (routeId) {
+      window.location.reload();
     }
   };
 
@@ -392,6 +403,15 @@ const RouteDetail = () => {
                     <h1 className="text-3xl font-bold text-mountain-800 dark:text-mountain-200">
                       {route.name}
                     </h1>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowEditDialog(true)}
+                      className="shrink-0"
+                      title="Editar ruta"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
                     {advancedAnalysisMode && (
                       <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
                         Análisis Avanzado V1 Activo
@@ -666,6 +686,14 @@ const RouteDetail = () => {
         onOpenChange={setShowSaveVersionDialog}
         onSave={handleSaveVersion}
         isLoading={isSavingVersion}
+      />
+
+      {/* Edit Route Dialog */}
+      <EditRouteDialog
+        isOpen={showEditDialog}
+        onClose={() => setShowEditDialog(false)}
+        route={route}
+        onRouteUpdated={handleRouteUpdated}
       />
     </div>
   );
