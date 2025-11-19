@@ -34,8 +34,6 @@ const SharedRoute = () => {
     return distanceDiff > 0 ? (elevationDiff / distanceDiff) * 100 : 0;
   });
 
-  const maxGrade = grades.length > 0 ? Math.max(...grades.map(g => Math.abs(g))) : 0;
-
   const estimatedTime = route ? (route.distance_km! / 5) * 60 : 0;
   const hours = Math.floor(estimatedTime / 60);
   const minutes = Math.round(estimatedTime % 60);
@@ -151,13 +149,6 @@ const SharedRoute = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                 </svg>
                 <span className="font-medium text-teal-600">{Math.round(minElevation)}m</span>
-              </div>
-              
-              <div className="flex items-center gap-1">
-                <svg className="w-3 h-3 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-                <span className="font-medium text-rose-600">{Math.min(maxGrade, 50).toFixed(1)}%</span>
               </div>
             </div>
           </div>
