@@ -35,7 +35,7 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
     description: route.description || '',
     route_type: route.route_type || 'training',
     gpx_capture_date: route.gpx_capture_date ? route.gpx_capture_date.split('T')[0] : '',
-    difficulty_level: route.difficulty_level || 'Media',
+    difficulty_level: route.difficulty_level || 'medium',
   });
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
       description: route.description || '',
       route_type: route.route_type || 'training',
       gpx_capture_date: route.gpx_capture_date ? route.gpx_capture_date.split('T')[0] : '',
-      difficulty_level: route.difficulty_level || 'Media',
+      difficulty_level: route.difficulty_level || 'medium',
     });
   }, [route]);
 
@@ -126,9 +126,7 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
                 <SelectContent>
                   <SelectItem value="training">Entrenamiento</SelectItem>
                   <SelectItem value="race_profile">Perfil de Carrera</SelectItem>
-                  <SelectItem value="exploration">Exploración</SelectItem>
-                  <SelectItem value="competition">Competición</SelectItem>
-                  <SelectItem value="other">Otro</SelectItem>
+                  <SelectItem value="route_planning">Planificación de Ruta</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -153,11 +151,9 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Fácil">Fácil</SelectItem>
-                  <SelectItem value="Media">Media</SelectItem>
-                  <SelectItem value="Difícil">Difícil</SelectItem>
-                  <SelectItem value="Muy difícil">Muy difícil</SelectItem>
-                  <SelectItem value="Extrema">Extrema</SelectItem>
+                  <SelectItem value="easy">Fácil</SelectItem>
+                  <SelectItem value="medium">Media</SelectItem>
+                  <SelectItem value="hard">Difícil</SelectItem>
                 </SelectContent>
               </Select>
             </div>
