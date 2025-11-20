@@ -24,8 +24,8 @@ i18n
       escapeValue: false, // react already safes from xss
     },
     detection: {
-      order: ['cookie', 'localStorage', 'navigator', 'htmlTag'],
-      caches: ['cookie'],
+      order: ['localStorage', 'cookie', 'navigator', 'htmlTag'],
+      caches: ['localStorage', 'cookie'],
     },
   });
 

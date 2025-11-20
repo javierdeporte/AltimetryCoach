@@ -211,10 +211,8 @@ const RouteDetail = () => {
   };
 
   const handleRouteUpdated = () => {
-    // Refetch route data after update
-    if (routeId) {
-      window.location.reload();
-    }
+    // Refetch route data after update without reloading the page
+    loadRouteData();
   };
 
   const handleShareRoute = async () => {
