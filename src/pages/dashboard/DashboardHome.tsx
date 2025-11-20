@@ -7,12 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Map, ArrowUp, ArrowDown, Plus, Calendar, MapPin, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate } from '@/utils/routeUtils';
+import { getDisplayDate } from '@/utils/routeUtils';
+import { useRouteTypes } from '@/hooks/useRouteTypes';
+import { useDifficultyLevels } from '@/hooks/useDifficultyLevels';
 
 const DashboardHome = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { routes, isLoading, error } = useRoutes();
+  const { getLabelByKey: getRouteTypeLabel, getColorByKey: getRouteTypeColor } = useRouteTypes();
+  const { getLabelByKey: getDifficultyLabel } = useDifficultyLevels();
 
   // Calculate real stats from routes data
   const stats = React.useMemo(() => {

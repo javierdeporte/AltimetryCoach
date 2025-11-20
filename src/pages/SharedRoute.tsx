@@ -4,12 +4,16 @@ import { ElevationChartD3 } from '@/components/route/elevation-chart-d3';
 import { SegmentsTable } from '@/components/route/segments-table';
 import { Badge } from '@/components/ui/badge';
 import { usePublicRouteData } from '@/hooks/usePublicRouteData';
-import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate } from '@/utils/routeUtils';
+import { getDisplayDate } from '@/utils/routeUtils';
 import { useSegmentAnalysis } from '@/hooks/useSegmentAnalysis';
 import { useRouteCalculations } from '@/hooks/useRouteCalculations';
+import { useRouteTypes } from '@/hooks/useRouteTypes';
+import { useDifficultyLevels } from '@/hooks/useDifficultyLevels';
 
 const SharedRoute = () => {
   const { shareSlug } = useParams<{ shareSlug: string }>();
+  const { getLabelByKey: getRouteTypeLabel, getColorByKey: getRouteTypeColor } = useRouteTypes();
+  const { getLabelByKey: getDifficultyLabel } = useDifficultyLevels();
   
   const { route, elevationData, analysisType, analysisParams, showGradeLabels, isLoading, error } = 
     usePublicRouteData(shareSlug || '');

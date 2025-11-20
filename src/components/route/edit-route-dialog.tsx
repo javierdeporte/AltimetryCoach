@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { useRouteTypes } from '@/hooks/useRouteTypes';
+import { useDifficultyLevels } from '@/hooks/useDifficultyLevels';
 
 interface EditRouteDialogProps {
   isOpen: boolean;
@@ -29,6 +32,9 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
   route,
   onRouteUpdated,
 }) => {
+  const { t } = useTranslation();
+  const { routeTypes, isLoading: isLoadingTypes, getLabel: getRouteTypeLabel } = useRouteTypes();
+  const { difficultyLevels, isLoading: isLoadingLevels, getLabel: getDifficultyLabel } = useDifficultyLevels();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: route.name,
@@ -67,12 +73,14 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
 
       if (error) throw error;
 
-      toast.success('Ruta actualizada correctamente');
+      toast.success(t('edit_route_dialog.success_title'), {
+        description: t('edit_route_dialog.success_description'),
+      });
       onRouteUpdated();
       onClose();
     } catch (error) {
       console.error('Error updating route:', error);
-      toast.error('Error al actualizar la ruta');
+      toast.error(t('edit_route_dialog.error_title'));
     } finally {
       setIsLoading(false);
     }
@@ -82,57 +90,57 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Editar Ruta</DialogTitle>
-          <DialogDescription>
-            Actualiza la información de tu ruta
-          </DialogDescription>
+          <DialogTitle>{t('edit_route_dialog.title')}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nombre de la ruta *</Label>
+              <Label htmlFor="name">{t('edit_route_dialog.name_label')}</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ej: Subida al Aconcagua"
+                placeholder={t('edit_route_dialog.name_placeholder')}
                 required
                 maxLength={200}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Descripción</Label>
+              <Label htmlFor="description">{t('edit_route_dialog.description_label')}</Label>
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe tu ruta..."
+                placeholder={t('edit_route_dialog.description_placeholder')}
                 rows={3}
                 maxLength={1000}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="route_type">Tipo de ruta</Label>
+              <Label htmlFor="route_type">{t('edit_route_dialog.route_type_label')}</Label>
               <Select
                 value={formData.route_type}
                 onValueChange={(value) => setFormData({ ...formData, route_type: value })}
+                disabled={isLoadingTypes}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="training">Entrenamiento</SelectItem>
-                  <SelectItem value="race_profile">Perfil de Carrera</SelectItem>
-                  <SelectItem value="route_planning">Planificación de Ruta</SelectItem>
+                  {routeTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.key}>
+                      {getRouteTypeLabel(type)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="gpx_capture_date">Fecha de captura</Label>
+              <Label htmlFor="gpx_capture_date">{t('edit_route_dialog.date_label')}</Label>
               <Input
                 id="gpx_capture_date"
                 type="date"
@@ -142,18 +150,21 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="difficulty_level">Dificultad</Label>
+              <Label htmlFor="difficulty_level">{t('edit_route_dialog.difficulty_label')}</Label>
               <Select
                 value={formData.difficulty_level}
                 onValueChange={(value) => setFormData({ ...formData, difficulty_level: value })}
+                disabled={isLoadingLevels}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="easy">Fácil</SelectItem>
-                  <SelectItem value="medium">Media</SelectItem>
-                  <SelectItem value="hard">Difícil</SelectItem>
+                  {difficultyLevels.map((level) => (
+                    <SelectItem key={level.id} value={level.key}>
+                      {getDifficultyLabel(level)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -166,11 +177,14 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
               onClick={onClose}
               disabled={isLoading}
             >
-              Cancelar
+              {t('edit_route_dialog.cancel_button')}
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Guardar cambios
+            <Button
+              type="submit"
+              disabled={isLoading || isLoadingTypes || isLoadingLevels}
+            >
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isLoading ? t('edit_route_dialog.saving_button') : t('edit_route_dialog.save_button')}
             </Button>
           </DialogFooter>
         </form>

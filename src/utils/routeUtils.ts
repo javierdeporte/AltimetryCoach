@@ -1,34 +1,7 @@
 
 // Utility functions for route handling
-export const getRouteTypeLabel = (routeType?: string) => {
-  switch (routeType) {
-    case 'training':
-      return 'Entrenamiento';
-    case 'race_profile':
-      return 'Altimetría de Carrera';
-    case 'route_planning':
-      return 'Planificación';
-    case 'custom':
-      return 'Personalizada';
-    default:
-      return 'Entrenamiento';
-  }
-};
-
-export const getRouteTypeColor = (routeType?: string) => {
-  switch (routeType) {
-    case 'training':
-      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-    case 'race_profile':
-      return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
-    case 'route_planning':
-      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-    case 'custom':
-      return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
-    default:
-      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-  }
-};
+// Note: Route type labels and colors are now loaded from database
+// Use useRouteTypes() hook instead of these functions
 
 export const getDateSourceIcon = (dateSource?: string) => {
   switch (dateSource) {

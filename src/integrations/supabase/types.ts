@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      difficulty_levels: {
+        Row: {
+          created_at: string | null
+          display_order: number
+          id: string
+          key: string
+          label_en: string
+          label_es: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_order: number
+          id?: string
+          key: string
+          label_en: string
+          label_es: string
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          key?: string
+          label_en?: string
+          label_es?: string
+        }
+        Relationships: []
+      }
       plans: {
         Row: {
           athlete_weight_kg: number | null
@@ -137,6 +164,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      route_types: {
+        Row: {
+          color_classes: string
+          created_at: string | null
+          display_order: number
+          id: string
+          key: string
+          label_en: string
+          label_es: string
+        }
+        Insert: {
+          color_classes: string
+          created_at?: string | null
+          display_order: number
+          id?: string
+          key: string
+          label_en: string
+          label_es: string
+        }
+        Update: {
+          color_classes?: string
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          key?: string
+          label_en?: string
+          label_es?: string
+        }
+        Relationships: []
       }
       routes: {
         Row: {
