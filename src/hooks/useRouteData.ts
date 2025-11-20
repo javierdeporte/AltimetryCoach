@@ -123,7 +123,7 @@ export const useRouteData = (routeId: string) => {
     loadRouteData();
   }, [loadRouteData]);
 
-  return { route, segments, elevationData, isLoading, error };
+  return { route, segments, elevationData, isLoading, error, loadRouteData };
 };
 
 function parseGPXForElevation(gpxData: string, segments: Segment[]): ElevationPoint[] {
