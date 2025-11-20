@@ -106,5 +106,33 @@
     "history_title": "Billing History",
     "history_empty_title": "No billing history",
     "history_empty_desc": "You're currently on the free plan. Upgrade to Pro to see billing history."
+  },
+  "route_detail": {
+    "back_to_routes": "Back to My Routes",
+    "edit_route": "Edit Route",
+    "distance": "Distance",
+    "elevation_gain": "Elevation Gain",
+    "elevation_loss": "Elevation Loss",
+    "show_map": "Show Map",
+    "hide_map": "Hide Map",
+    "loading": "Loading route...",
+    "error": "Error loading route",
+    "not_found": "Route not found"
+  },
+  "edit_route_dialog": {
+    "title": "Edit Route",
+    "name_label": "Route name",
+    "name_placeholder": "E.g: Mountain Route",
+    "description_label": "Description",
+    "description_placeholder": "Describe your route...",
+    "route_type_label": "Route type",
+    "date_label": "Date",
+    "difficulty_label": "Difficulty",
+    "cancel_button": "Cancel",
+    "save_button": "Save changes",
+    "saving_button": "Saving...",
+    "success_title": "Route updated",
+    "success_description": "Changes saved successfully",
+    "error_title": "Error updating route"
   }
 }

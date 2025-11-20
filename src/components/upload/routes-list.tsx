@@ -5,11 +5,15 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { ArrowUp, ArrowDown, Calendar, MapPin, Eye, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate } from '@/utils/routeUtils';
+import { getDisplayDate } from '@/utils/routeUtils';
+import { useRouteTypes } from '@/hooks/useRouteTypes';
+import { useDifficultyLevels } from '@/hooks/useDifficultyLevels';
 
 export const RoutesList: React.FC = () => {
   const { routes, isLoading, error } = useRoutes();
   const navigate = useNavigate();
+  const { getLabelByKey: getRouteTypeLabel, getColorByKey: getRouteTypeColor } = useRouteTypes();
+  const { getLabelByKey: getDifficultyLabel } = useDifficultyLevels();
   const [selectedRouteType, setSelectedRouteType] = useState<string>('all');
 
   const handleViewRoute = (routeId: string) => {

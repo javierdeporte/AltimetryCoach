@@ -106,5 +106,33 @@
     "history_title": "Historial de Facturación",
     "history_empty_title": "Sin historial de facturación",
     "history_empty_desc": "Actualmente estás en el plan gratuito. Actualiza a Pro para ver el historial de facturación."
+  },
+  "route_detail": {
+    "back_to_routes": "Volver a Mis Rutas",
+    "edit_route": "Editar Ruta",
+    "distance": "Distancia",
+    "elevation_gain": "Desnivel Positivo",
+    "elevation_loss": "Desnivel Negativo",
+    "show_map": "Mostrar Mapa",
+    "hide_map": "Ocultar Mapa",
+    "loading": "Cargando ruta...",
+    "error": "Error al cargar la ruta",
+    "not_found": "No se encontró la ruta"
+  },
+  "edit_route_dialog": {
+    "title": "Editar Ruta",
+    "name_label": "Nombre de la ruta",
+    "name_placeholder": "Ej: Ruta de Montaña",
+    "description_label": "Descripción",
+    "description_placeholder": "Describe tu ruta...",
+    "route_type_label": "Tipo de ruta",
+    "date_label": "Fecha",
+    "difficulty_label": "Dificultad",
+    "cancel_button": "Cancelar",
+    "save_button": "Guardar cambios",
+    "saving_button": "Guardando...",
+    "success_title": "Ruta actualizada",
+    "success_description": "Los cambios se guardaron correctamente",
+    "error_title": "Error al actualizar ruta"
   }
 }

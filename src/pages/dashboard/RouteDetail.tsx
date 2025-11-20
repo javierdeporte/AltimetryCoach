@@ -11,7 +11,10 @@ import { Switch } from '../../components/ui/switch';
 import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft, Zap, Share2, Save, FolderOpen, Pencil } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
-import { getRouteTypeLabel, getRouteTypeColor, getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
+import { getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
+import { useRouteTypes } from '../../hooks/useRouteTypes';
+import { useDifficultyLevels } from '../../hooks/useDifficultyLevels';
+import { useTranslation } from 'react-i18next';
 import { segmentProfileAdvanced, DEFAULT_ADVANCED_SEGMENTATION_PARAMS } from '../../utils/advancedSegmentation';
 import { segmentProfileV2, DEFAULT_V2_PARAMS, AdvancedSegmentationV2Params } from '../../utils/advancedSegmentationV2';
 import { AdvancedControlsPanel } from '../../components/route/advanced-controls-panel';
@@ -29,6 +32,9 @@ import { EditRouteDialog } from '../../components/route/edit-route-dialog';
 const RouteDetail = () => {
   const { routeId } = useParams<{ routeId: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { getLabelByKey: getRouteTypeLabel, getColorByKey: getRouteTypeColor } = useRouteTypes();
+  const { getLabelByKey: getDifficultyLabel } = useDifficultyLevels();
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   const [showMap, setShowMap] = useState(false);
   
@@ -330,7 +336,7 @@ const RouteDetail = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-mountain-600 dark:text-mountain-400">Cargando datos de la ruta...</p>
+          <p className="text-mountain-600 dark:text-mountain-400">{t('route_detail.loading')}</p>
         </div>
       </div>
     );
@@ -341,12 +347,12 @@ const RouteDetail = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <p className="text-red-600 dark:text-red-400 mb-4">
-            {error || 'Ruta no encontrada'}
+            {error || t('route_detail.not_found')}
           </p>
           <div className="flex gap-2 justify-center">
             <Button onClick={handleBackToRoutes} variant="outline">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Volver a Rutas
+              {t('route_detail.back_to_routes')}
             </Button>
             <Button onClick={() => window.location.reload()}>
               Reintentar
@@ -408,7 +414,7 @@ const RouteDetail = () => {
                       size="sm"
                       onClick={() => setShowEditDialog(true)}
                       className="shrink-0"
-                      title="Editar ruta"
+                      title={t('route_detail.edit_route')}
                     >
                       <Pencil className="w-4 h-4" />
                     </Button>
