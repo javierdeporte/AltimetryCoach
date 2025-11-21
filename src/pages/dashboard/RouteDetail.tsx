@@ -403,10 +403,36 @@ const RouteDetail = () => {
       {isSaving && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm animate-fade-in">
           <div className="bg-white dark:bg-mountain-800 rounded-lg shadow-xl p-6 flex flex-col items-center gap-4 animate-scale-in">
-            <div className="relative">
-              <PersonStanding className="w-12 h-12 text-primary animate-bounce" />
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary/30 rounded-full animate-pulse" />
-            </div>
+            <svg 
+              width="80" 
+              height="60" 
+              viewBox="0 0 80 60" 
+              fill="none" 
+              xmlns="http://www.w3.org/2000/svg"
+              className="text-primary"
+            >
+              {/* Línea base de referencia */}
+              <line 
+                x1="5" 
+                y1="50" 
+                x2="75" 
+                y2="50" 
+                stroke="currentColor" 
+                strokeWidth="0.5" 
+                strokeDasharray="2 2" 
+                opacity="0.3"
+              />
+              {/* Perfil de elevación animado */}
+              <path
+                d="M 5 50 L 15 45 L 25 35 L 35 25 L 45 20 L 55 30 L 65 40 L 75 45"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+                className="animate-draw-elevation"
+              />
+            </svg>
             <p className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
               {t('route_detail.saving') || 'Guardando...'}
             </p>
