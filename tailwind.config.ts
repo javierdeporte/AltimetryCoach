@@ -161,7 +161,7 @@ export default {
 				'fade-in': 'fade-in 0.6s ease-out',
 				'slide-up': 'slide-up 0.8s ease-out',
 				'scale-in': 'scale-in 0.4s ease-out',
-				'draw-elevation': 'draw-elevation 2s ease-in-out infinite',
+				'draw-elevation': 'draw-elevation 1s linear infinite',
 			},
 			backgroundImage: {
 				'hero-gradient': 'linear-gradient(135deg, #22c55e 0%, #fbbf24 50%, #16a34a 100%)',
