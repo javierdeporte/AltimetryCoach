@@ -24,6 +24,7 @@ interface EditRouteDialogProps {
     difficulty_level?: string | null;
   };
   onRouteUpdated: () => void;
+  onSaveStart?: () => void;
 }
 
 export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
@@ -31,6 +32,7 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
   onClose,
   route,
   onRouteUpdated,
+  onSaveStart,
 }) => {
   const { t } = useTranslation();
   const { routeTypes, isLoading: isLoadingTypes, getLabel: getRouteTypeLabel } = useRouteTypes();
@@ -56,6 +58,10 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Notify parent component that saving is starting
+    onSaveStart?.();
+    
     setIsLoading(true);
 
     try {
