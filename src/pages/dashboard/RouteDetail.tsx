@@ -88,7 +88,7 @@ const RouteDetail = () => {
     );
   }
   
-  const { route, segments, elevationData, isLoading, error } = useRouteData(routeId);
+  const { route, segments, elevationData, isLoading, error, loadRouteData } = useRouteData(routeId);
 
   // Transform elevation data to the format expected by D3 chart and advanced segmentation
   const processedElevationData = React.useMemo(() => {
