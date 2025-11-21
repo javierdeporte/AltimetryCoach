@@ -344,10 +344,41 @@ const RouteDetail = () => {
 
   if (isLoading && !isSaving) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-mountain-600 dark:text-mountain-400">{t('route_detail.loading')}</p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm animate-fade-in">
+        <div className="bg-white dark:bg-mountain-800 rounded-lg shadow-xl p-6 flex flex-col items-center gap-4 animate-scale-in">
+          <svg 
+            width="80" 
+            height="60" 
+            viewBox="0 0 80 60" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
+            className="text-primary"
+          >
+            {/* Línea base de referencia */}
+            <line 
+              x1="5" 
+              y1="50" 
+              x2="75" 
+              y2="50" 
+              stroke="currentColor" 
+              strokeWidth="0.5" 
+              strokeDasharray="2 2" 
+              opacity="0.3"
+            />
+            {/* Perfil de elevación animado */}
+            <path
+              d="M 5 50 L 15 45 L 25 35 L 35 25 L 45 20 L 55 30 L 65 40 L 75 45"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+              className="animate-draw-elevation"
+            />
+          </svg>
+          <p className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
+            {t('route_detail.loading')}
+          </p>
         </div>
       </div>
     );
