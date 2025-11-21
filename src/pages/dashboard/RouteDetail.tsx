@@ -735,7 +735,7 @@ const RouteDetail = () => {
               onPointHover={setHoveredSegment}
               hoveredSegment={hoveredSegment}
               options={{
-                height: 230, // Reducido de 400 a 320 (20% menos)
+                height: 320, // Reducido de 400 a 320 (20% menos)
                 backgroundColor: "transparent",
               }}
               advancedSegments={currentSegments}
