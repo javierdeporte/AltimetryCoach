@@ -30,7 +30,10 @@ export const getDateSourceLabel = (dateSource?: string) => {
 export const getDisplayDate = (route: any) => {
   if (route.gpx_capture_date) {
     const icon = getDateSourceIcon(route.date_source);
-    const date = new Date(route.gpx_capture_date).toLocaleDateString('es-ES');
+    // Extract date without timezone conversion
+    const dateStr = route.gpx_capture_date.split('T')[0];
+    const [year, month, day] = dateStr.split('-');
+    const date = `${day}/${month}/${year}`;
     return `${icon} ${date}`;
   }
   return `📄 ${new Date(route.created_at).toLocaleDateString('es-ES')}`;

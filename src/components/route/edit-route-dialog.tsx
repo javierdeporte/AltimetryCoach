@@ -71,7 +71,7 @@ export const EditRouteDialog: React.FC<EditRouteDialogProps> = ({
           name: formData.name.trim(),
           description: formData.description.trim() || null,
           route_type: formData.route_type,
-          gpx_capture_date: formData.gpx_capture_date ? new Date(formData.gpx_capture_date).toISOString() : null,
+          gpx_capture_date: formData.gpx_capture_date ? `${formData.gpx_capture_date}T00:00:00.000Z` : null,
           difficulty_level: formData.difficulty_level,
           updated_at: new Date().toISOString(),
         })
