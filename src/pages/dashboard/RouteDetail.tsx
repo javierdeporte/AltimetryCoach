@@ -213,10 +213,12 @@ const RouteDetail = () => {
     }
   };
 
-  const handleRouteUpdated = async () => {
-    // Show saving indicator
+  const handleSaveStart = () => {
+    // Show saving indicator immediately when user clicks save
     setIsSaving(true);
-    
+  };
+
+  const handleRouteUpdated = async () => {
     // Refetch route data after update without reloading the page
     await loadRouteData();
     
@@ -724,6 +726,7 @@ const RouteDetail = () => {
         onClose={() => setShowEditDialog(false)}
         route={route}
         onRouteUpdated={handleRouteUpdated}
+        onSaveStart={handleSaveStart}
       />
     </div>
   );
