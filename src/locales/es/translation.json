@@ -116,6 +116,7 @@
     "show_map": "Mostrar Mapa",
     "hide_map": "Ocultar Mapa",
     "loading": "Cargando ruta...",
+    "saving": "Guardando...",
     "error": "Error al cargar la ruta",
     "not_found": "No se encontró la ruta"
   },

@@ -116,6 +116,7 @@
     "show_map": "Show Map",
     "hide_map": "Hide Map",
     "loading": "Loading route...",
+    "saving": "Saving...",
     "error": "Error loading route",
     "not_found": "Route not found"
   },

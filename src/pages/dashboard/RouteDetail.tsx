@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Slider } from '../../components/ui/slider';
 import { Switch } from '../../components/ui/switch';
-import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft, Zap, Share2, Save, FolderOpen, Pencil } from 'lucide-react';
+import { ArrowUp, ArrowDown, Map, Settings, ArrowLeft, Brain, Eye, EyeOff, Sliders, RotateCcw, ChevronRight, ChevronLeft, Zap, Share2, Save, FolderOpen, Pencil, PersonStanding } from 'lucide-react';
 import { useRouteData } from '../../hooks/useRouteData';
 import { useNavigate } from 'react-router-dom';
 import { getDisplayDate, getDateSourceLabel } from '../../utils/routeUtils';
@@ -67,6 +67,9 @@ const RouteDetail = () => {
   
   // Edit route state
   const [showEditDialog, setShowEditDialog] = useState(false);
+  
+  // Saving state for smooth transition
+  const [isSaving, setIsSaving] = useState(false);
   
   console.log('RouteDetail mounted with routeId:', routeId);
   
@@ -210,9 +213,17 @@ const RouteDetail = () => {
     }
   };
 
-  const handleRouteUpdated = () => {
+  const handleRouteUpdated = async () => {
+    // Show saving indicator
+    setIsSaving(true);
+    
     // Refetch route data after update without reloading the page
-    loadRouteData();
+    await loadRouteData();
+    
+    // Keep indicator visible for smooth transition
+    setTimeout(() => {
+      setIsSaving(false);
+    }, 800);
   };
 
   const handleShareRoute = async () => {
@@ -386,6 +397,21 @@ const RouteDetail = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-mountain-900">
+      {/* Saving Indicator Overlay */}
+      {isSaving && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-mountain-800 rounded-lg shadow-xl p-6 flex flex-col items-center gap-4 animate-scale-in">
+            <div className="relative">
+              <PersonStanding className="w-12 h-12 text-primary animate-bounce" />
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary/30 rounded-full animate-pulse" />
+            </div>
+            <p className="text-lg font-semibold text-mountain-800 dark:text-mountain-200">
+              {t('route_detail.saving') || 'Guardando...'}
+            </p>
+          </div>
+        </div>
+      )}
+      
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-3 max-w-full">
