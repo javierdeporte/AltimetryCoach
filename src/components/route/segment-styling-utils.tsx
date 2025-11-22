@@ -1,16 +1,13 @@
 
-export const getGradeColor = (grade: number): string => {
-  const absGrade = Math.abs(grade);
-  const isIntense = absGrade > 8; // Más del 8% se considera intenso
-  
+export const getGradeColor = (grade: number, isMaxInDirection: boolean = false): string => {
   if (grade > 0) {
     // Ascenso - verde
-    return isIntense 
+    return isMaxInDirection 
       ? 'text-green-600 dark:text-green-400 font-bold' 
       : 'text-green-600 dark:text-green-400';
   } else if (grade < 0) {
     // Descenso - azul
-    return isIntense 
+    return isMaxInDirection 
       ? 'text-blue-600 dark:text-blue-400 font-bold' 
       : 'text-blue-600 dark:text-blue-400';
   }
