@@ -614,26 +614,12 @@ const RouteDetail = () => {
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <svg className="w-3 h-3 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 10l7-7m0 0l7 7m-7-7v18"
-                        />
-                      </svg>
+                      <span className="text-xs text-orange-600">máx</span>
                       <span className="font-medium text-orange-600">{Math.round(maxElevation)}m</span>
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <svg className="w-3 h-3 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                        />
-                      </svg>
+                      <span className="text-xs text-teal-600">mín</span>
                       <span className="font-medium text-teal-600">{Math.round(minElevation)}m</span>
                     </div>
                   </div>
