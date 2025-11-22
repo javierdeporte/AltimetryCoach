@@ -21,13 +21,17 @@ interface SegmentsTableRowProps {
   isAdvancedMode: boolean;
   hoveredSegment?: number | null;
   onSegmentHover?: (segmentIndex: number | null) => void;
+  isMaxAscent?: boolean;
+  isMaxDescent?: boolean;
 }
 
 export const SegmentsTableRow: React.FC<SegmentsTableRowProps> = ({
   segment,
   isAdvancedMode,
   hoveredSegment,
-  onSegmentHover
+  onSegmentHover,
+  isMaxAscent = false,
+  isMaxDescent = false
 }) => {
   // Determinar si es ascenso o descenso basado en la ganancia de elevación
   const isAscent = segment.elevation_gain_m > segment.elevation_loss_m;
@@ -63,7 +67,7 @@ export const SegmentsTableRow: React.FC<SegmentsTableRowProps> = ({
       <TableCell className="text-blue-600 dark:text-blue-400">
         -{Math.round(segment.elevation_loss_m)}m
       </TableCell>
-      <TableCell className={getGradeColor(segment.avg_grade_percent)}>
+      <TableCell className={getGradeColor(segment.avg_grade_percent, isMaxAscent || isMaxDescent)}>
         {segment.avg_grade_percent > 0 ? '+' : ''}{segment.avg_grade_percent.toFixed(1)}%
       </TableCell>
       {isAdvancedMode && (

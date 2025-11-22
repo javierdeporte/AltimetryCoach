@@ -35,6 +35,10 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
 
   const displaySegments = useProcessedSegments(isAdvancedMode, advancedSegments, segments);
 
+  // Calcular máximo ascenso y máximo descenso
+  const maxAscentGrade = Math.max(...displaySegments.filter(s => s.avg_grade_percent > 0).map(s => s.avg_grade_percent), 0);
+  const maxDescentGrade = Math.min(...displaySegments.filter(s => s.avg_grade_percent < 0).map(s => s.avg_grade_percent), 0);
+
   return (
     <div className="bg-white dark:bg-mountain-800 rounded-xl border border-primary-200 dark:border-mountain-700 overflow-hidden">
       <SegmentsTableHeaderInfo
@@ -57,6 +61,8 @@ export const SegmentsTable: React.FC<SegmentsTableProps> = ({
                   isAdvancedMode={isAdvancedMode}
                   hoveredSegment={hoveredSegment}
                   onSegmentHover={onSegmentHover}
+                  isMaxAscent={segment.avg_grade_percent === maxAscentGrade && maxAscentGrade > 0}
+                  isMaxDescent={segment.avg_grade_percent === maxDescentGrade && maxDescentGrade < 0}
                 />
               ))}
             </TableBody>
