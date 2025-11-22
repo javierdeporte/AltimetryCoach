@@ -1,10 +1,21 @@
 
 export const getGradeColor = (grade: number): string => {
   const absGrade = Math.abs(grade);
-  if (absGrade > 8) return 'text-red-600 dark:text-red-400';
-  if (absGrade > 4) return 'text-earth-600 dark:text-earth-400';
-  if (absGrade > 0) return 'text-primary-600 dark:text-primary-400';
-  return 'text-blue-600 dark:text-blue-400';
+  const isIntense = absGrade > 8; // Más del 8% se considera intenso
+  
+  if (grade > 0) {
+    // Ascenso - verde
+    return isIntense 
+      ? 'text-green-600 dark:text-green-400 font-bold' 
+      : 'text-green-600 dark:text-green-400';
+  } else if (grade < 0) {
+    // Descenso - azul
+    return isIntense 
+      ? 'text-blue-600 dark:text-blue-400 font-bold' 
+      : 'text-blue-600 dark:text-blue-400';
+  }
+  // Plano
+  return 'text-muted-foreground';
 };
 
 export const getQualityIndicator = (rSquared: number | null) => {
