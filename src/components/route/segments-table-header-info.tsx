@@ -31,6 +31,19 @@ export const SegmentsTableHeaderInfo: React.FC<SegmentsTableHeaderInfoProps> = (
               : 'Los segmentos se generarán automáticamente al procesar el archivo GPX'
             }
           </p>
+          {displaySegmentsLength > 0 && (
+            <div className="text-xs text-mountain-500 dark:text-mountain-500 mt-2 flex items-center gap-3 flex-wrap">
+              <span className="flex items-center gap-1">
+                <span className="text-green-600 dark:text-green-400">●</span> Ascensos
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="text-blue-600 dark:text-blue-400">●</span> Descensos
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="font-bold">Negrita</span> = Máxima intensidad
+              </span>
+            </div>
+          )}
         </div>
         {isAdvancedMode && advancedSegments.length > 0 && (
           <div className="text-right text-sm text-mountain-600 dark:text-mountain-400">
