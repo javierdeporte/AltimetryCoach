@@ -30,7 +30,7 @@ export const SegmentsTableHeaderInfo: React.FC<SegmentsTableHeaderInfoProps> = (
               ? `${displaySegmentsLength} segmentos ${isAdvancedMode ? 'generados por regresión lineal' : 'básicos'}` 
               : 'Los segmentos se generarán automáticamente al procesar el archivo GPX'
             }
-          </p>
+          
           {displaySegmentsLength > 0 && (
             <div className="text-xs text-mountain-500 dark:text-mountain-500 mt-2 flex items-center gap-3 flex-wrap">
               <span className="flex items-center gap-1">
@@ -43,6 +43,7 @@ export const SegmentsTableHeaderInfo: React.FC<SegmentsTableHeaderInfoProps> = (
                 <span className="font-bold">Negrita</span> = Máxima intensidad
               </span>
             </div>
+           </p>
           )}
         </div>
         {isAdvancedMode && advancedSegments.length > 0 && (
