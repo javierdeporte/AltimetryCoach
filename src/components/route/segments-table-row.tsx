@@ -61,10 +61,10 @@ export const SegmentsTableRow: React.FC<SegmentsTableRowProps> = ({
       <TableCell className="text-mountain-600 dark:text-mountain-400">
         {segment.distance_km.toFixed(1)} km
       </TableCell>
-      <TableCell className="text-primary-600 dark:text-primary-400">
+      <TableCell className={segment.elevation_gain_m > 0 ? "text-green-600 dark:text-green-400" : "text-mountain-600 dark:text-mountain-400"}>
         +{Math.round(segment.elevation_gain_m)}m
       </TableCell>
-      <TableCell className="text-blue-600 dark:text-blue-400">
+      <TableCell className={segment.elevation_loss_m > 0 ? "text-blue-600 dark:text-blue-400" : "text-mountain-600 dark:text-mountain-400"}>
         -{Math.round(segment.elevation_loss_m)}m
       </TableCell>
       <TableCell className={getGradeColor(segment.avg_grade_percent, isMaxAscent || isMaxDescent)}>
