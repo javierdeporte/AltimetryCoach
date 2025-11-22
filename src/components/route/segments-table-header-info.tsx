@@ -1,6 +1,5 @@
-
-import React from 'react';
-import { AdvancedSegment } from '@/utils/types';
+import React from "react";
+import { AdvancedSegment } from "@/utils/types";
 
 interface SegmentsTableHeaderInfoProps {
   isAdvancedMode: boolean;
@@ -11,7 +10,7 @@ interface SegmentsTableHeaderInfoProps {
 export const SegmentsTableHeaderInfo: React.FC<SegmentsTableHeaderInfoProps> = ({
   isAdvancedMode,
   displaySegmentsLength,
-  advancedSegments
+  advancedSegments,
 }) => {
   return (
     <div className="p-6 border-b border-primary-200 dark:border-mountain-700">
@@ -26,11 +25,10 @@ export const SegmentsTableHeaderInfo: React.FC<SegmentsTableHeaderInfoProps> = (
             )}
           </h3>
           <p className="text-sm text-mountain-600 dark:text-mountain-400 mt-1">
-            {displaySegmentsLength > 0 
-              ? `${displaySegmentsLength} segmentos ${isAdvancedMode ? 'generados por regresión lineal' : 'básicos'}` 
-              : 'Los segmentos se generarán automáticamente al procesar el archivo GPX'
-            }
-          
+            {displaySegmentsLength > 0
+              ? `${displaySegmentsLength} segmentos ${isAdvancedMode ? "generados por regresión lineal" : "básicos"}`
+              : "Los segmentos se generarán automáticamente al procesar el archivo GPX"}
+          </p>
           {displaySegmentsLength > 0 && (
             <div className="text-xs text-mountain-500 dark:text-mountain-500 mt-2 flex items-center gap-3 flex-wrap">
               <span className="flex items-center gap-1">
@@ -43,13 +41,18 @@ export const SegmentsTableHeaderInfo: React.FC<SegmentsTableHeaderInfoProps> = (
                 <span className="font-bold">Negrita</span> = Máxima intensidad
               </span>
             </div>
-           </p>
           )}
         </div>
         {isAdvancedMode && advancedSegments.length > 0 && (
           <div className="text-right text-sm text-mountain-600 dark:text-mountain-400">
-            <div>R² Promedio: {(advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length).toFixed(3)}</div>
-            <div>Calidad: {Math.round((advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length) * 100)}%</div>
+            <div>
+              R² Promedio:{" "}
+              {(advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length).toFixed(3)}
+            </div>
+            <div>
+              Calidad:{" "}
+              {Math.round((advancedSegments.reduce((acc, s) => acc + s.rSquared, 0) / advancedSegments.length) * 100)}%
+            </div>
           </div>
         )}
       </div>
